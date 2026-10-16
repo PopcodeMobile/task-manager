@@ -10,17 +10,27 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test": "node --test tests/*.test.js tests/*.test.mjs",
+    "test:e2e": "playwright test",
+    "check:tokens": "node scripts/check-tokens.mjs",
+    "check": "npm run lint && npm run format:check && npm test && npm run check:tokens && npm run build"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.64.1",
     "eslint": "^9.39.5",
     "globals": "^15.15.0",
     "lucide": "^0.460.0",
     "prettier": "^3.9.9",
     "vite": "^6.4.4"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "dompurify": "^3.4.17"
   }
 }

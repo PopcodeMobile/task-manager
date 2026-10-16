@@ -1,3 +1,4 @@
+import { t as tr } from '../core/i18n.js';
 /* =====================================================================
    ACTIONS · ARCHIVE: restore and purge
    ===================================================================== */
@@ -15,17 +16,17 @@ A.restoreTask = el => {
       logAct('restored', t);
     })
   )
-    toast(`Restored “${t.title}”`, { action: 'Open', onAction: () => A.openTask({ dataset: { id: t.id } }) });
+    toast(tr('Restored “{value1}”', { value1: t.title }), { action: tr('Open'), onAction: () => A.openTask({ dataset: { id: t.id } }) });
 };
 A.purgeTask = el => {
   const t = task(el.dataset.id);
   confirmDlg({
-    title: 'Delete task permanently?',
-    body: `<b>${esc(t.title)}</b>, its subtasks, comments, and attachments will be deleted for everyone. This can't be undone.`,
-    ok: 'Delete permanently',
+    title: tr('Delete task permanently?'),
+    body: `<b>${esc(t.title)}</b>${tr(", its subtasks, comments, and attachments will be deleted for everyone. This can't be undone.")}`,
+    ok: tr('Delete permanently'),
     danger: true,
     run: () => {
-      if (mutate(() => deleteTasks([t.id]))) toast(`Deleted “${t.title}”`);
+      if (mutate(() => deleteTasks([t.id]))) toast(tr('Deleted “{value1}”', { value1: t.title }));
     },
   });
 };

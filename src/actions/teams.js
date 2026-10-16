@@ -1,3 +1,4 @@
+import { t as tr } from '../core/i18n.js';
 /* =====================================================================
    ACTIONS · TEAMS: create, edit, delete
    ===================================================================== */
@@ -54,13 +55,13 @@ A.submitTeam = () => {
   f.name = ($('#tm-name')?.value || '').trim();
   f.desc = ($('#tm-desc')?.value || '').trim();
   if (!f.name) {
-    S.ui.errors.tname = 'Give the team a name';
+    S.ui.errors.tname = tr('Give the team a name');
     render();
     $('#tm-name')?.focus();
     return;
   }
   if (teamsList().some(t => t.name.toLowerCase() === f.name.toLowerCase() && t.id !== m.edit)) {
-    S.ui.errors.tname = `A team called “${f.name}” already exists`;
+    S.ui.errors.tname = tr('A team called “{value1}” already exists', { value1: f.name });
     render();
     $('#tm-name')?.focus();
     return;
@@ -86,10 +87,10 @@ A.submitTeam = () => {
   S.ui.modals.pop();
   if (m.edit) {
     render();
-    toast(`Saved ${t.name}`);
+    toast(tr('Saved {value1}', { value1: t.name }));
   } else {
     go('team', { id: t.id });
-    toast(`Created ${t.name}`);
+    toast(tr('Created {value1}', { value1: t.name }));
   }
 };
 A.delTeam = el => {
@@ -98,9 +99,9 @@ A.delTeam = el => {
   const np = D().projects.filter(p => p.team === t.id).length;
   S.ui.modals.pop();
   confirmDlg({
-    title: `Delete ${t.name}?`,
-    body: `${n ? `<b>${n} member${n > 1 ? 's' : ''}</b> will have no team` : 'The team has no members'}${np ? ` and <b>${np} project${np > 1 ? 's' : ''}</b> will need a new team` : ''}. People and projects are not deleted.`,
-    ok: 'Delete team',
+    title: tr('Delete {value1}?', { value1: t.name }),
+    body: `${n ? `<b>${tr('{value1} member{value2}', { value1: n, value2: n > 1 ? 's' : '' })}</b> ${tr('will have no team')}` : tr('The team has no members')}${np ? ` ${tr('and')} <b>${tr('{value1} project{value2}', { value1: np, value2: np > 1 ? 's' : '' })}</b> ${tr('will need a new team')}` : ''}. ${tr('People and projects are not deleted.')}`,
+    ok: tr('Delete team'),
     danger: true,
     icon: 'users',
     run: () => {
@@ -117,7 +118,7 @@ A.delTeam = el => {
         })
       ) {
         if (S.ui.route === 'team') go('teams');
-        toast(`Deleted ${t.name}`, { action: 'Undo', onAction: () => restore(snap) });
+        toast(tr('Deleted {value1}', { value1: t.name }), { action: tr('Undo'), onAction: () => restore(snap) });
       }
     },
   });

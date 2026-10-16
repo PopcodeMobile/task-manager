@@ -1,3 +1,4 @@
+import { t as tr } from '../core/i18n.js';
 /* ---------------- POPOVERS ---------------- */
 import { $, MOD, MONL, TODAY, WD, addD, dOff, diffD, esc, fmtDate, iso, parse } from '../core/utils.js';
 import { ic, wsLogo } from '../core/icons.js';
@@ -70,7 +71,7 @@ export function popList(items, opt = {}) {
   const q = (S.ui.pop.q || '').toLowerCase();
   const list = items.filter(it => !q || it.name.toLowerCase().includes(q));
   return `${opt.search ? `<div class="pin"><input data-pop-q data-in="popQ" id="pop-q" placeholder="${opt.search}" value="${esc(S.ui.pop.q || '')}" aria-label="${opt.search}"></div>` : ''}
-    ${list.map(it => `<button class="mi" data-a="${it.act || 'popPick'}" data-v="${esc(it.id)}" role="menuitemradio" aria-checked="${!!it.on}">${it.html || ''}<span class="trunc">${esc(it.name)}</span>${it.kbd ? `<span class="r"><kbd>${it.kbd}</kbd></span>` : ''}${it.on ? `<span class="ck">${ic('check', 14)}</span>` : ''}</button>`).join('') || `<div class="mi faint" style="cursor:default">No matches</div>`}`;
+    ${list.map(it => `<button class="mi" data-a="${it.act || 'popPick'}" data-v="${esc(it.id)}" role="menuitemradio" aria-checked="${!!it.on}">${it.html || ''}<span class="trunc">${esc(it.name)}</span>${it.kbd ? `<span class="r"><kbd>${it.kbd}</kbd></span>` : ''}${it.on ? `<span class="ck">${ic('check', 14)}</span>` : ''}</button>`).join('') || `<div class="mi faint" style="cursor:default">${tr('No matches')}</div>`}`;
 }
 export function miniCal(p, val) {
   const m = parse(p.m);
@@ -78,15 +79,15 @@ export function miniCal(p, val) {
   const start = startOfWeek(first);
   const cells = Array.from({ length: 42 }, (_, i) => addD(start, i));
   const wdn = Array.from({ length: 7 }, (_, i) => WD[(i + S.prefs.weekStart) % 7].slice(0, 2));
-  return `<div style="padding:6px 6px 2px;width:252px">
-    <div class="row" style="margin-bottom:6px"><b style="font-weight:600;font-size:13px;padding-left:4px">${MONL[m.getMonth()]} ${m.getFullYear()}</b><span class="sp"></span><button class="ibtn ibtn-xs" data-a="popMonth" data-d="-1" aria-label="Previous month">${ic('chevron-left', 14)}</button><button class="ibtn ibtn-xs" data-a="popMonth" data-d="1" aria-label="Next month">${ic('chevron-right', 14)}</button></div>
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:11px">${wdn.map(d => `<span class="faint" style="padding:3px 0">${d}</span>`).join('')}
+  return `<div style="padding:var(--s-1-5) var(--s-1-5) var(--s-half);width:252px">
+    <div class="row" style="margin-bottom:var(--s-1-5)"><b style="font-weight:var(--fw-semibold);font-size:var(--fs-body-sm);padding-left:var(--s-1)">${MONL[m.getMonth()]} ${m.getFullYear()}</b><span class="sp"></span><button class="ibtn ibtn-xs" data-a="popMonth" data-d="-1" aria-label="${tr('Previous month')}">${ic('chevron-left', 14)}</button><button class="ibtn ibtn-xs" data-a="popMonth" data-d="1" aria-label="${tr('Next month')}">${ic('chevron-right', 14)}</button></div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:var(--s-half);text-align:center;font-size:var(--fs-2xs)">${wdn.map(d => `<span class="faint" style="padding:calc(var(--space-unit) * 0.75) 0">${d}</span>`).join('')}
     ${cells
       .map(d => {
         const ds = iso(d);
         const on = ds === val;
         const today = diffD(d, TODAY) === 0;
-        return `<button data-a="popPick" data-v="${ds}" style="height:30px;border-radius:6px;font-size:12px;${on ? 'background:var(--accent);color:var(--on-accent);font-weight:600' : today ? 'color:var(--accent);font-weight:600;box-shadow:inset 0 0 0 1px var(--accent-line)' : d.getMonth() !== m.getMonth() ? 'color:var(--text-3)' : ''}" onmouseover="if(!this.style.background)this.style.background='var(--surface-2)'" onmouseout="if(this.style.background==='var(--surface-2)')this.style.background=''" aria-label="${fmtDate(ds, true)}" class="num">${d.getDate()}</button>`;
+        return `<button data-a="popPick" data-v="${ds}" style="height:30px;border-radius:var(--r-sm);font-size:var(--fs-xs);${on ? 'background:var(--accent);color:var(--on-accent);font-weight:var(--fw-semibold)' : today ? 'color:var(--accent);font-weight:var(--fw-semibold);box-shadow:inset 0 0 0 1px var(--accent-line)' : d.getMonth() !== m.getMonth() ? 'color:var(--text-3)' : ''}" onmouseover="if(!this.style.background)this.style.background='var(--surface-2)'" onmouseout="if(this.style.background==='var(--surface-2)')this.style.background=''" aria-label="${fmtDate(ds, true)}" class="num">${d.getDate()}</button>`;
       })
       .join('')}</div></div>`;
 }
@@ -97,7 +98,7 @@ export function popHtml(p) {
   const t = ['status', 'priority', 'assignee', 'labels', 'date', 'project', 'deps', 'recur', 'estimate'].includes(p.type) ? tgt(p) : null;
   switch (p.type) {
     case 'create':
-      inner = `<div class="mh">Create</div><button class="mi" data-a="newTask">${ic('circle-check', 15)}Task<span class="r"><kbd>N</kbd></span></button><button class="mi" data-a="newProject">${ic('folder-plus', 15)}Project<span class="r"><kbd>P</kbd></span></button><button class="mi" data-a="newTeam">${ic('users', 15)}Team</button><div class="msep"></div><button class="mi" data-a="invite">${ic('user-plus', 15)}Invite member</button>`;
+      inner = `<div class="mh">${tr('Create')}</div><button class="mi" data-a="newTask">${tr('{value1}Task', { value1: ic('circle-check', 15) })}<span class="r"><kbd>${tr('N')}</kbd></span></button><button class="mi" data-a="newProject">${tr('{value1}Project', { value1: ic('folder-plus', 15) })}<span class="r"><kbd>${tr('P')}</kbd></span></button><button class="mi" data-a="newTeam">${tr('{value1}Team', { value1: ic('users', 15) })}</button><div class="msep"></div><button class="mi" data-a="invite">${tr('{value1}Invite member', { value1: ic('user-plus', 15) })}</button>`;
       style = 'width:220px';
       break;
     case 'subassignee': {
@@ -106,12 +107,12 @@ export function popHtml(p) {
       if (!sb) break;
       inner = popList(
         [
-          { id: '', name: 'Unassigned', html: av(null, 'sm', false), on: !sb.assignee },
+          { id: '', name: tr('Unassigned'), html: av(null, 'sm', false), on: !sb.assignee },
           ...D()
             .members.filter(m => m.status !== 'deactivated')
-            .map(m => ({ id: m.id, name: m.name + (m.id === D().me ? ' (you)' : ''), html: av(m.id, 'sm', false), on: sb.assignee === m.id })),
+            .map(m => ({ id: m.id, name: m.name + (m.id === D().me ? tr(' (you)') : ''), html: av(m.id, 'sm', false), on: sb.assignee === m.id })),
         ],
-        { search: 'Assign subtask to…' },
+        { search: tr('Assign subtask to…') },
       );
       break;
     }
@@ -124,12 +125,12 @@ export function popHtml(p) {
     case 'assignee':
       inner = popList(
         [
-          { id: '', name: 'Unassigned', html: av(null, 'sm', false), on: !t?.assignee },
+          { id: '', name: tr('Unassigned'), html: av(null, 'sm', false), on: !t?.assignee },
           ...D()
             .members.filter(m => m.status !== 'deactivated')
-            .map(m => ({ id: m.id, name: m.name + (m.id === D().me ? ' (you)' : ''), html: av(m.id, 'sm', false), on: t?.assignee === m.id })),
+            .map(m => ({ id: m.id, name: m.name + (m.id === D().me ? tr(' (you)') : ''), html: av(m.id, 'sm', false), on: t?.assignee === m.id })),
         ],
-        { search: 'Assign to…' },
+        { search: tr('Assign to…') },
       );
       break;
     case 'labels':
@@ -141,7 +142,7 @@ export function popHtml(p) {
           on: t?.labels.includes(l.id),
           act: 'popToggleLabel',
         })),
-        { search: 'Filter labels…' },
+        { search: tr('Filter labels…') },
       );
       break;
     case 'project':
@@ -149,14 +150,14 @@ export function popHtml(p) {
         visibleProjects()
           .filter(q => canSee(q) && q.status !== 'complete')
           .map(q => ({ id: q.id, name: q.name, html: `<span class="pdot" style="--c:${pColor(q)}"></span>`, on: t?.project === q.id })),
-        { search: 'Move to project…' },
+        { search: tr('Move to project…') },
       );
       break;
     case 'recur':
       inner = popList(
         ['Does not repeat', 'Daily', 'Weekly', 'Every 2 weeks', 'Monthly'].map(x => ({
           id: x,
-          name: x,
+          name: tr(x),
           html: ic('repeat', 14),
           on: (t?.recur || 'Does not repeat') === x,
         })),
@@ -166,26 +167,26 @@ export function popHtml(p) {
       inner = popList(
         ['30m', '1h', '2h', '4h', '1d', '2d', '3d', '5d', '8d']
           .map(x => ({ id: x, name: x, html: ic('timer', 14), on: t?.estimate === x }))
-          .concat([{ id: '', name: 'Clear estimate', html: ic('x', 14) }]),
+          .concat([{ id: '', name: tr('Clear estimate'), html: ic('x', 14) }]),
       );
       break;
     case 'deps': {
       const cands = D().tasks.filter(x => x.project === t.project && x.id !== t.id && !x.archived);
       inner = popList(
         cands.map(x => ({ id: x.id, name: `${x.key}  ${x.title}`, html: stIcon(x.status), on: t.deps.includes(x.id), act: 'popToggleDep' })),
-        { search: 'Blocked by…' },
+        { search: tr('Blocked by…') },
       );
       break;
     }
     case 'date': {
       const val = p.field === 'subdue' ? t?.subtasks[p.i]?.due : t?.[p.field];
       const q = [
-        ['Today', 0],
-        ['Tomorrow', 1],
-        ['Next week', 7 - ((TODAY.getDay() + 6) % 7)],
-        ['In 2 weeks', 14],
+        [tr('Today'), 0],
+        [tr('Tomorrow'), 1],
+        [tr('Next week'), 7 - ((TODAY.getDay() + 6) % 7)],
+        [tr('In 2 weeks'), 14],
       ];
-      inner = `<div class="row" style="gap:4px;padding:4px;flex-wrap:wrap">${q.map(([n, d]) => `<button class="badge" data-a="popPick" data-v="${dOff(d)}" style="cursor:pointer">${n}</button>`).join('')}${val ? `<button class="badge" data-a="popPick" data-v="" style="cursor:pointer;color:var(--red)">Clear</button>` : ''}</div><div class="msep"></div>${miniCal(p, val)}`;
+      inner = `<div class="row" style="gap:var(--s-1);padding:var(--s-1);flex-wrap:wrap">${q.map(([n, d]) => `<button class="badge" data-a="popPick" data-v="${dOff(d)}" style="cursor:pointer">${tr(n)}</button>`).join('')}${val ? `<button class="badge" data-a="popPick" data-v="" style="cursor:pointer;color:var(--red)">${tr('Clear')}</button>` : ''}</div><div class="msep"></div>${miniCal(p, val)}`;
       style = 'min-width:0';
       break;
     }
@@ -195,7 +196,7 @@ export function popHtml(p) {
         Object.entries(PSTAT).map(([k, v]) => ({
           id: k,
           name: v.name,
-          html: `<span class="pdot" style="--c:${v.c};border-radius:50%"></span>`,
+          html: `<span class="pdot" style="--c:${v.c};border-radius:var(--r-circle)"></span>`,
           on: pr.status === k,
         })),
       );
@@ -204,87 +205,87 @@ export function popHtml(p) {
     case 'role': {
       const m = mem(p.id);
       inner =
-        `<div class="mh">Role for ${esc(m.name)}</div>` +
+        `<div class="mh">${tr('Role for {value1}', { value1: esc(m.name) })}</div>` +
         ['Admin', 'Member', 'Guest']
           .map(
             r =>
-              `<button class="mi" data-a="popPick" data-v="${r}" style="height:auto;padding:7px 8px;align-items:flex-start"><div class="grow" style="white-space:normal"><div style="font-weight:500">${r}</div><div class="faint" style="font-size:11.5px">${{ Admin: 'Manage members, settings, and all projects', Member: 'Create projects and work on tasks', Guest: 'Only sees projects they are invited to' }[r]}</div></div>${m.role === r ? `<span class="ck">${ic('check', 14)}</span>` : ''}</button>`,
+              `<button class="mi" data-a="popPick" data-v="${r}" style="height:auto;padding:calc(var(--space-unit) * 1.75) var(--s-2);align-items:flex-start"><div class="grow" style="white-space:normal"><div style="font-weight:var(--fw-medium)">${tr(r)}</div><div class="faint" style="font-size:var(--fs-meta)">${{ Admin: tr('Manage members, settings, and all projects'), Member: tr('Create projects and work on tasks'), Guest: tr('Only sees projects they are invited to') }[r]}</div></div>${m.role === r ? `<span class="ck">${ic('check', 14)}</span>` : ''}</button>`,
           )
           .join('');
       style = 'width:300px';
       break;
     }
     case 'ws':
-      inner = `<div class="mh">Workspaces</div>${D()
+      inner = `<div class="mh">${tr('Workspaces')}</div>${D()
         .workspaces.map(
           w =>
-            `<button class="mi" data-a="switchWs" data-v="${w.id}">${wsLogo(w, 20)}<span class="grow">${esc(w.name)}</span><span class="faint" style="font-size:11px">${w.plan}</span>${w.name === D().ws.name ? `<span class="ck">${ic('check', 14)}</span>` : ''}</button>`,
+            `<button class="mi" data-a="switchWs" data-v="${w.id}">${wsLogo(w, 20)}<span class="grow">${esc(w.name)}</span><span class="faint" style="font-size:var(--fs-2xs)">${esc(w.plan)}</span>${w.name === D().ws.name ? `<span class="ck">${ic('check', 14)}</span>` : ''}</button>`,
         )
         .join(
           '',
-        )}<div class="msep"></div><button class="mi" data-a="newWorkspace">${ic('plus', 15)}Create workspace</button><button class="mi" data-a="go" data-r="settings" data-sec="workspace">${ic('settings', 15)}Workspace settings</button><button class="mi" data-a="invite">${ic('user-plus', 15)}Invite members</button><div class="msep"></div><button class="mi" data-a="signOut">${ic('log-out', 15)}Sign out</button>`;
+        )}<div class="msep"></div><button class="mi" data-a="newWorkspace">${tr('{value1}Create workspace', { value1: ic('plus', 15) })}</button><button class="mi" data-a="go" data-r="settings" data-sec="workspace">${tr('{value1}Workspace settings', { value1: ic('settings', 15) })}</button><button class="mi" data-a="invite">${tr('{value1}Invite members', { value1: ic('user-plus', 15) })}</button><div class="msep"></div><button class="mi" data-a="signOut">${tr('{value1}Sign out', { value1: ic('log-out', 15) })}</button>`;
       style = 'width:260px';
       break;
     case 'user':
-      inner = `<div class="row" style="padding:8px 8px 10px;gap:10px">${av(D().me, 'lg', false)}<div style="min-width:0"><div style="font-weight:600">${esc(S.prefs.name)}</div><div class="faint trunc" style="font-size:12px">${esc(me().email)}</div></div></div><div class="msep"></div>
-      <button class="mi" data-a="go" data-r="member" data-id="${D().me}">${ic('user', 15)}View profile</button><button class="mi" data-a="go" data-r="settings" data-sec="profile">${ic('settings', 15)}Account settings</button>
-      <div class="msep"></div><div class="mh">Theme</div><div style="padding:2px 6px 6px"><div class="seg" style="width:100%">${[
-        ['light', 'sun', 'Light'],
-        ['dark', 'moon', 'Dark'],
-        ['system', 'monitor', 'System'],
+      inner = `<div class="row" style="padding:var(--s-2) var(--s-2) var(--s-2-5);gap:var(--s-2-5)">${av(D().me, 'lg', false)}<div style="min-width:0"><div style="font-weight:var(--fw-semibold)">${esc(S.prefs.name)}</div><div class="faint trunc" style="font-size:var(--fs-xs)">${esc(me().email)}</div></div></div><div class="msep"></div>
+      <button class="mi" data-a="go" data-r="member" data-id="${D().me}">${tr('{value1}View profile', { value1: ic('user', 15) })}</button><button class="mi" data-a="go" data-r="settings" data-sec="profile">${tr('{value1}Account settings', { value1: ic('settings', 15) })}</button>
+      <div class="msep"></div><div class="mh">${tr('Theme')}</div><div style="padding:var(--s-half) var(--s-1-5) var(--s-1-5)"><div class="seg" style="width:100%">${[
+        ['light', 'sun', tr('Light')],
+        ['dark', 'moon', tr('Dark')],
+        ['system', 'monitor', tr('System')],
       ]
         .map(
           ([k, i, n]) =>
-            `<button class="${S.prefs.theme === k ? 'on' : ''}" style="flex:1;justify-content:center" data-a="setTheme" data-v="${k}">${ic(i, 13)}${n}</button>`,
+            `<button class="${S.prefs.theme === k ? 'on' : ''}" style="flex:1;justify-content:center" data-a="setTheme" data-v="${k}">${ic(i, 13)}${tr(n)}</button>`,
         )
         .join('')}</div></div>
-      <div class="msep"></div><button class="mi" data-a="shortcuts">${ic('keyboard', 15)}Keyboard shortcuts<span class="r"><kbd>?</kbd></span></button><button class="mi" data-a="signOut">${ic('log-out', 15)}Sign out</button>`;
+      <div class="msep"></div><button class="mi" data-a="shortcuts">${tr('{value1}Keyboard shortcuts', { value1: ic('keyboard', 15) })}<span class="r"><kbd>?</kbd></span></button><button class="mi" data-a="signOut">${tr('{value1}Sign out', { value1: ic('log-out', 15) })}</button>`;
       style = 'width:260px';
       break;
     case 'help':
-      inner = `<div class="mh">Help & resources</div><button class="mi" data-a="shortcuts">${ic('keyboard', 15)}Keyboard shortcuts<span class="r"><kbd>?</kbd></span></button><button class="mi" data-a="openPalette">${ic('command', 15)}Command menu<span class="r"><kbd>${MOD}K</kbd></span></button><button class="mi" data-a="go" data-r="system">${ic('component', 15)}Design system</button><button class="mi" data-a="go" data-r="states">${ic('layers', 15)}System states</button>
-      <div class="msep"></div><div class="mh">Prototype</div><button class="mi" data-a="startOnboarding">${ic('sparkles', 15)}Replay onboarding</button><button class="mi" data-a="toggleOffline">${ic(S.ui.offline ? 'wifi' : 'wifi-off', 15)}${S.ui.offline ? 'Go back online' : 'Simulate offline'}</button><button class="mi" data-a="go" data-r="nowhere">${ic('file-question', 15)}Open a broken link</button><button class="mi" data-a="resetDemo">${ic('rotate-ccw', 15)}Reset demo data</button>`;
+      inner = `<div class="mh">${tr('Help & resources')}</div><button class="mi" data-a="shortcuts">${tr('{value1}Keyboard shortcuts', { value1: ic('keyboard', 15) })}<span class="r"><kbd>?</kbd></span></button><button class="mi" data-a="openPalette">${tr('{value1}Command menu', { value1: ic('command', 15) })}<span class="r"><kbd>${tr('{value1}K', { value1: MOD })}</kbd></span></button><button class="mi" data-a="go" data-r="system">${tr('{value1}Design system', { value1: ic('component', 15) })}</button><button class="mi" data-a="go" data-r="states">${tr('{value1}System states', { value1: ic('layers', 15) })}</button>
+      <div class="msep"></div><div class="mh">${tr('Prototype')}</div><button class="mi" data-a="startOnboarding">${tr('{value1}Replay onboarding', { value1: ic('sparkles', 15) })}</button><button class="mi" data-a="toggleOffline">${ic(S.ui.offline ? 'wifi' : 'wifi-off', 15)}${S.ui.offline ? tr('Go back online') : tr('Simulate offline')}</button><button class="mi" data-a="go" data-r="nowhere">${tr('{value1}Open a broken link', { value1: ic('file-question', 15) })}</button><button class="mi" data-a="resetDemo">${tr('{value1}Reset demo data', { value1: ic('rotate-ccw', 15) })}</button>`;
       style = 'width:260px';
       break;
     case 'sort': {
       const v = viewOf(p.key);
       inner =
-        `<div class="mh">Sort by</div>` +
+        `<div class="mh">${tr('Sort by')}</div>` +
         [
-          ['manual', 'Manual'],
-          ['priority', 'Priority'],
-          ['due', 'Due date'],
-          ['start', 'Start date'],
-          ['title', 'Title'],
-          ['status', 'Status'],
-          ['assignee', 'Assignee'],
-          ['created', 'Created'],
-          ['updated', 'Last updated'],
+          ['manual', tr('Manual')],
+          ['priority', tr('Priority')],
+          ['due', tr('Due date')],
+          ['start', tr('Start date')],
+          ['title', tr('Title')],
+          ['status', tr('Status')],
+          ['assignee', tr('Assignee')],
+          ['created', tr('Created')],
+          ['updated', tr('Last updated')],
         ]
           .map(
             ([k, n]) =>
-              `<button class="mi" data-a="setSort" data-key="${p.key}" data-v="${k}">${n}${v.sort.f === k ? `<span class="ck">${ic('check', 14)}</span>` : ''}</button>`,
+              `<button class="mi" data-a="setSort" data-key="${p.key}" data-v="${k}">${tr(n)}${v.sort.f === k ? `<span class="ck">${ic('check', 14)}</span>` : ''}</button>`,
           )
           .join('') +
-        `<div class="msep"></div><div style="padding:4px 6px"><div class="seg" style="width:100%"><button class="${v.sort.dir > 0 ? 'on' : ''}" style="flex:1;justify-content:center" data-a="setSortDir" data-key="${p.key}" data-v="1">${ic('arrow-up', 12)}Ascending</button><button class="${v.sort.dir < 0 ? 'on' : ''}" style="flex:1;justify-content:center" data-a="setSortDir" data-key="${p.key}" data-v="-1">${ic('arrow-down', 12)}Descending</button></div></div>`;
+        `<div class="msep"></div><div style="padding:var(--s-1) var(--s-1-5)"><div class="seg" style="width:100%"><button class="${v.sort.dir > 0 ? 'on' : ''}" style="flex:1;justify-content:center" data-a="setSortDir" data-key="${p.key}" data-v="1">${tr('{value1}Ascending', { value1: ic('arrow-up', 12) })}</button><button class="${v.sort.dir < 0 ? 'on' : ''}" style="flex:1;justify-content:center" data-a="setSortDir" data-key="${p.key}" data-v="-1">${tr('{value1}Descending', { value1: ic('arrow-down', 12) })}</button></div></div>`;
       style = 'width:240px';
       break;
     }
     case 'group': {
       const v = viewOf(p.key);
       inner =
-        `<div class="mh">Group by</div>` +
+        `<div class="mh">${tr('Group by')}</div>` +
         [
-          ['status', 'Status', 'circle-dot'],
-          ['priority', 'Priority', 'signal-high'],
-          ['assignee', 'Assignee', 'user'],
-          ['project', 'Project', 'folder'],
-          ['due', 'Due date', 'calendar'],
-          ['none', 'No grouping', 'minus'],
+          ['status', tr('Status'), 'circle-dot'],
+          ['priority', tr('Priority'), 'signal-high'],
+          ['assignee', tr('Assignee'), 'user'],
+          ['project', tr('Project'), 'folder'],
+          ['due', tr('Due date'), 'calendar'],
+          ['none', tr('No grouping'), 'minus'],
         ]
           .map(
             ([k, n, i]) =>
-              `<button class="mi" data-a="setGroup" data-key="${p.key}" data-v="${k}">${ic(i, 15)}${n}${v.group === k ? `<span class="ck">${ic('check', 14)}</span>` : ''}</button>`,
+              `<button class="mi" data-a="setGroup" data-key="${p.key}" data-v="${k}">${ic(i, 15)}${tr(n)}${v.group === k ? `<span class="ck">${ic('check', 14)}</span>` : ''}</button>`,
           )
           .join('');
       break;
@@ -292,14 +293,14 @@ export function popHtml(p) {
     case 'cols': {
       const v = viewOf(p.key);
       inner =
-        `<div class="mh">Visible columns</div>` +
+        `<div class="mh">${tr('Visible columns')}</div>` +
         TCOLS.filter(c => c[0] !== 'title')
           .map(
             c =>
-              `<label class="mi" style="cursor:pointer"><input type="checkbox" class="check" data-a="toggleCol2" data-key="${p.key}" data-v="${c[0]}" ${v.hidden.includes(c[0]) ? '' : 'checked'}>${c[1]}</label>`,
+              `<label class="mi" style="cursor:pointer"><input type="checkbox" class="check" data-a="toggleCol2" data-key="${p.key}" data-v="${c[0]}" ${v.hidden.includes(c[0]) ? '' : 'checked'}>${tr(c[1])}</label>`,
           )
           .join('') +
-        `<div class="msep"></div><button class="mi" data-a="resetCols" data-key="${p.key}">${ic('rotate-ccw', 14)}Reset widths</button>`;
+        `<div class="msep"></div><button class="mi" data-a="resetCols" data-key="${p.key}">${tr('{value1}Reset widths', { value1: ic('rotate-ccw', 14) })}</button>`;
       break;
     }
     case 'filter':
@@ -312,7 +313,7 @@ export function popHtml(p) {
       const f = v.filters[p.i];
       if (!f) break;
       inner =
-        `<div class="mh">${FIELDS[f.f].name} ${f.op === 'not' ? 'is not' : 'is'}</div>` +
+        `<div class="mh">${FIELDS[f.f].name} ${f.op === 'not' ? tr('is not') : tr('is')}</div>` +
         FIELDS[f.f]
           .opts()
           .map(
@@ -331,7 +332,7 @@ export function popHtml(p) {
         evs
           .map(
             e =>
-              `<button class="mi" data-a="go" data-r="project" data-id="${e.project}" data-tab="calendar">${ic('clock', 14)}${esc(e.title)}<span class="r">${e.time}</span></button>`,
+              `<button class="mi" data-a="go" data-r="project" data-id="${e.project}" data-tab="calendar">${ic('clock', 14)}${esc(e.title)}<span class="r">${esc(e.time)}</span></button>`,
           )
           .join('') +
         ts
@@ -346,12 +347,12 @@ export function popHtml(p) {
     case 'event': {
       const e = D().events.find(x => x.id === p.id);
       const pr = proj(e.project);
-      inner = `<div style="padding:10px 10px 6px"><div class="row" style="gap:8px;margin-bottom:6px"><span class="pdot" style="--c:${pColor(pr)};border-radius:50%"></span><b style="font-size:14px;font-weight:600">${esc(e.title)}</b></div><div class="muted" style="font-size:12.5px;display:flex;flex-direction:column;gap:4px"><span class="row" style="gap:6px">${ic('calendar', 13)}${fmtDate(e.date, true)} · ${e.time}</span><span class="row" style="gap:6px">${ic('folder', 13)}${esc(pr.name)}</span><span class="row" style="gap:6px">${ic('users', 13)}${avStack(pr.members, 5)}</span></div></div><div class="msep"></div><button class="mi" data-a="go" data-r="project" data-id="${pr.id}" data-tab="overview">${ic('arrow-up-right', 14)}Open project</button>`;
+      inner = `<div style="padding:var(--s-2-5) var(--s-2-5) var(--s-1-5)"><div class="row" style="gap:var(--s-2);margin-bottom:var(--s-1-5)"><span class="pdot" style="--c:${pColor(pr)};border-radius:var(--r-circle)"></span><b style="font-size:var(--fs-label);font-weight:var(--fw-semibold)">${esc(e.title)}</b></div><div class="muted" style="font-size:var(--fs-sm);display:flex;flex-direction:column;gap:var(--s-1)"><span class="row" style="gap:var(--s-1-5)">${ic('calendar', 13)}${fmtDate(e.date, true)} · ${esc(e.time)}</span><span class="row" style="gap:var(--s-1-5)">${ic('folder', 13)}${esc(pr.name)}</span><span class="row" style="gap:var(--s-1-5)">${ic('users', 13)}${avStack(pr.members, 5)}</span></div></div><div class="msep"></div><button class="mi" data-a="go" data-r="project" data-id="${pr.id}" data-tab="overview">${tr('{value1}Open project', { value1: ic('arrow-up-right', 14) })}</button>`;
       style = 'width:270px';
       break;
     }
     case 'emoji':
-      inner = `<div class="row" style="gap:2px;padding:2px">${['👍', '🎉', '❤️', '👀', '🚀', '✅'].map(e => `<button class="ibtn" data-a="react" data-id="${p.id}" data-e="${e}" style="font-size:16px" aria-label="React ${e}">${e}</button>`).join('')}</div>`;
+      inner = `<div class="row" style="gap:var(--s-half);padding:var(--s-half)">${['👍', '🎉', '❤️', '👀', '🚀', '✅'].map(e => `<button class="ibtn" data-a="react" data-id="${p.id}" data-e="${e}" style="font-size:var(--fs-lg)" aria-label="${tr('React {value1}', { value1: e })}">${e}</button>`).join('')}</div>`;
       style = 'min-width:0';
       break;
     case 'ctx':
@@ -364,7 +365,7 @@ export function popHtml(p) {
       inner = PRIOS.map(s => `<button class="mi" data-a="bulkSet" data-f="priority" data-v="${s.id}">${prIcon(s.id)}${s.name}</button>`).join('');
       break;
     case 'bulk-assignee':
-      inner = [{ id: '', name: 'Unassigned' }, ...D().members]
+      inner = [{ id: '', name: tr('Unassigned') }, ...D().members]
         .map(m => `<button class="mi" data-a="bulkSet" data-f="assignee" data-v="${m.id}">${av(m.id || null, 'sm', false)}${esc(m.name)}</button>`)
         .join('');
       break;
@@ -380,19 +381,19 @@ export function filterBuilder(p) {
       const opts = F.opts();
       const names = f.v.map(id => opts.find(o => o.id === id)?.name || id);
       const open = p.edit === i;
-      return `<div class="frow"><span class="conj">${i ? 'and' : 'Where'}</span>
-      <select class="select" data-in="fField" data-key="${p.key}" data-i="${i}" aria-label="Field">${Object.entries(FIELDS)
+      return `<div class="frow"><span class="conj">${i ? tr('and') : tr('Where')}</span>
+      <select class="select" data-in="fField" data-key="${p.key}" data-i="${i}" aria-label="${tr('Field')}">${Object.entries(FIELDS)
         .map(([k, x]) => `<option value="${k}" ${f.f === k ? 'selected' : ''}>${x.name}</option>`)
         .join('')}</select>
-      <select class="select" data-in="fOp" data-key="${p.key}" data-i="${i}" aria-label="Operator"><option value="is" ${f.op === 'is' ? 'selected' : ''}>is</option><option value="not" ${f.op === 'not' ? 'selected' : ''}>is not</option></select>
-      <button class="valbtn" data-a="fEdit" data-i="${i}" aria-expanded="${open}"><span class="trunc grow">${names.length ? esc(names.join(', ')) : '<span class="faint">Select…</span>'}</span>${ic('chevron-down', 12)}</button>
-      <button class="ibtn ibtn-xs" data-a="rmFilter" data-key="${p.key}" data-i="${i}" aria-label="Remove filter">${ic('trash-2', 13)}</button></div>
-      ${open ? `<div style="margin-left:50px;border:1px solid var(--border);border-radius:var(--r);padding:4px;max-height:200px;overflow:auto">${opts.map(o => `<label class="mi" style="cursor:pointer;min-height:28px"><input type="checkbox" class="check" data-a="fToggleVal" data-key="${p.key}" data-i="${i}" data-v="${o.id}" ${f.v.includes(o.id) ? 'checked' : ''}>${o.html || ''}${esc(o.name)}</label>`).join('')}</div>` : ''}`;
+      <select class="select" data-in="fOp" data-key="${p.key}" data-i="${i}" aria-label="${tr('Operator')}"><option value="is" ${f.op === 'is' ? 'selected' : ''}>${tr('is')}</option><option value="not" ${f.op === 'not' ? 'selected' : ''}>${tr('is not')}</option></select>
+      <button class="valbtn" data-a="fEdit" data-i="${i}" aria-expanded="${open}"><span class="trunc grow">${names.length ? esc(names.join(', ')) : `<span class="faint">${tr('Select…')}</span>`}</span>${ic('chevron-down', 12)}</button>
+      <button class="ibtn ibtn-xs" data-a="rmFilter" data-key="${p.key}" data-i="${i}" aria-label="${tr('Remove filter')}">${ic('trash-2', 13)}</button></div>
+      ${open ? `<div style="margin-left:calc(var(--space-unit) * 12.5);border:1px solid var(--border);border-radius:var(--r);padding:var(--s-1);max-height:200px;overflow:auto">${opts.map(o => `<label class="mi" style="cursor:pointer;min-height:28px"><input type="checkbox" class="check" data-a="fToggleVal" data-key="${p.key}" data-i="${i}" data-v="${o.id}" ${f.v.includes(o.id) ? 'checked' : ''}>${o.html || ''}${esc(o.name)}</label>`).join('')}</div>` : ''}`;
     })
     .join('');
-  return `<div class="mh fb-h">Filter by${v.filters.length ? `<button class="btn btn-sm btn-ghost" data-a="clearFilters" data-key="${p.key}">Clear all</button>` : ''}</div>
-    ${rows ? `<div class="fb-rows">${rows}</div>` : '<p class="fb-empty">No filters applied. Combine filters to narrow the task list, e.g. Status is In Progress and Assignee is Sarah.</p>'}
-    <div class="msep"></div><div class="fb-add"><span class="faint">Add filter:</span>${Object.entries(FIELDS)
+  return `<div class="mh fb-h">${tr('Filter by{value1}', { value1: v.filters.length ? `<button class="btn btn-sm btn-ghost" data-a="clearFilters" data-key="${p.key}">${tr('Clear all')}</button>` : '' })}</div>
+    ${rows ? `<div class="fb-rows">${rows}</div>` : `<p class="fb-empty">${tr('No filters applied. Combine filters to narrow the task list, e.g. Status is In Progress and Assignee is Sarah.')}</p>`}
+    <div class="msep"></div><div class="fb-add"><span class="faint">${tr('Add filter:')}</span>${Object.entries(FIELDS)
       .map(([k, x]) => `<button class="badge" style="cursor:pointer" data-a="addFilter" data-key="${p.key}" data-f="${k}">${ic(x.icon, 11)}${x.name}</button>`)
       .join('')}</div>`;
 }

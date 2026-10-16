@@ -1,13 +1,20 @@
+import { t as tr } from '../core/i18n.js';
 /* ---------- drag & drop ---------- */
 import { $, $$, addD, diffD, fmtDate, iso, parse } from '../core/utils.js';
 import { PR, ST } from '../core/constants.js';
-import { D, S, proj, save, task } from '../core/store.js';
+import { D, S, isScopeCurrent, proj, save, scope, task } from '../core/store.js';
 import { mutate, toast } from '../ui/toast.js';
 import { fxSet, render } from '../shell/render.js';
 import { viewOf } from '../shell/view-engine.js';
 import { applyPatch, handleFiles, updateTask } from './actions.js';
 
 export let DRAG = null;
+let cancelPointer;
+window.addEventListener('workspace:change', () => {
+  DRAG = null;
+  cancelPointer?.();
+  clearDropMarks();
+});
 export function clearDropMarks() {
   $$('.drop-line').forEach(x => x.remove());
   $$('.over').forEach(x => x.classList.remove('over'));
@@ -15,6 +22,10 @@ export function clearDropMarks() {
   $$('.dragging').forEach(x => x.classList.remove('dragging'));
 }
 document.addEventListener('dragstart', e => {
+  if (S.workspace?.membership?.role === 'guest') {
+    e.preventDefault();
+    return;
+  }
   const card = e.target.closest?.('[data-drag-card]'),
     row = e.target.closest?.('[data-drag-row]'),
     cal = e.target.closest?.('[data-drag-cal]'),
@@ -28,6 +39,7 @@ document.addEventListener('dragstart', e => {
       : cal
         ? { type: 'cal', id: cal.dataset.dragCal }
         : { type: 'proj', id: sp.dataset.dragProj };
+  DRAG.scope = scope();
   e.dataTransfer.effectAllowed = 'move';
   try {
     e.dataTransfer.setData('text/plain', DRAG.id);
@@ -59,7 +71,7 @@ document.addEventListener('dragover', e => {
     }
     return;
   }
-  if (!DRAG) return;
+  if (!DRAG || !isScopeCurrent(DRAG.scope)) return;
   if (DRAG.type === 'card') {
     const col = e.target.closest('[data-drop-col]');
     if (!col) return;
@@ -115,6 +127,10 @@ document.addEventListener('dragleave', e => {
   if (dz && !dz.contains(e.relatedTarget)) dz.classList.remove('over');
 });
 document.addEventListener('drop', e => {
+  if (S.workspace?.membership?.role === 'guest') {
+    e.preventDefault();
+    return;
+  }
   const files = e.dataTransfer?.files;
   if (files && files.length && !DRAG) {
     const dz = e.target.closest?.('[data-dropzone],[data-dropzone-task],.drawer');
@@ -133,8 +149,10 @@ document.addEventListener('drop', e => {
   const d = DRAG;
   DRAG = null;
   clearDropMarks();
+  if (!isScopeCurrent(d.scope)) return;
   if (d.type === 'card' && d.col) {
     const t = task(d.id);
+    if (!t) return;
     const colTs = D()
       .tasks.filter(x => x.status === d.col && x.id !== t.id && !x.archived)
       .sort((a, b) => a.order - b.order);
@@ -143,6 +161,7 @@ document.addEventListener('drop', e => {
       const i = colTs.findIndex(x => x.id === d.before);
       const prev = colTs[i - 1];
       const nx = colTs[i];
+      if (!nx) return;
       order = prev ? (prev.order + nx.order) / 2 : nx.order - 1;
     } else order = colTs.length ? colTs[colTs.length - 1].order + 1 : t.order;
     const moved = t.status !== d.col;
@@ -151,10 +170,11 @@ document.addEventListener('drop', e => {
       t.order = order;
       if (moved) applyPatch(t, { status: d.col });
     });
-    if (moved) toast(`Moved “${t.title}” to ${ST[d.col].name}`, { ms: 2200 });
+    if (moved) toast(tr('Moved “{title}” to {status}', { title: t.title, status: ST[d.col].name }), { ms: 2200 });
   } else if (d.type === 'row' && d.target) {
     const t = task(d.id),
       tg = task(d.target);
+    if (!t || !tg) return;
     const key = d.lkey;
     const v = key ? viewOf(key) : null;
     const all = D()
@@ -180,15 +200,17 @@ document.addEventListener('drop', e => {
         switched = true;
       }
     });
-    if (switched) toast('Sorted manually to keep your order', { kind: 'info', ms: 2200 });
+    if (switched) toast(tr('Sorted manually to keep your order'), { kind: 'info', ms: 2200 });
   } else if (d.type === 'cal' && d.day) {
     const t = task(d.id);
+    if (!t) return;
     if (t.due === d.day) return;
     const len = t.start && t.due ? diffD(parse(t.due), parse(t.start)) : null;
     fxSet({ moved: t.id });
     updateTask(t.id, { due: d.day, ...(len != null ? { start: iso(addD(parse(d.day), -len)) } : {}) });
-    toast(`Rescheduled “${t.title}” to ${fmtDate(d.day)}`, { ms: 2200 });
+    toast(tr('Rescheduled “{title}” to {date}', { title: t.title, date: fmtDate(d.day) }), { ms: 2200 });
   } else if (d.type === 'proj' && d.before && d.before !== d.id) {
+    if (!proj(d.id) || !proj(d.before)) return;
     const o = D().projOrder.filter(x => x !== d.id);
     o.splice(o.indexOf(d.before), 0, d.id);
     D().projOrder = o;
@@ -200,6 +222,8 @@ document.addEventListener('drop', e => {
 /* timeline bar drag + table column resize (pointer events) */
 document.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
+  const captured = scope();
+  cancelPointer?.();
   const rz = e.target.closest?.('[data-rsz]');
   if (rz) {
     e.preventDefault();
@@ -214,32 +238,43 @@ document.addEventListener('pointerdown', e => {
     const x0 = e.clientX;
     rz.classList.add('on');
     const mv = ev => {
+      if (!isScopeCurrent(captured)) return;
       const w = Math.max(64, w0 + ev.clientX - x0);
       col.style.width = w + 'px';
       tbl.style.width = tw0 + w - w0 + 'px';
     };
     const up = ev => {
-      removeEventListener('pointermove', mv);
-      removeEventListener('pointerup', up);
+      cleanup();
+      if (!isScopeCurrent(captured)) return;
       v.colW[c] = Math.max(64, Math.round(w0 + ev.clientX - x0));
       save();
       S.ui.justResized = true;
       setTimeout(() => {
-        S.ui.justResized = false;
+        if (isScopeCurrent(captured)) S.ui.justResized = false;
       }, 60);
       render();
     };
+    const cleanup = () => {
+      removeEventListener('pointermove', mv);
+      removeEventListener('pointerup', up);
+      removeEventListener('pointercancel', cleanup);
+      rz.classList.remove('on');
+      cancelPointer = null;
+    };
+    cancelPointer = cleanup;
     addEventListener('pointermove', mv);
     addEventListener('pointerup', up);
+    addEventListener('pointercancel', cleanup);
     return;
   }
   const b = e.target.closest?.('[data-bar]');
-  if (!b) return;
+  if (!b || S.workspace?.membership?.role === 'guest') return;
   const x0 = e.clientX;
   const l0 = parseFloat(b.style.left);
   const dw = +b.dataset.dw;
   let moved = false;
   const mv = ev => {
+    if (!isScopeCurrent(captured)) return;
     const dx = ev.clientX - x0;
     if (Math.abs(dx) > 4) {
       moved = true;
@@ -248,22 +283,34 @@ document.addEventListener('pointerdown', e => {
     if (moved) b.style.left = l0 + Math.round(dx / dw) * dw + 'px';
   };
   const up = ev => {
-    removeEventListener('pointermove', mv);
-    removeEventListener('pointerup', up);
+    cleanup();
+    if (!isScopeCurrent(captured)) return;
     if (!moved) return;
     S.ui.suppressClick = true;
     setTimeout(() => {
-      S.ui.suppressClick = false;
+      if (isScopeCurrent(captured)) S.ui.suppressClick = false;
     }, 60);
     const days = Math.round((ev.clientX - x0) / dw);
     const t = task(b.dataset.bar);
+    if (!t) return;
     if (!days) {
       render();
       return;
     }
     updateTask(t.id, { due: iso(addD(parse(t.due), days)), start: t.start ? iso(addD(parse(t.start), days)) : null });
-    toast(`Moved “${t.title}” ${Math.abs(days)} day${Math.abs(days) > 1 ? 's' : ''} ${days > 0 ? 'later' : 'earlier'}`, { ms: 2200 });
+    toast(tr(days > 0 ? 'Moved “{title}” {count} days later' : 'Moved “{title}” {count} days earlier', { title: t.title, count: Math.abs(days) }), {
+      ms: 2200,
+    });
   };
+  const cleanup = () => {
+    removeEventListener('pointermove', mv);
+    removeEventListener('pointerup', up);
+    removeEventListener('pointercancel', cleanup);
+    b.classList.remove('dragging');
+    cancelPointer = null;
+  };
+  cancelPointer = cleanup;
   addEventListener('pointermove', mv);
   addEventListener('pointerup', up);
+  addEventListener('pointercancel', cleanup);
 });

@@ -1,13 +1,15 @@
 /* ---------- theme ---------- */
 import { setDateFormat } from './utils.js';
 import { S } from './store.js';
+import { getLocale, setLocale } from './i18n.js';
 
 export function applyPrefs() {
   const r = document.documentElement,
     p = S.prefs;
+  setLocale(p.lang);
   setDateFormat(p.dateFmt);
-  if (p.theme === 'system') r.removeAttribute('data-theme');
-  else r.setAttribute('data-theme', p.theme);
+  r.lang = getLocale();
+  r.setAttribute('data-theme', effectiveDark() ? 'dark' : 'light');
   if (p.accent === 'indigo') r.removeAttribute('data-accent');
   else r.setAttribute('data-accent', p.accent);
   r.setAttribute('data-side', p.side);

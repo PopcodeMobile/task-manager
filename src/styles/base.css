@@ -16,7 +16,7 @@ body {
   color: var(--text);
   font-family: var(--font);
   font-size: var(--fs);
-  line-height: 1.45;
+  line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   font-feature-settings: 'ss01', 'cv11';
@@ -43,7 +43,7 @@ svg.i {
   display: block;
 }
 ::selection {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: var(--selection);
 }
 input,
 textarea,
@@ -54,14 +54,14 @@ textarea,
   position: fixed;
   left: 12px;
   top: -60px;
-  z-index: 300;
-  padding: 8px 12px;
+  z-index: var(--z-skip);
+  padding: var(--s-2) var(--s-3);
   border-radius: var(--r-sm);
   background: var(--text);
   color: var(--text-inv);
   font-size: var(--fs-sm);
-  font-weight: 500;
-  transition: top 0.15s var(--ease);
+  font-weight: var(--fw-medium);
+  transition: top calc(var(--motion-step) * 15) var(--ease);
 }
 .skip:focus {
   top: calc(8px + env(safe-area-inset-top, 0px));
@@ -69,15 +69,16 @@ textarea,
 :focus {
   outline: none;
 }
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+:focus-visible,
+.state-focus {
+  outline: var(--stroke-strong) solid var(--accent);
+  outline-offset: var(--focus-offset);
   border-radius: var(--r-xs);
 }
 .mono {
   font-family: var(--mono);
   font-size: 0.92em;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-tight);
 }
 .num {
   font-variant-numeric: tabular-nums;
@@ -121,19 +122,19 @@ textarea,
 kbd,
 .kbd {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   min-width: 18px;
   height: 18px;
-  padding: 0 5px;
+  padding: 0 calc(var(--space-unit) * 1.25);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--r-xs);
-  border: 1px solid var(--border);
-  border-bottom-width: 1.5px;
+  border: var(--stroke) solid var(--border);
+  border-bottom-width: var(--stroke-medium);
   background: var(--surface);
   color: var(--text-2);
-  line-height: 1;
+  line-height: var(--lh-tight);
 }
 ::-webkit-scrollbar {
   width: 10px;
@@ -141,7 +142,7 @@ kbd,
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   border: 3px solid transparent;
   background-clip: padding-box;
 }

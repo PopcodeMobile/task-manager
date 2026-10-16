@@ -1,0 +1,50 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+
+test('cloud session authenticates, edits its tenant, persists and signs out without cached workspace data', async ({ page }) => {
+  test.skip(!process.env.SUPABASE_E2E_USER_FILE, 'Requires the separately started local Supabase stack and test account.');
+  const user = JSON.parse(fs.readFileSync(process.env.SUPABASE_E2E_USER_FILE, 'utf8'));
+  const failures = [];
+  page.on('pageerror', error => failures.push(error.message));
+  await page.goto(process.env.SUPABASE_E2E_APP_URL || 'http://127.0.0.1:5174');
+  await page.locator('#l-email').fill(user.email);
+  await page.locator('#l-pw').fill(user.password);
+  await page.locator('form[data-submit="doLogin"] button[type="submit"]').click();
+  await expect(page.locator('.shell')).toBeVisible();
+  await expect(page.locator('.workspace-status')).toContainText('nuvem');
+  await page.locator('[data-pop="ws"]').click();
+  await page.locator('[data-a="newWorkspace"]').click();
+  await page.locator('#workspace-name').fill('Árvore de teste ' + Date.now());
+  await page.locator('form[data-submit="createWorkspace"] button[type="submit"]').click();
+  await expect(page.locator('.shell')).toBeVisible();
+  expect(await page.evaluate(() => window.__gr8r.D().tasks.length)).toBe(0);
+  await page.locator('[data-a="newProject"]').first().click();
+  await page.locator('#p-name').fill('Cloud project');
+  await page.locator('[data-a="submitProject"]').click();
+  await expect.poll(() => page.evaluate(() => window.__gr8r.S.sync.status)).toBe('saved');
+  await page.locator('.tab[data-tab="board"]').click();
+  await page.locator('[data-a="newTask"]').first().click();
+  await page.locator('#f-title').fill('Cloud browser task');
+  await page.locator('[data-a="submitTask"]').click();
+  await expect.poll(() => page.evaluate(() => window.__gr8r.S.sync.status)).toBe('saved');
+  await page.reload();
+  await expect(page.locator('.shell')).toBeVisible();
+  expect(await page.evaluate(() => window.__gr8r.D().tasks.some(task => task.title === 'Cloud browser task'))).toBe(true);
+  await page.locator('[data-pop="ws"]').click();
+  await page.locator('[data-a="signOut"]').click();
+  await expect(page.locator('#l-email')).toBeVisible();
+  expect(await page.evaluate(() => window.__gr8r.D().tasks.length)).toBe(0);
+  await page.reload();
+  await expect(page.locator('#l-email')).toBeVisible();
+  expect(failures).toEqual([]);
+});
+
+test('cloud login remembers the chosen language before authentication', async ({ page }) => {
+  test.skip(!process.env.SUPABASE_E2E_USER_FILE, 'Requires the separately started local Supabase stack.');
+  await page.goto(process.env.SUPABASE_E2E_APP_URL || 'http://127.0.0.1:5174');
+  await page.locator('#auth-language').selectOption('en');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await page.reload();
+  await expect(page.locator('#l-email')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+});

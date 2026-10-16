@@ -4,15 +4,15 @@
 .pgrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-  gap: 12px;
+  gap: var(--s-3);
 }
 .pcard {
-  border: 1px solid var(--border);
+  border: var(--stroke) solid var(--border);
   border-radius: var(--r-lg);
-  padding: 14px;
+  padding: var(--s-3-5);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--s-3);
   cursor: pointer;
   background: var(--surface);
   transition:
@@ -23,7 +23,7 @@
 }
 .pcard:hover {
   border-color: var(--border-strong);
-  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-project-hover);
 }
 .pcard .desc {
   font-size: var(--fs-sm);
@@ -33,22 +33,22 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   min-height: 2.9em;
-  line-height: 1.45;
+  line-height: var(--lh-body);
 }
 .pcard .foot {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2-5);
   font-size: var(--fs-xs);
   color: var(--text-3);
-  padding-top: 10px;
-  border-top: 1px solid var(--divider);
+  padding-top: var(--s-2-5);
+  border-top: var(--stroke) solid var(--divider);
 }
 .picon {
   --sz: 28px;
   width: var(--sz);
   height: var(--sz);
-  border-radius: 7px;
+  border-radius: calc(var(--radius-unit) * 3.5);
   display: grid;
   place-items: center;
   background: color-mix(in srgb, var(--c) 14%, transparent);
@@ -57,7 +57,7 @@
 }
 .picon.lg {
   --sz: 36px;
-  border-radius: 9px;
+  border-radius: calc(var(--radius-unit) * 4.5);
 }
 .pcard .more {
   position: absolute;
@@ -71,43 +71,43 @@
 .pstatus {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: calc(var(--space-unit) * 1.25);
   font-size: var(--fs-xs);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   height: 20px;
-  padding: 0 7px;
-  border-radius: 5px;
-  border: 1px solid var(--border);
+  padding: 0 calc(var(--space-unit) * 1.75);
+  border-radius: calc(var(--radius-unit) * 2.5);
+  border: var(--stroke) solid var(--border);
   white-space: nowrap;
 }
 .pstatus i {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--r-circle);
   background: var(--c);
 }
 .proj-h {
-  padding: 20px var(--gutter) 0;
+  padding: var(--s-5) var(--gutter) 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--s-3);
 }
 .proj-h .t {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--s-3);
   flex-wrap: wrap;
 }
 .proj-h h1 {
   font-size: var(--fs-xl);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   margin: 0;
-  letter-spacing: -0.018em;
+  letter-spacing: calc(var(--tracking-label) * -0.3);
 }
 /* tabs bleed to the edges; the first label still starts on the gutter (tab has 10px side padding) */
 .proj-h .tabs {
   margin: 0 calc(-1 * var(--gutter));
-  padding: 0 calc(var(--gutter) - 10px);
+  padding: 0 calc(var(--gutter) - var(--s-2-5));
 }
 .feed {
   display: flex;
@@ -115,20 +115,20 @@
 }
 .fitem {
   display: flex;
-  gap: 10px;
-  padding: 9px 0;
+  gap: var(--s-2-5);
+  padding: calc(var(--space-unit) * 2.25) 0;
   font-size: var(--fs-sm);
-  line-height: 1.45;
+  line-height: var(--lh-body);
   position: relative;
 }
 .fitem .av {
-  margin-top: 1px;
+  margin-top: calc(var(--space-unit) * 0.25);
 }
 .fitem b {
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 .fitem .obj {
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   cursor: pointer;
 }
 .fitem .obj:hover {
@@ -151,16 +151,16 @@
 }
 .day-h {
   font-size: var(--fs-xs);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: var(--text-3);
-  padding: 14px 0 4px;
+  padding: var(--s-3-5) 0 var(--s-1);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-label);
 }
 .kv {
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
-  row-gap: 2px;
+  row-gap: var(--s-half);
   align-items: center;
   font-size: var(--fs-sm);
 }
@@ -168,7 +168,7 @@
   color: var(--text-2);
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: calc(var(--space-unit) * 1.75);
   height: 30px;
   margin: 0;
 }
@@ -177,7 +177,7 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s-1);
   flex-wrap: wrap;
   min-height: 30px;
 }
@@ -189,10 +189,10 @@
 .fgrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
+  gap: var(--s-3);
 }
 .fcard {
-  border: 1px solid var(--border);
+  border: var(--stroke) solid var(--border);
   border-radius: var(--r-lg);
   overflow: hidden;
   cursor: pointer;
@@ -209,7 +209,7 @@
   display: grid;
   place-items: center;
   background: var(--sunken);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--stroke) solid var(--border);
   position: relative;
   overflow: hidden;
   max-width: 100%;
@@ -217,18 +217,18 @@
 .fprev .art {
   position: absolute;
   inset: 14px 18px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   background: var(--surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  padding: 10px;
+  box-shadow: var(--shadow-file);
+  padding: var(--s-2-5);
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: calc(var(--space-unit) * 1.25);
 }
 .fprev .art i {
   display: block;
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--r-2xs);
   background: var(--surface-3);
 }
 .fprev .art i.h {
@@ -241,23 +241,23 @@
   right: 8px;
   bottom: 8px;
   font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 5px;
-  border-radius: 4px;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+  padding: var(--s-half) calc(var(--space-unit) * 1.25);
+  border-radius: var(--r-xs);
   background: var(--c);
-  color: #fff;
+  color: var(--on-solid);
   text-transform: uppercase;
 }
 .fcard .fi {
-  padding: 9px 10px;
+  padding: calc(var(--space-unit) * 2.25) var(--s-2-5);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--s-half);
 }
 .fcard .fn {
   font-size: var(--fs-sm);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 .fcard .fm {
   font-size: var(--fs-2xs);
@@ -277,7 +277,7 @@
 .ftype {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   display: grid;
   place-items: center;
   background: color-mix(in srgb, var(--c) 13%, transparent);
@@ -287,20 +287,20 @@
 .upl {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
+  gap: var(--s-2-5);
+  padding: var(--s-2-5) var(--s-3);
+  border: var(--stroke) solid var(--border);
   border-radius: var(--r);
   font-size: var(--fs-sm);
 }
 .dropzone {
-  border: 1.5px dashed var(--border-strong);
+  border: var(--stroke-medium) dashed var(--border-strong);
   border-radius: var(--r-lg);
-  padding: 18px;
+  padding: calc(var(--space-unit) * 4.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: var(--s-2-5);
   color: var(--text-2);
   font-size: var(--fs-sm);
   transition:

@@ -1,37 +1,166 @@
+import { t } from './i18n.js';
 /* ---------- vocab ---------- */
 export const STATUSES = [
-  { id: 'backlog', name: 'Backlog' },
-  { id: 'todo', name: 'To Do' },
-  { id: 'progress', name: 'In Progress' },
-  { id: 'review', name: 'Review' },
-  { id: 'done', name: 'Done' },
+  {
+    id: 'backlog',
+    get name() {
+      return t('Backlog');
+    },
+  },
+  {
+    id: 'todo',
+    get name() {
+      return t('To Do');
+    },
+  },
+  {
+    id: 'progress',
+    get name() {
+      return t('In Progress');
+    },
+  },
+  {
+    id: 'review',
+    get name() {
+      return t('Review');
+    },
+  },
+  {
+    id: 'done',
+    get name() {
+      return t('Done');
+    },
+  },
 ];
 export const ST = Object.fromEntries(STATUSES.map(s => [s.id, s]));
 export const PRIOS = [
-  { id: 'urgent', name: 'Urgent', w: 4 },
-  { id: 'high', name: 'High', w: 3 },
-  { id: 'medium', name: 'Medium', w: 2 },
-  { id: 'low', name: 'Low', w: 1 },
-  { id: 'none', name: 'No priority', w: 0 },
+  {
+    id: 'urgent',
+    get name() {
+      return t('Urgent');
+    },
+    w: 4,
+  },
+  {
+    id: 'high',
+    get name() {
+      return t('High');
+    },
+    w: 3,
+  },
+  {
+    id: 'medium',
+    get name() {
+      return t('Medium');
+    },
+    w: 2,
+  },
+  {
+    id: 'low',
+    get name() {
+      return t('Low');
+    },
+    w: 1,
+  },
+  {
+    id: 'none',
+    get name() {
+      return t('No priority');
+    },
+    w: 0,
+  },
 ];
 export const PR = Object.fromEntries(PRIOS.map(p => [p.id, p]));
 export const LABELS = [
-  { id: 'design', name: 'Design', c: 'var(--violet)' },
-  { id: 'frontend', name: 'Frontend', c: 'var(--blue)' },
-  { id: 'backend', name: 'Backend', c: 'var(--teal)' },
-  { id: 'research', name: 'Research', c: 'var(--amber)' },
-  { id: 'content', name: 'Content', c: 'var(--rose)' },
-  { id: 'bug', name: 'Bug', c: 'var(--red)' },
-  { id: 'qa', name: 'QA', c: 'var(--green)' },
-  { id: 'growth', name: 'Growth', c: 'var(--orange)' },
+  {
+    id: 'design',
+    get name() {
+      return t('Design');
+    },
+    c: 'var(--violet)',
+  },
+  {
+    id: 'frontend',
+    get name() {
+      return t('Frontend');
+    },
+    c: 'var(--blue)',
+  },
+  {
+    id: 'backend',
+    get name() {
+      return t('Backend');
+    },
+    c: 'var(--teal)',
+  },
+  {
+    id: 'research',
+    get name() {
+      return t('Research');
+    },
+    c: 'var(--amber)',
+  },
+  {
+    id: 'content',
+    get name() {
+      return t('Content');
+    },
+    c: 'var(--rose)',
+  },
+  {
+    id: 'bug',
+    get name() {
+      return t('Bug');
+    },
+    c: 'var(--red)',
+  },
+  {
+    id: 'qa',
+    get name() {
+      return t('QA');
+    },
+    c: 'var(--green)',
+  },
+  {
+    id: 'growth',
+    get name() {
+      return t('Growth');
+    },
+    c: 'var(--orange)',
+  },
 ];
 export const LB = Object.fromEntries(LABELS.map(l => [l.id, l]));
 export const PSTAT = {
-  planning: { name: 'Planning', c: 'var(--gray)' },
-  active: { name: 'In Progress', c: 'var(--blue)' },
-  risk: { name: 'At Risk', c: 'var(--red)' },
-  hold: { name: 'On Hold', c: 'var(--amber)' },
-  complete: { name: 'Completed', c: 'var(--green)' },
+  planning: {
+    get name() {
+      return t('Planning');
+    },
+    c: 'var(--gray)',
+  },
+  active: {
+    get name() {
+      return t('In Progress');
+    },
+    c: 'var(--blue)',
+  },
+  risk: {
+    get name() {
+      return t('At Risk');
+    },
+    c: 'var(--red)',
+  },
+  hold: {
+    get name() {
+      return t('On Hold');
+    },
+    c: 'var(--amber)',
+  },
+  complete: {
+    get name() {
+      return t('Completed');
+    },
+    c: 'var(--green)',
+  },
 };
 export const PCOLORS = {
   indigo: '#5A67D8',

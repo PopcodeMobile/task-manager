@@ -16,23 +16,23 @@ table.tbl {
 .tbl th {
   position: sticky;
   top: 0;
-  z-index: 3;
+  z-index: var(--z-sticky-cell);
   background: var(--surface);
-  height: 34px;
+  height: var(--table-head-h);
   text-align: left;
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   color: var(--text-2);
   font-size: var(--fs-xs);
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--divider);
-  padding: 0 10px;
+  border-bottom: var(--stroke) solid var(--border);
+  border-right: var(--stroke) solid var(--divider);
+  padding: 0 var(--s-2-5);
   white-space: nowrap;
   user-select: none;
 }
 .tbl th .thi {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: calc(var(--space-unit) * 1.25);
   cursor: pointer;
   overflow: hidden;
 }
@@ -46,17 +46,17 @@ table.tbl {
   bottom: 0;
   width: 6px;
   cursor: col-resize;
-  z-index: 4;
+  z-index: var(--z-resizer);
 }
 .tbl th .rsz:hover,
 .tbl th .rsz.on {
   background: var(--accent-line);
 }
 .tbl td {
-  height: 36px;
-  border-bottom: 1px solid var(--divider);
-  border-right: 1px solid var(--divider);
-  padding: 0 10px;
+  height: var(--table-row-h);
+  border-bottom: var(--stroke) solid var(--divider);
+  border-right: var(--stroke) solid var(--divider);
+  padding: 0 var(--s-2-5);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -80,29 +80,29 @@ table.tbl {
 .tbl .sticky {
   position: sticky;
   left: 0;
-  z-index: 2;
+  z-index: var(--z-sticky);
 }
 .tbl th.sticky {
-  z-index: 5;
+  z-index: var(--z-sticky-header);
 }
 .tbl td.cellbtn {
   cursor: pointer;
 }
 .tbl .grow-row td {
   background: var(--sunken);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   font-size: var(--fs-xs);
   color: var(--text-2);
   height: 32px;
 }
 .tbl .depchip {
   font-family: var(--mono);
-  font-size: 11px;
-  padding: 1px 5px;
-  border-radius: 4px;
+  font-size: var(--fs-2xs);
+  padding: calc(var(--space-unit) * 0.25) calc(var(--space-unit) * 1.25);
+  border-radius: var(--r-xs);
   background: var(--surface-3);
   color: var(--text-2);
-  margin-right: 4px;
+  margin-right: var(--s-1);
 }
 /* the sticky first column starts on the shared gutter, like the breadcrumb and toolbar above it */
 .tbl th:first-child,

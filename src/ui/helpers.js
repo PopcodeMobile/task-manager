@@ -1,18 +1,19 @@
+import { t as tr, formatNumber } from '../core/i18n.js';
 /* ---------- small render helpers ---------- */
-import { TODAY, diffD, esc, parse, relDate } from '../core/utils.js';
+import { TODAY, diffD, esc, fmtDate, parse, relDate } from '../core/utils.js';
 import { ic } from '../core/icons.js';
 import { LB, PR, PSTAT, ST } from '../core/constants.js';
 import { D, mem, pColor } from '../core/store.js';
 
 export function av(id, cls = '', tip = true) {
   const m = mem(id);
-  if (!m) return `<span class="av empty ${cls}" ${tip ? 'data-tip="Unassigned"' : ''}>${ic('user', 11)}</span>`;
+  if (!m) return `<span class="av empty ${cls}" ${tip ? `data-tip="${tr('Unassigned')}"` : ''}>${ic('user', 11)}</span>`;
   const ini = m.name
     .split(' ')
     .map(x => x[0])
     .join('')
     .slice(0, 2);
-  return `<span class="av ${cls}" style="--c:${m.c}" ${tip ? `data-tip="${esc(m.name)}"` : ''} aria-label="${esc(m.name)}">${ini}</span>`;
+  return `<span class="av ${cls}" style="--c:${m.c}" ${tip ? `data-tip="${esc(m.name)}"` : ''} aria-label="${esc(m.name)}">${esc(ini)}</span>`;
 }
 export function avStack(ids, max = 4, cls = 'sm') {
   const v = ids.slice(0, max);
@@ -34,7 +35,7 @@ export function stIcon(st, s = 14) {
 }
 export function prIcon(p, s = 14) {
   if (p === 'urgent')
-    return `<svg width="${s}" height="${s}" viewBox="0 0 14 14" aria-hidden="true" style="flex-shrink:0"><rect x="1" y="1" width="12" height="12" rx="3" fill="var(--red)"/><path d="M7 3.8v4" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/><circle cx="7" cy="10.1" r=".95" fill="#fff"/></svg>`;
+    return `<svg width="${s}" height="${s}" viewBox="0 0 14 14" aria-hidden="true" style="flex-shrink:0"><rect x="1" y="1" width="12" height="12" rx="3" fill="var(--red)"/><path d="M7 3.8v4" stroke="var(--on-danger)" stroke-width="1.7" stroke-linecap="round"/><circle cx="7" cy="10.1" r=".95" fill="var(--on-danger)"/></svg>`;
   if (!p || p === 'none')
     return `<svg width="${s}" height="${s}" viewBox="0 0 14 14" aria-hidden="true" style="flex-shrink:0"><path d="M2.5 7h2M6 7h2M9.5 7h2" stroke="var(--text-3)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   const w = PR[p].w;
@@ -74,12 +75,48 @@ export function fmtComment(txt) {
 export const FT = {
   fig: { c: '#8662C9', i: 'pen-tool', n: 'Figma' },
   pdf: { c: '#C4473A', i: 'file-text', n: 'PDF' },
-  zip: { c: '#6B7280', i: 'folder-archive', n: 'Archive' },
-  img: { c: '#23918A', i: 'image', n: 'Image' },
-  sheet: { c: '#3D8E5F', i: 'file-spreadsheet', n: 'Spreadsheet' },
-  doc: { c: '#3B82C4', i: 'file-text', n: 'Document' },
-  code: { c: '#C48A1E', i: 'file-code', n: 'Code' },
-  other: { c: '#6B7280', i: 'file', n: 'File' },
+  zip: {
+    c: '#6B7280',
+    i: 'folder-archive',
+    get n() {
+      return tr('Archive');
+    },
+  },
+  img: {
+    c: '#23918A',
+    i: 'image',
+    get n() {
+      return tr('Image');
+    },
+  },
+  sheet: {
+    c: '#3D8E5F',
+    i: 'file-spreadsheet',
+    get n() {
+      return tr('Spreadsheet');
+    },
+  },
+  doc: {
+    c: '#3B82C4',
+    i: 'file-text',
+    get n() {
+      return tr('Document');
+    },
+  },
+  code: {
+    c: '#C48A1E',
+    i: 'file-code',
+    get n() {
+      return tr('Code');
+    },
+  },
+  other: {
+    c: '#6B7280',
+    i: 'file',
+    get n() {
+      return tr('File');
+    },
+  },
 };
 export function fileType(name) {
   const e = (name.split('.').pop() || '').toLowerCase();
@@ -93,20 +130,65 @@ export function fileType(name) {
   return 'other';
 }
 export function fsize(b) {
-  if (b < 1024) return b + ' B';
-  if (b < 1048576) return Math.round(b / 1024) + ' KB';
-  return (b / 1048576).toFixed(1) + ' MB';
+  if (b < 1024) return formatNumber(b) + ' B';
+  if (b < 1048576) return formatNumber(Math.round(b / 1024)) + ' KB';
+  return formatNumber(b / 1048576, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MB';
 }
 export function filePrev(f) {
   const t = FT[f.type] || FT.other;
   let art;
   if (f.type === 'img')
     art = `<div class="art" style="padding:0;overflow:hidden;background:linear-gradient(135deg,color-mix(in srgb,${t.c} 35%,var(--surface)),color-mix(in srgb,${t.c} 10%,var(--surface)))"><svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%"><path d="M0 60 L30 28 L52 46 L70 32 L100 58 L100 60Z" fill="color-mix(in srgb,${t.c} 45%,var(--surface))"/><circle cx="76" cy="16" r="7" fill="color-mix(in srgb,${t.c} 30%,var(--surface))"/></svg></div>`;
-  else if (f.type === 'sheet') art = `<div class="art" style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">${'<i></i>'.repeat(20)}</div>`;
+  else if (f.type === 'sheet')
+    art = `<div class="art" style="display:grid;grid-template-columns:repeat(4,1fr);gap:calc(var(--space-unit) * 0.75)">${'<i></i>'.repeat(20)}</div>`;
   else if (f.type === 'fig')
-    art = `<div class="art" style="flex-direction:row;gap:6px"><div style="flex:1;display:flex;flex-direction:column;gap:5px"><i class="h"></i><i></i><i style="width:70%"></i><i style="height:18px;background:color-mix(in srgb,${t.c} 20%,var(--surface))"></i></div><div style="width:34%;border-radius:3px;background:color-mix(in srgb,${t.c} 14%,var(--surface))"></div></div>`;
+    art = `<div class="art" style="flex-direction:row;gap:var(--s-1-5)"><div style="flex:1;display:flex;flex-direction:column;gap:calc(var(--space-unit) * 1.25)"><i class="h"></i><i></i><i style="width:70%"></i><i style="height:18px;background:color-mix(in srgb,${t.c} 20%,var(--surface))"></i></div><div style="width:34%;border-radius:calc(var(--radius-unit) * 1.5);background:color-mix(in srgb,${t.c} 14%,var(--surface))"></div></div>`;
   else if (f.type === 'zip') art = `<div style="color:${t.c}">${ic('folder-archive', 30)}</div>`;
   else art = `<div class="art"><i class="h"></i><i></i><i></i><i style="width:80%"></i><i></i><i style="width:60%"></i></div>`;
   const ext = (f.name.split('.').pop() || '').slice(0, 4);
   return `<div class="fprev">${art}<span class="ext" style="--c:${t.c}">${esc(ext)}</span></div>`;
+}
+
+// System activity metadata is localized at display time; names and free text stay intact.
+export function activityExtra(activity) {
+  const extra = activity.extra;
+  if (!extra) return '';
+  if (typeof extra === 'object') {
+    const to = value => tr('to {value}', { value });
+    switch (extra.kind) {
+      case 'status':
+        return tr('from {from} to {to}', { from: ST[extra.from]?.name || extra.from, to: ST[extra.to]?.name || extra.to });
+      case 'priority':
+        return to(PR[extra.value]?.name || extra.value);
+      case 'projectStatus':
+        return to(PSTAT[extra.value]?.name || extra.value);
+      case 'assignee':
+        return extra.name ? to(extra.name) : tr('(unassigned)');
+      case 'date':
+        return extra.value ? to(fmtDate(extra.value)) : tr('(cleared)');
+      case 'rename':
+        return tr('to “{value}”', { value: extra.value });
+      case 'repeat':
+        return extra.value ? tr(extra.value) : tr('off');
+      case 'estimate':
+        return extra.value || tr('none');
+      case 'into':
+        return tr('into {value}', { value: extra.value });
+      case 'to':
+        return to(extra.value);
+      default:
+        return '';
+    }
+  }
+  // Backwards compatibility for activity already stored by the English prototype.
+  if (['(unassigned)', '(cleared)', 'off', 'none'].includes(extra)) return tr(extra);
+  if (activity.verb === 'changed priority of' && extra.startsWith('to ')) return tr('to {value}', { value: tr(extra.slice(3)) });
+  if (activity.verb === 'moved' && /^to (Backlog|To Do|In Progress|Review|Done)$/.test(extra)) return tr('to {value}', { value: tr(extra.slice(3)) });
+  if (extra.startsWith('from ') && extra.includes(' to ')) {
+    const [from, to] = extra.slice(5).split(' to ');
+    return tr('from {from} to {to}', { from: tr(from), to: tr(to) });
+  }
+  if (extra.startsWith('to ')) return tr('to {value}', { value: extra.slice(3) });
+  if (extra.startsWith('into ')) return tr('into {value}', { value: extra.slice(5) });
+  return extra;
 }

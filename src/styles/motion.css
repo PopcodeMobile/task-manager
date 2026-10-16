@@ -53,7 +53,7 @@
 @keyframes doneRing {
   from {
     box-shadow:
-      0 0 0 2px var(--green),
+      0 0 0 2px var(--success),
       var(--shadow-card);
   }
   to {
@@ -91,30 +91,30 @@
 /* route change: content rises in, lightly staggered */
 .fx-route > .page > *,
 .fx-route > .fullstate {
-  animation: riseIn 0.36s var(--ease) both;
+  animation: riseIn calc(var(--motion-step) * 36) var(--ease) both;
 }
 .fx-route > .page > *:nth-child(2) {
-  animation-delay: 0.035s;
+  animation-delay: calc(var(--motion-step) * 3.5);
 }
 .fx-route > .page > *:nth-child(3) {
-  animation-delay: 0.07s;
+  animation-delay: calc(var(--motion-step) * 7);
 }
 .fx-route > .page > *:nth-child(n + 4) {
-  animation-delay: 0.1s;
+  animation-delay: calc(var(--motion-step) * 10);
 }
 .fx-route .grid2 > * > *:nth-child(2),
 .fx-route .grid2 > *:nth-child(2) > *:first-child {
-  animation: riseIn 0.4s 0.09s var(--ease) both;
+  animation: riseIn var(--dur-page) calc(var(--motion-step) * 9) var(--ease) both;
 }
 .fx-route .prog > i {
-  animation: growX 0.8s 0.12s var(--ease) both;
+  animation: growX calc(var(--motion-step) * 80) var(--dur-fast) var(--ease) both;
 }
 .fx-route .stackbar i {
   transform-origin: left;
-  animation: growX 0.8s 0.12s var(--ease) both;
+  animation: growX calc(var(--motion-step) * 80) var(--dur-fast) var(--ease) both;
 }
 .fx-route .bar {
-  animation: riseIn 0.4s var(--ease) both;
+  animation: riseIn var(--dur-page) var(--ease) both;
 }
 .pbody {
   flex: 1;
@@ -123,109 +123,109 @@
   flex-direction: column;
 }
 .pbody.fx-tab > * {
-  animation: riseIn 0.26s var(--ease) both;
+  animation: riseIn var(--dur-enter) var(--ease) both;
 }
 .pbody.fx-tab .kcard {
-  animation: riseIn 0.32s var(--ease) both;
+  animation: riseIn calc(var(--motion-step) * 32) var(--ease) both;
 }
 .pbody.fx-tab .bcol:nth-child(2) .kcard {
-  animation-delay: 0.03s;
+  animation-delay: calc(var(--motion-step) * 3);
 }
 .pbody.fx-tab .bcol:nth-child(3) .kcard {
-  animation-delay: 0.06s;
+  animation-delay: calc(var(--motion-step) * 6);
 }
 .pbody.fx-tab .bcol:nth-child(n + 4) .kcard {
-  animation-delay: 0.09s;
+  animation-delay: calc(var(--motion-step) * 9);
 }
 /* task completed */
 .trow.fx-done,
 .mini.fx-done {
-  animation: doneWash 1s var(--ease) both;
+  animation: doneWash var(--dur-feedback) var(--ease) both;
 }
 .kcard.fx-done {
-  animation: doneRing 1s var(--ease) both;
+  animation: doneRing var(--dur-feedback) var(--ease) both;
 }
 .fx-done .check,
 .fx-done .done-ic {
-  animation: popCheck 0.42s var(--spring) both;
+  animation: popCheck calc(var(--motion-step) * 42) var(--spring) both;
 }
 .fx-done .tt,
 .fx-done .title {
   text-decoration: none !important;
   background: linear-gradient(currentColor, currentColor) 0 58%/0 1.5px no-repeat;
-  animation: strike 0.38s 0.1s var(--ease) forwards;
+  animation: strike calc(var(--motion-step) * 38) calc(var(--motion-step) * 10) var(--ease) forwards;
 }
 /* dropped, created */
 .kcard.fx-moved {
-  animation: land 0.5s var(--spring) both;
+  animation: land calc(var(--motion-step) * 50) var(--spring) both;
 }
 .cev.fx-moved,
 .wcard.fx-moved {
-  animation: popCheck 0.4s var(--spring) both;
+  animation: popCheck var(--dur-page) var(--spring) both;
 }
 .trow.fx-added,
 .mini.fx-added {
   animation:
-    riseIn 0.3s var(--ease) both,
-    addWash 1.4s var(--ease) both;
+    riseIn calc(var(--motion-step) * 30) var(--ease) both,
+    addWash calc(var(--motion-step) * 140) var(--ease) both;
 }
 .kcard.fx-added {
   animation:
-    riseIn 0.3s var(--ease) both,
-    addRing 1.4s var(--ease) both;
+    riseIn calc(var(--motion-step) * 30) var(--ease) both,
+    addRing calc(var(--motion-step) * 140) var(--ease) both;
 }
 .subt.fx-added {
-  animation: riseIn 0.28s var(--ease) both;
+  animation: riseIn calc(var(--motion-step) * 28) var(--ease) both;
 }
 /* auth + onboarding */
 .auth-card.fx-auth > * {
-  animation: riseIn 0.42s var(--ease) both;
+  animation: riseIn calc(var(--motion-step) * 42) var(--ease) both;
 }
 .auth-card.fx-auth > *:nth-child(2) {
-  animation-delay: 0.04s;
+  animation-delay: calc(var(--motion-step) * 4);
 }
 .auth-card.fx-auth > *:nth-child(3) {
-  animation-delay: 0.08s;
+  animation-delay: calc(var(--motion-step) * 8);
 }
 .auth-card.fx-auth > *:nth-child(n + 4) {
-  animation-delay: 0.12s;
+  animation-delay: var(--dur-fast);
 }
 .onb.fx-step > *:not(.steps) {
-  animation: slideInR 0.36s var(--ease) both;
+  animation: slideInR calc(var(--motion-step) * 36) var(--ease) both;
 }
 .onb.fx-step > *:nth-child(n + 4) {
-  animation-delay: 0.05s;
+  animation-delay: calc(var(--motion-step) * 5);
 }
 .steps i {
   transform-origin: left;
-  transition: background 0.3s;
+  transition: background calc(var(--motion-step) * 30);
 }
 .onb.fx-step .steps i.cur {
-  animation: growX 0.45s var(--ease) both;
+  animation: growX calc(var(--motion-step) * 45) var(--ease) both;
 }
 .onb.fx-step .ready-row {
-  animation: riseIn 0.4s var(--ease) both;
+  animation: riseIn var(--dur-page) var(--ease) both;
 }
 .onb.fx-step .ready-row:nth-child(2) {
-  animation-delay: 0.12s;
+  animation-delay: var(--dur-fast);
 }
 .onb.fx-step .ready-row:nth-child(3) {
-  animation-delay: 0.24s;
+  animation-delay: calc(var(--motion-step) * 24);
 }
 .onb.fx-step .ready-row .ok {
-  animation: popCheck 0.42s var(--spring) both;
+  animation: popCheck calc(var(--motion-step) * 42) var(--spring) both;
 }
 .onb.fx-step .ready-row:nth-child(1) .ok {
-  animation-delay: 0.18s;
+  animation-delay: calc(var(--motion-step) * 18);
 }
 .onb.fx-step .ready-row:nth-child(2) .ok {
-  animation-delay: 0.3s;
+  animation-delay: calc(var(--motion-step) * 30);
 }
 .onb.fx-step .ready-row:nth-child(3) .ok {
-  animation-delay: 0.42s;
+  animation-delay: calc(var(--motion-step) * 42);
 }
 .onb.fx-step .ready-badge {
-  animation: popCheck 0.5s 0.05s var(--spring) both;
+  animation: popCheck calc(var(--motion-step) * 50) calc(var(--motion-step) * 5) var(--spring) both;
 }
 /* tactile micro-feedback */
 .check:active {
@@ -235,16 +235,16 @@
   transition:
     background var(--dur),
     border-color var(--dur),
-    transform 0.12s var(--ease);
+    transform var(--dur-fast) var(--ease);
 }
 .toggle::after {
-  transition: transform 0.28s var(--spring);
+  transition: transform calc(var(--motion-step) * 28) var(--spring);
 }
 .pcard {
   transition:
     border-color var(--dur),
-    box-shadow 0.2s var(--ease),
-    transform 0.2s var(--ease);
+    box-shadow var(--dur-ui) var(--ease),
+    transform var(--dur-ui) var(--ease);
 }
 .pcard:hover {
   transform: translateY(-2px);
@@ -252,7 +252,7 @@
 .kcard {
   transition:
     box-shadow var(--dur),
-    transform 0.18s var(--ease);
+    transform calc(var(--motion-step) * 18) var(--ease);
 }
 .kcard:hover {
   transform: translateY(-1px);
@@ -277,7 +277,7 @@
   .onb.fx-step .ready-row,
   .onb.fx-step .ready-row .ok,
   .onb.fx-step .ready-badge {
-    animation: fadeOnly 0.12s both !important;
+    animation: fadeOnly var(--dur-fast) both !important;
   }
   .fx-route .prog > i,
   .fx-route .stackbar i,
@@ -302,7 +302,7 @@
 :root[data-motion='reduce'] .onb.fx-step > *,
 :root[data-motion='reduce'] .drawer.enter .drawer-b > *,
 :root[data-motion='reduce'] .kcard.fx-moved {
-  animation: fadeOnly 0.12s both !important;
+  animation: fadeOnly var(--dur-fast) both !important;
 }
 :root[data-motion='reduce'] .fx-route .prog > i,
 :root[data-motion='reduce'] .fx-route .stackbar i {

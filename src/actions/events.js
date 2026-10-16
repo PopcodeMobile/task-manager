@@ -4,7 +4,7 @@
 import { $$ } from '../core/utils.js';
 import { S } from '../core/store.js';
 import { render } from '../shell/render.js';
-import { A, BLUR, DBL, IN } from './actions.js';
+import { A, BLUR, DBL, IN } from './registry.js';
 
 document.addEventListener(
   'click',

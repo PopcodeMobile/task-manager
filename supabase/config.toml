@@ -1,0 +1,54 @@
+project_id = "task-manager-review"
+
+[api]
+enabled = true
+port = 61921
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 61922
+shadow_port = 61920
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[db.pooler]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173", "http://localhost:5173/#reset"]
+jwt_expiry = 3600
+enable_signup = true
+minimum_password_length = 10
+
+# Local integration tests only. Hosted environments should require confirmation.
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[studio]
+enabled = false
+port = 61923
+
+[inbucket]
+enabled = true
+port = 61924
+
+[storage]
+enabled = false
+
+[realtime]
+enabled = false
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false
+port = 61927

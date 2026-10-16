@@ -3,13 +3,13 @@
    ============================================================ */
 .tl {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: var(--timeline-label-w) minmax(0, 1fr);
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 .tl-left {
-  border-right: 1px solid var(--border);
+  border-right: var(--stroke) solid var(--border);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -21,30 +21,30 @@
 .tl-head {
   height: 52px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--stroke) solid var(--border);
   background: var(--surface);
   position: sticky;
   top: 0;
-  z-index: 4;
+  z-index: var(--z-resizer);
 }
 .tl-left .tl-head {
   display: flex;
   align-items: flex-end;
-  padding: 0 12px 8px var(--gutter);
+  padding: 0 var(--s-3) var(--s-2) var(--gutter);
   font-size: var(--fs-xs);
   color: var(--text-3);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 .tl-rows {
   overflow: hidden;
 }
 .tl-row {
-  height: 36px;
+  height: var(--timeline-row-h);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px 0 var(--gutter);
-  border-bottom: 1px solid var(--divider);
+  gap: var(--s-2);
+  padding: 0 var(--s-3) 0 var(--gutter);
+  border-bottom: var(--stroke) solid var(--divider);
   font-size: var(--fs-sm);
   cursor: pointer;
   white-space: nowrap;
@@ -53,14 +53,14 @@
   background: var(--surface-2);
 }
 .tl-row.g {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   font-size: var(--fs-xs);
   color: var(--text-2);
   background: var(--sunken);
   cursor: default;
 }
 .tl-row.sub {
-  padding-left: 34px;
+  padding-left: calc(var(--space-unit) * 8.5);
   color: var(--text-2);
   font-size: var(--fs-xs);
 }
@@ -76,13 +76,13 @@
 }
 .tl-days {
   top: 26px;
-  border-top: 1px solid var(--divider);
+  border-top: var(--stroke) solid var(--divider);
 }
 .tl-months div {
-  border-left: 1px solid var(--border);
+  border-left: var(--stroke) solid var(--border);
   font-size: var(--fs-xs);
-  font-weight: 600;
-  padding: 5px 0;
+  font-weight: var(--fw-semibold);
+  padding: calc(var(--space-unit) * 1.25) 0;
   color: var(--text);
   white-space: nowrap;
 }
@@ -90,11 +90,11 @@
 .tl-months span {
   position: sticky;
   left: 8px;
-  padding: 0 8px;
+  padding: 0 var(--s-2);
 }
 .tl-days div {
-  border-left: 1px solid var(--divider);
-  font-size: 11px;
+  border-left: var(--stroke) solid var(--divider);
+  font-size: var(--fs-2xs);
   color: var(--text-3);
   display: grid;
   place-items: center;
@@ -102,7 +102,7 @@
 }
 .tl-days div.today {
   color: var(--accent);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .tl-grid {
   position: relative;
@@ -127,14 +127,14 @@
   width: 2px;
   background: var(--accent);
   opacity: 0.7;
-  z-index: 2;
+  z-index: var(--z-sticky);
 }
 .tl-rowbg {
   position: absolute;
   left: 0;
   right: 0;
-  height: 36px;
-  border-bottom: 1px solid var(--divider);
+  height: var(--timeline-row-h);
+  border-bottom: var(--stroke) solid var(--divider);
 }
 .tl-rowbg.g {
   background: color-mix(in srgb, var(--sunken) 70%, transparent);
@@ -143,19 +143,19 @@
   position: absolute;
   height: 24px;
   font-size: var(--fs-sm) !important;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: color-mix(in srgb, var(--c) 16%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+  border: var(--stroke) solid color-mix(in srgb, var(--c) 45%, transparent);
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 8px;
+  gap: var(--s-1-5);
+  padding: 0 var(--s-2);
   font-size: var(--fs-xs);
   color: var(--text);
   cursor: grab;
   overflow: hidden;
   white-space: nowrap;
-  z-index: 3;
+  z-index: var(--z-sticky-cell);
   user-select: none;
 }
 .bar:hover {
@@ -183,21 +183,21 @@
   white-space: nowrap;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-1-5);
   pointer-events: none;
-  z-index: 3;
+  z-index: var(--z-sticky-cell);
 }
 .ms-w {
   position: absolute;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   height: 18px;
-  z-index: 3;
+  z-index: var(--z-sticky-cell);
   cursor: default;
 }
 .ms-w:hover {
-  z-index: 6;
+  z-index: var(--z-active);
 }
 .ms {
   width: 12px;
@@ -205,11 +205,11 @@
   flex-shrink: 0;
   transform: rotate(45deg);
   background: var(--text);
-  border-radius: 2px;
+  border-radius: var(--r-2xs);
 }
 .ms-l {
   font-size: var(--fs-xs);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -224,6 +224,6 @@
   left: 0;
   top: 0;
   pointer-events: none;
-  z-index: 2;
+  z-index: var(--z-sticky);
   overflow: visible;
 }

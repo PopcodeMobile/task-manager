@@ -12,48 +12,9 @@ import { renderLayer } from '../overlays/drawer.js';
 import { placePop } from '../overlays/popovers.js';
 import { renderAuth } from '../pages/auth.js';
 
-export const ROUTE_NAMES = {
-  home: 'Home',
-  inbox: 'Inbox',
-  mytasks: 'My Tasks',
-  favorites: 'Favorites',
-  notifications: 'Notifications',
-  search: 'Search',
-  overview: 'Overview',
-  projects: 'Projects',
-  tasks: 'Tasks',
-  calendar: 'Calendar',
-  timeline: 'Timeline',
-  members: 'Members',
-  member: 'Member',
-  teams: 'Teams',
-  team: 'Team',
-  activity: 'Activity',
-  settings: 'Settings',
-  system: 'Design system',
-  states: 'System states',
-  archive: 'Archive',
-};
-export const ROUTE_ICONS = {
-  home: 'house',
-  inbox: 'inbox',
-  mytasks: 'circle-check',
-  favorites: 'star',
-  notifications: 'bell',
-  search: 'search',
-  overview: 'layout-dashboard',
-  projects: 'folder-kanban',
-  tasks: 'list-checks',
-  calendar: 'calendar',
-  timeline: 'chart-gantt',
-  members: 'users',
-  activity: 'activity',
-  teams: 'users',
-  settings: 'settings',
-  system: 'component',
-  states: 'layers',
-  archive: 'archive',
-};
+export { ROUTE_NAMES, ROUTE_ICONS } from '../core/navigation.js';
+import { ROUTE_NAMES } from '../core/navigation.js';
+import { t as tr } from '../core/i18n.js';
 
 export function go(route, params = {}, opt = {}) {
   if (route === 'project' && !params.tab) params.tab = 'board';
@@ -108,8 +69,8 @@ export function tryFocus(key) {
 export function pageTitle() {
   const u = S.ui;
   if (u.auth) return 'Gr8r Studio';
-  let t = ROUTE_NAMES[u.route] || 'Not found';
-  if (u.route === 'project' && proj(u.params.id)) t = `${(PTABS.find(x => x[0] === u.params.tab) || [0, 'Saved view'])[1]} · ${proj(u.params.id).name}`;
+  let t = ROUTE_NAMES[u.route] || tr('Not found');
+  if (u.route === 'project' && proj(u.params.id)) t = `${(PTABS.find(x => x[0] === u.params.tab) || [0, tr('Saved view')])[1]} · ${proj(u.params.id).name}`;
   if (u.route === 'member' && mem(u.params.id)) t = mem(u.params.id).name;
   if (u.route === 'team' && team(u.params.id)) t = team(u.params.id).name;
   return `${t} · ${D().ws.name}`;
@@ -151,8 +112,12 @@ export function render() {
   }
   const keep = $$('[data-keep]').map(el => [el.dataset.keep, el.scrollTop, el.scrollLeft]);
   $('#app').innerHTML = S.ui.auth ? renderAuth() : renderShell();
-  $('#layer').innerHTML = renderLayer();
+  $('#layer').innerHTML = S.ui.auth ? '' : renderLayer();
   makeFocusable();
+  if (S.workspace?.membership?.role === 'guest') {
+    for (const element of document.querySelectorAll('[contenteditable="true"]')) element.contentEditable = 'false';
+    for (const element of document.querySelectorAll('[draggable="true"]')) element.draggable = false;
+  }
   keep.forEach(([k, t, l]) => {
     const el = document.querySelector(`[data-keep="${CSS.escape(k)}"]`);
     if (el) {
@@ -174,7 +139,7 @@ export function render() {
   // Return focus to whatever opened a surface that just closed; otherwise keep the control that had it.
   const lost = () => !document.activeElement || document.activeElement === document.body;
   if (prevOv.modals > ov.modals) {
-    const k = S.ui.modalOpeners.splice(ov.modals).shift();
+    const k = (S.ui.modalOpeners || []).splice(ov.modals).shift();
     if (lost()) tryFocus(k);
   }
   if (prevOv.pop && !ov.pop && lost()) tryFocus(S.ui.popOpener);

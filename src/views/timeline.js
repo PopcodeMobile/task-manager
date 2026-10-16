@@ -1,3 +1,4 @@
+import { t as tr } from '../core/i18n.js';
 /* ---------- TIMELINE ---------- */
 import { $, MON, MONL, TODAY, addD, diffD, esc, fmtDate, parse } from '../core/utils.js';
 import { ic } from '../core/icons.js';
@@ -7,21 +8,21 @@ import { applyView, groupTasks, viewOf, viewToolbar } from '../shell/view-engine
 import { startOfWeek } from './calendar.js';
 
 export function tlControls() {
-  return `<div class="seg" style="margin-left:4px">${[
-    ['week', 'Weeks'],
-    ['month', 'Months'],
+  return `<div class="seg" style="margin-left:var(--s-1)">${[
+    ['week', tr('Weeks')],
+    ['month', tr('Months')],
   ]
     .map(([k, n]) => `<button class="${S.ui.tlZoom === k ? 'on' : ''}" data-a="set" data-k="tlZoom" data-v="${k}">${n}</button>`)
     .join('')}</div>
-  <select class="select" style="height:26px;width:auto;font-size:12px;margin-left:4px" data-in="tlGroup" aria-label="Group by">${[
-    ['status', 'Group: Status'],
-    ['assignee', 'Group: Assignee'],
-    ['project', 'Group: Project'],
-    ['none', 'No grouping'],
+  <select class="select" style="height:26px;width:auto;font-size:var(--fs-xs);margin-left:var(--s-1)" data-in="tlGroup" aria-label="${tr('Group by')}">${[
+    ['status', tr('Group: Status')],
+    ['assignee', tr('Group: Assignee')],
+    ['project', tr('Group: Project')],
+    ['none', tr('No grouping')],
   ]
     .map(([k, n]) => `<option value="${k}" ${S.ui.tlGroup === k ? 'selected' : ''}>${n}</option>`)
     .join('')}</select>
-  <button class="btn btn-ghost" data-a="tlToday">${ic('crosshair', 14)}Today</button>`;
+  <button class="btn btn-ghost" data-a="tlToday">${tr('{value1}Today', { value1: ic('crosshair', 14) })}</button>`;
 }
 export function timelineHtml(ts, key, p) {
   const dw = S.ui.tlZoom === 'week' ? 32 : 11;
@@ -115,28 +116,29 @@ export function timelineHtml(ts, key, p) {
     .join('');
   const left = rows
     .map(r => {
-      if (r.type === 'ms') return `<div class="tl-row g">${ic('diamond', 12)}Milestones<span class="faint" style="font-weight:500">${ms.length}</span></div>`;
+      if (r.type === 'ms')
+        return `<div class="tl-row g">${tr('{value1}Milestones', { value1: ic('diamond', 12) })}<span class="faint" style="font-weight:var(--fw-medium)">${ms.length}</span></div>`;
       if (r.type === 'g')
-        return `<div class="tl-row g">${r.G.html || ''}${esc(r.G.name)}<span class="faint" style="font-weight:500">${r.G.tasks.length}</span></div>`;
+        return `<div class="tl-row g">${r.G.html || ''}${esc(r.G.name)}<span class="faint" style="font-weight:var(--fw-medium)">${r.G.tasks.length}</span></div>`;
       const t = r.t;
-      return `<div class="tl-row" data-a="openTask" data-id="${t.id}">${stIcon(t.status, 13)}<span class="trunc grow" style="${t.status === 'done' ? 'color:var(--text-3)' : ''}">${esc(t.title)}</span>${t.subtasks.length ? `<span class="faint num" style="font-size:11px">${t.subtasks.filter(s => s.done).length}/${t.subtasks.length}</span>` : ''}${av(t.assignee, 'sm')}</div>`;
+      return `<div class="tl-row" data-a="openTask" data-id="${t.id}">${stIcon(t.status, 13)}<span class="trunc grow" style="${t.status === 'done' ? 'color:var(--text-3)' : ''}">${esc(t.title)}</span>${t.subtasks.length ? `<span class="faint num" style="font-size:var(--fs-2xs)">${t.subtasks.filter(s => s.done).length}/${t.subtasks.length}</span>` : ''}${av(t.assignee, 'sm')}</div>`;
     })
     .join('');
   if (!rows.length)
     return empty(
       'chart-gantt',
-      'Nothing on the timeline',
-      'Give tasks a start and due date to see them here.',
-      `<button class="btn btn-primary btn-sm" data-a="newTask" ${p ? `data-project="${p.id}"` : ''}>${ic('plus', 14)}New task</button>`,
+      tr('Nothing on the timeline'),
+      tr('Give tasks a start and due date to see them here.'),
+      `<button class="btn btn-primary btn-sm" data-a="newTask" ${p ? `data-project="${p.id}"` : ''}>${tr('{value1}New task', { value1: ic('plus', 14) })}</button>`,
     );
   const todayX = diffD(TODAY, rs) * dw;
   return `<div class="tl" data-tl-today="${todayX}" data-tl-key="${key}">
-    <div class="tl-left"><div class="tl-head">Task</div><div class="tl-rows" id="tl-rows">${left}<div style="height:40px"></div></div></div>
+    <div class="tl-left"><div class="tl-head">${tr('Task')}</div><div class="tl-rows" id="tl-rows">${left}<div style="height:40px"></div></div></div>
     <div class="tl-right" id="tl-right" data-keep="tl:${key}:${S.ui.tlZoom}">
       <div class="tl-head" style="width:${W}px"><div class="tl-months">${months.map(m => `<div style="width:${m.n * dw}px"><span>${MONL[m.d.getMonth()]} ${m.d.getFullYear()}</span></div>`).join('')}</div><div class="tl-days">${days}</div></div>
       <div class="tl-grid" style="width:${W}px;height:${H + 40}px">
         ${weekend}${glines}
-        <div class="tl-today" style="left:${todayX + dw / 2}px" title="Today"></div>
+        <div class="tl-today" style="left:${todayX + dw / 2}px" title="${tr('Today')}"></div>
         ${bars}
         <svg class="tl-deps" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">${deps}</svg>
       </div>
@@ -159,7 +161,7 @@ export function msLane(ms, X, dw, y) {
       const name = first.name + (pt.list.length > 1 ? ` +${pt.list.length - 1}` : '');
       const tip = pt.list.map(m => m.name + (m.p ? ` (${m.p.name})` : '')).join(' · ') + ' · ' + fmtDate(pt.date);
       const label = room >= 28 ? `<span class="ms-l" style="max-width:${Number.isFinite(room) ? Math.round(room) + 'px' : 'none'}">${esc(name)}</span>` : '';
-      return `<div class="ms-w" style="left:${pt.x - 6}px;top:${y + 9}px" data-tip="${esc(tip)}" tabindex="0" aria-label="Milestone: ${esc(tip)}"><span class="ms" style="${first.p ? `background:${pColor(first.p)}` : ''}"></span>${label}</div>`;
+      return `<div class="ms-w" style="left:${pt.x - 6}px;top:${y + 9}px" data-tip="${esc(tip)}" tabindex="0" aria-label="${tr('Milestone: {value1}', { value1: esc(tip) })}"><span class="ms" style="${first.p ? `background:${pColor(first.p)}` : ''}"></span>${label}</div>`;
     })
     .join('');
 }
@@ -185,6 +187,6 @@ export function pageWsTimeline() {
     S.ui._tlWsInit = 1;
     S.ui.tlGroup = 'project';
   }
-  return `<div class="page flush"><div class="ph"><div><h1>Timeline</h1><p>Schedules, dependencies, and milestones across projects.</p></div></div>
+  return `<div class="page flush"><div class="ph"><div><h1>${tr('Timeline')}</h1><p>${tr('Schedules, dependencies, and milestones across projects.')}</p></div></div>
   ${viewToolbar(key, { group: false, extra: tlControls(key) })}${timelineHtml(applyView(allTasks(), v), key, null)}</div>`;
 }

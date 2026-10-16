@@ -17,22 +17,22 @@
   min-height: 32px;
   font-size: var(--fs-xs);
   color: var(--text-3);
-  font-weight: 500;
-  border-bottom: 1px solid var(--border);
+  font-weight: var(--fw-medium);
+  border-bottom: var(--stroke) solid var(--border);
   position: sticky;
   top: 0;
   background: var(--surface);
-  z-index: 2;
+  z-index: var(--z-sticky);
 }
 .thead > div {
-  padding: 0 8px;
+  padding: 0 var(--s-2);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s-1);
   white-space: nowrap;
 }
 .trow {
-  border-bottom: 1px solid var(--divider);
+  border-bottom: var(--stroke) solid var(--divider);
   position: relative;
   transition: background var(--dur);
 }
@@ -52,11 +52,11 @@
   opacity: 0.4;
 }
 .trow > div {
-  padding: 0 8px;
+  padding: 0 var(--s-2);
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-1-5);
 }
 .trow .handle {
   opacity: 0;
@@ -72,7 +72,7 @@
 .trow .ttl {
   font-size: var(--fs);
   cursor: pointer;
-  gap: 8px;
+  gap: var(--s-2);
 }
 .trow .ttl .tt {
   overflow: hidden;
@@ -91,32 +91,32 @@
 }
 .trow .key {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--text-3);
   flex-shrink: 0;
 }
 .trow .meta-mini {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: calc(var(--space-unit) * 0.75);
   color: var(--text-3);
   font-size: var(--fs-2xs);
 }
 .grp {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   height: 36px;
-  padding: 0 8px 0 22px;
-  margin-top: 10px;
+  padding: 0 var(--s-2) 0 calc(var(--space-unit) * 5.5);
+  margin-top: var(--s-2-5);
   font-size: var(--fs-sm);
-  font-weight: 600;
-  border-bottom: 1px solid var(--border);
+  font-weight: var(--fw-semibold);
+  border-bottom: var(--stroke) solid var(--border);
   user-select: none;
 }
 .grp .cnt {
   color: var(--text-3);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 .grp .ibtn {
   opacity: 0.6;
@@ -130,10 +130,10 @@
 .subrow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   height: 32px;
-  padding-left: 64px;
-  border-bottom: 1px solid var(--divider);
+  padding-left: var(--s-16);
+  border-bottom: var(--stroke) solid var(--divider);
   font-size: var(--fs-sm);
 }
 .subrow.done span {
@@ -143,14 +143,14 @@
 .addrow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   height: 34px;
-  padding: 0 10px 0 26px;
+  padding: 0 var(--s-2-5) 0 calc(var(--space-unit) * 6.5);
   color: var(--text-3);
   font-size: var(--fs-sm);
   width: 100%;
   text-align: left;
-  border-bottom: 1px solid var(--divider);
+  border-bottom: var(--stroke) solid var(--divider);
 }
 .addrow:hover {
   color: var(--text);
@@ -172,17 +172,17 @@
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 6px 6px 14px;
+  gap: var(--s-1);
+  padding: var(--s-1-5) var(--s-1-5) var(--s-1-5) var(--s-3-5);
   border-radius: var(--r-lg);
   background: var(--text);
   color: var(--text-inv);
   box-shadow: var(--shadow-pop);
-  z-index: 40;
+  z-index: var(--z-bulk);
   font-size: var(--fs-sm);
 }
 .bulkbar.enter {
-  animation: popUp 0.28s var(--spring);
+  animation: popUp calc(var(--motion-step) * 28) var(--spring);
 }
 .bulkbar .btn {
   color: var(--text-inv);
@@ -196,7 +196,7 @@
   width: 1px;
   height: 18px;
   background: color-mix(in srgb, var(--text-inv) 20%, transparent);
-  margin: 0 4px;
+  margin: 0 var(--s-1);
 }
 @keyframes popUp {
   from {
@@ -213,10 +213,10 @@
 .mini {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--s-2-5);
   min-height: 38px;
-  padding: 0 14px;
-  border-top: 1px solid var(--divider);
+  padding: 0 var(--s-3-5);
+  border-top: var(--stroke) solid var(--divider);
   cursor: pointer;
   transition: background var(--dur);
 }
@@ -237,7 +237,7 @@
 .mini .pj {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: calc(var(--space-unit) * 1.25);
   font-size: var(--fs-xs);
   color: var(--text-2);
   max-width: 140px;
@@ -245,7 +245,7 @@
 .pdot {
   width: 8px;
   height: 8px;
-  border-radius: 3px;
+  border-radius: calc(var(--radius-unit) * 1.5);
   background: var(--c);
   flex-shrink: 0;
 }
@@ -255,17 +255,17 @@
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s-1);
   font-variant-numeric: tabular-nums;
 }
 .due.over {
-  color: var(--red);
+  color: var(--danger);
 }
 .due.soon {
-  color: var(--amber);
+  color: var(--warning);
 }
 /* List rows start with an 18px drag handle + 30px checkbox column; pulling the wrapper left by
    the handle+cell inset puts the checkbox (and group chevrons) exactly on the shared gutter. */
 .list-wrap {
-  padding: 0 var(--gutter) 90px calc(var(--gutter) - 26px);
+  padding: 0 var(--gutter) calc(var(--space-unit) * 22.5) calc(var(--gutter) - calc(var(--space-unit) * 6.5));
 }

@@ -3,46 +3,46 @@
    ============================================================ */
 .panel {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: var(--stroke) solid var(--border);
   border-radius: var(--r-lg);
 }
 .panel-h {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 14px 10px;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-3-5) var(--s-2-5);
 }
 .panel-h h2 {
   font-size: var(--fs);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   margin: 0;
 }
 .panel-h .acts {
   margin-left: auto;
   display: flex;
-  gap: 4px;
+  gap: var(--s-1);
   align-items: center;
 }
 .panel-b {
-  padding: 0 14px 14px;
+  padding: 0 var(--s-3-5) var(--s-3-5);
 }
 .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  border: 1px solid var(--border);
+  border: var(--stroke) solid var(--border);
   border-radius: var(--r-lg);
   overflow: hidden;
 }
 .stat {
-  padding: 14px 16px;
+  padding: var(--s-3-5) var(--s-4);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s-1-5);
   text-align: left;
   transition: background var(--dur);
 }
 .stat + .stat {
-  border-left: 1px solid var(--border);
+  border-left: var(--stroke) solid var(--border);
 }
 .stat:hover {
   background: var(--surface-2);
@@ -52,34 +52,34 @@
   color: var(--text-2);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-1-5);
 }
 .stat .v {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: var(--fs-stat);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-heading);
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  line-height: var(--lh-stat);
 }
 .stat .d {
   font-size: var(--fs-xs);
   color: var(--text-3);
 }
 .stat .d.up {
-  color: var(--green);
+  color: var(--success);
 }
 .stat .d.bad {
-  color: var(--red);
+  color: var(--danger);
 }
 .grid2 {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--s-4);
 }
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--s-4);
 }
 /* rows inside a bordered panel draw separators between themselves only, never against the panel edge */
 .panel > .mini:first-child {
@@ -88,12 +88,12 @@
 .nrow {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 11px 14px;
+  gap: var(--s-3);
+  padding: calc(var(--space-unit) * 2.75) var(--s-3-5);
   cursor: pointer;
 }
 .nrow + .nrow {
-  border-top: 1px solid var(--divider);
+  border-top: var(--stroke) solid var(--divider);
 }
 .nrow.unread {
   background: color-mix(in srgb, var(--accent) 3.5%, transparent);
@@ -112,9 +112,9 @@
   display: none;
 }
 .inbox-tabs {
-  margin-top: 8px;
+  margin-top: var(--s-2);
   padding: 0 var(--gutter);
-  gap: 16px;
+  gap: var(--s-4);
 }
 .inbox-tabs .tab {
   padding: 0;

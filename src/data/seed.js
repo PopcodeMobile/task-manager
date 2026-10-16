@@ -5,11 +5,11 @@ export function seed() {
   const members = [
     {
       id: 'm1',
-      name: 'Tanjim Islam',
-      email: 'hello@gr8rstudio.com',
+      name: 'Rafael Costa',
+      email: 'rafael@exemplo.com',
       role: 'Owner',
       team: 'product',
-      title: 'Head of Product',
+      title: 'Líder de produto',
       c: '#5A67D8',
       status: 'active',
       last: 0,
@@ -17,11 +17,11 @@ export function seed() {
     },
     {
       id: 'm2',
-      name: 'Sarah Chen',
-      email: 'sarah@gr8rstudio.com',
+      name: 'Marina Alves',
+      email: 'marina@exemplo.com',
       role: 'Admin',
       team: 'design',
-      title: 'Design Lead',
+      title: 'Líder de design',
       c: '#C54B78',
       status: 'active',
       last: 4,
@@ -29,11 +29,11 @@ export function seed() {
     },
     {
       id: 'm3',
-      name: 'John Carter',
-      email: 'john@gr8rstudio.com',
+      name: 'João Pereira',
+      email: 'joao@exemplo.com',
       role: 'Member',
       team: 'eng',
-      title: 'Frontend Engineer',
+      title: 'Desenvolvedor frontend',
       c: '#3B82C4',
       status: 'active',
       last: 22,
@@ -41,11 +41,11 @@ export function seed() {
     },
     {
       id: 'm4',
-      name: 'Emma Wilson',
-      email: 'emma@gr8rstudio.com',
+      name: 'Camila Santos',
+      email: 'camila@exemplo.com',
       role: 'Member',
       team: 'design',
-      title: 'Product Designer',
+      title: 'Designer de produto',
       c: '#23918A',
       status: 'active',
       last: 9,
@@ -53,11 +53,11 @@ export function seed() {
     },
     {
       id: 'm5',
-      name: 'Priya Patel',
-      email: 'priya@gr8rstudio.com',
+      name: 'Juliana Rocha',
+      email: 'juliana@exemplo.com',
       role: 'Member',
       team: 'mkt',
-      title: 'Content Strategist',
+      title: 'Estrategista de conteúdo',
       c: '#C48A1E',
       status: 'active',
       last: 95,
@@ -65,11 +65,11 @@ export function seed() {
     },
     {
       id: 'm6',
-      name: 'Marcus Lee',
-      email: 'marcus@gr8rstudio.com',
+      name: 'Lucas Ferreira',
+      email: 'lucas@exemplo.com',
       role: 'Member',
       team: 'eng',
-      title: 'Backend Engineer',
+      title: 'Desenvolvedor backend',
       c: '#8662C9',
       status: 'active',
       last: 240,
@@ -77,11 +77,11 @@ export function seed() {
     },
     {
       id: 'm7',
-      name: 'Lena Fischer',
-      email: 'lena@gr8rstudio.com',
+      name: 'Ana Oliveira',
+      email: 'ana@exemplo.com',
       role: 'Admin',
       team: 'product',
-      title: 'QA Lead',
+      title: 'Líder de qualidade',
       c: '#3D8E5F',
       status: 'active',
       last: 1500,
@@ -89,11 +89,11 @@ export function seed() {
     },
     {
       id: 'm8',
-      name: 'Diego Alvarez',
-      email: 'diego@freelance.io',
+      name: 'Diego Souza',
+      email: 'diego@exemplo.com',
       role: 'Guest',
       team: 'mkt',
-      title: 'Freelance Copywriter',
+      title: 'Redator freelancer',
       c: '#C0612B',
       status: 'invited',
       last: null,
@@ -104,7 +104,7 @@ export function seed() {
     {
       id: 'p1',
       key: 'WEB',
-      name: 'Website Redesign',
+      name: 'Redesign do site',
       icon: 'globe',
       color: 'indigo',
       status: 'active',
@@ -114,18 +114,18 @@ export function seed() {
       start: dOff(-30),
       fav: true,
       members: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'],
-      desc: 'Rebuild gr8rstudio.com with a clearer information architecture, a responsive component library, and a faster CMS-driven blog.',
+      desc: 'Reorganizar o site com uma navegação clara, interfaces responsivas e um blog mais rápido.',
       milestones: [
-        { name: 'Wireframes signed off', date: dOff(2) },
-        { name: 'Dev handoff', date: dOff(14) },
-        { name: 'Public launch', date: dOff(24) },
+        { name: 'Wireframes aprovados', date: dOff(2) },
+        { name: 'Entrega para desenvolvimento', date: dOff(14) },
+        { name: 'Lançamento público', date: dOff(24) },
       ],
       last: 12,
     },
     {
       id: 'p2',
       key: 'MOB',
-      name: 'Mobile App',
+      name: 'Aplicativo móvel',
       icon: 'smartphone',
       color: 'blue',
       status: 'active',
@@ -135,17 +135,17 @@ export function seed() {
       start: dOff(-45),
       fav: true,
       members: ['m1', 'm3', 'm4', 'm6', 'm7'],
-      desc: 'Native iOS and Android client for field teams with offline sync, push notifications, and biometric sign-in.',
+      desc: 'Aplicativo para equipes em campo, com sincronização offline, notificações e acesso por biometria.',
       milestones: [
-        { name: 'Beta build', date: dOff(9) },
-        { name: 'App Store submission', date: dOff(45) },
+        { name: 'Versão beta', date: dOff(9) },
+        { name: 'Envio para a App Store', date: dOff(45) },
       ],
       last: 48,
     },
     {
       id: 'p3',
       key: 'MKT',
-      name: 'Marketing Campaign',
+      name: 'Campanha de marketing',
       icon: 'megaphone',
       color: 'rose',
       status: 'planning',
@@ -155,17 +155,17 @@ export function seed() {
       start: dOff(-10),
       fav: false,
       members: ['m1', 'm4', 'm5', 'm7', 'm8'],
-      desc: 'Q4 awareness campaign across paid social, email, and a launch webinar targeting operations leads.',
+      desc: 'Campanha de divulgação com mídia paga, email e apresentação online para lideranças de operações.',
       milestones: [
-        { name: 'Creative lock', date: dOff(12) },
-        { name: 'Campaign live', date: dOff(21) },
+        { name: 'Aprovação das peças', date: dOff(12) },
+        { name: 'Campanha no ar', date: dOff(21) },
       ],
       last: 130,
     },
     {
       id: 'p4',
       key: 'LCH',
-      name: 'Product Launch',
+      name: 'Lançamento do produto',
       icon: 'rocket',
       color: 'amber',
       status: 'risk',
@@ -175,17 +175,17 @@ export function seed() {
       start: dOff(-21),
       fav: false,
       members: ['m1', 'm2', 'm3', 'm5', 'm7'],
-      desc: 'Coordinate the Workflows 2.0 launch: pricing, docs, press, and sales enablement across teams.',
+      desc: 'Coordenar o lançamento: preços, documentação, imprensa e preparação da equipe comercial.',
       milestones: [
-        { name: 'Go / no-go', date: dOff(11) },
-        { name: 'Launch day', date: dOff(12) },
+        { name: 'Decisão de lançamento', date: dOff(11) },
+        { name: 'Dia do lançamento', date: dOff(12) },
       ],
       last: 35,
     },
     {
       id: 'p5',
       key: 'DS',
-      name: 'Design System',
+      name: 'Sistema de design',
       icon: 'component',
       color: 'violet',
       status: 'active',
@@ -195,14 +195,14 @@ export function seed() {
       start: dOff(-60),
       fav: false,
       members: ['m2', 'm3', 'm4'],
-      desc: 'Shared tokens, components, and documentation used by web and mobile teams.',
-      milestones: [{ name: 'v2 tokens', date: dOff(3) }],
+      desc: 'Estilos, componentes e documentação compartilhados entre as equipes web e mobile.',
+      milestones: [{ name: 'Tokens da versão 2', date: dOff(3) }],
       last: 300,
     },
     {
       id: 'p6',
       key: 'CP',
-      name: 'Customer Portal',
+      name: 'Portal do cliente',
       icon: 'building-2',
       color: 'teal',
       status: 'hold',
@@ -213,14 +213,14 @@ export function seed() {
       fav: false,
       members: ['m6', 'm7'],
       private: true,
-      desc: 'Self-serve billing and support portal for enterprise customers. Restricted during contract review.',
+      desc: 'Portal de cobrança e suporte para clientes. Acesso restrito durante a revisão do contrato.',
       milestones: [],
       last: 2880,
     },
     {
       id: 'p7',
       key: 'MW',
-      name: 'Marketing Website',
+      name: 'Site institucional',
       icon: 'layout-grid',
       color: 'green',
       status: 'complete',
@@ -230,7 +230,7 @@ export function seed() {
       start: dOff(-80),
       fav: false,
       members: ['m1', 'm3', 'm5'],
-      desc: 'Launch site for the spring release. Shipped and handed to the web team for maintenance.',
+      desc: 'Site da nova versão. Publicado e entregue à equipe web para manutenção.',
       milestones: [],
       last: 26000,
     },
@@ -268,109 +268,109 @@ export function seed() {
       ),
     );
   };
-  // Website Redesign
-  t('p1', 'Audit existing navigation', 'done', 'm2', 'high', -12, ['research'], { est: '2d', len: 5, age: 28 });
-  t('p1', 'Summarize stakeholder interviews', 'done', 'm1', 'medium', -9, ['research'], { est: '1d', age: 26 });
-  t('p1', 'Create homepage wireframes', 'review', 'm2', 'high', 1, ['design'], {
+  // Redesign do site
+  t('p1', 'Auditar a navegação atual', 'done', 'm2', 'high', -12, ['research'], { est: '2d', len: 5, age: 28 });
+  t('p1', 'Resumir entrevistas com as áreas envolvidas', 'done', 'm1', 'medium', -9, ['research'], { est: '1d', age: 26 });
+  t('p1', 'Criar wireframes da página inicial', 'review', 'm2', 'high', 1, ['design'], {
     est: '3d',
     len: 7,
     fav: true,
-    desc: '<p>Low-fidelity wireframes for the new homepage covering <b>desktop, tablet, and mobile</b> breakpoints.</p><ul><li>Hero with product value proposition</li><li>Customer logos and proof points</li><li>Feature overview linking to product pages</li></ul><p>Reference the navigation audit for IA decisions.</p>',
+    desc: '<p>Wireframes da nova página inicial para <b>computador, tablet e celular</b>.</p><ul><li>Apresentação do produto</li><li>Marcas de clientes e resultados</li><li>Resumo das funcionalidades com links para as páginas do produto</li></ul><p>Consultar a auditoria de navegação antes de definir a estrutura.</p>',
     subtasks: [
-      { id: 's1', title: 'Desktop layout', done: true },
-      { id: 's2', title: 'Tablet layout', done: true },
-      { id: 's3', title: 'Mobile layout', done: true },
-      { id: 's4', title: 'Annotate interactions', done: false },
+      { id: 's1', title: 'Layout para computador', done: true },
+      { id: 's2', title: 'Layout para tablet', done: true },
+      { id: 's3', title: 'Layout para celular', done: true },
+      { id: 's4', title: 'Documentar interações', done: false },
     ],
     attachments: [
       { id: 'a1', name: 'homepage-wireframes-v3.fig', type: 'fig', size: '4.2 MB', by: 'm2', at: minsAgo(300) },
       { id: 'a2', name: 'nav-audit-findings.pdf', type: 'pdf', size: '860 KB', by: 'm2', at: minsAgo(8000) },
     ],
   });
-  t('p1', 'Finalize navigation', 'progress', 'm3', 'high', 0, ['design', 'frontend'], {
+  t('p1', 'Finalizar a navegação', 'progress', 'm3', 'high', 0, ['design', 'frontend'], {
     est: '2d',
     len: 4,
     subtasks: [
-      { id: 's5', title: 'Primary nav structure', done: true },
-      { id: 's6', title: 'Mega-menu content', done: false },
-      { id: 's7', title: 'Mobile drawer behavior', done: false },
+      { id: 's5', title: 'Estrutura da navegação principal', done: true },
+      { id: 's6', title: 'Conteúdo do menu expandido', done: false },
+      { id: 's7', title: 'Comportamento do menu no celular', done: false },
     ],
   });
-  t('p1', 'Design responsive navigation', 'progress', 'm4', 'medium', 3, ['design'], {
+  t('p1', 'Desenhar a navegação responsiva', 'progress', 'm4', 'medium', 3, ['design'], {
     est: '3d',
     len: 6,
     subtasks: [
-      { id: 's8', title: 'Breakpoint rules', done: true },
-      { id: 's9', title: 'Sticky header states', done: false },
+      { id: 's8', title: 'Regras de responsividade', done: true },
+      { id: 's9', title: 'Estados do cabeçalho fixo', done: false },
     ],
   });
-  t('p1', 'Prepare design system tokens', 'todo', 'm1', 'medium', 6, ['design'], { est: '2d', len: 4 });
-  t('p1', 'Review responsive layouts', 'todo', 'm4', 'medium', 8, ['qa', 'design'], { est: '1d', len: 3 });
-  t('p1', 'Prepare developer handoff', 'todo', 'm2', 'high', 14, ['frontend'], { est: '2d', len: 4, deps: ['t3', 't5'] });
-  t('p1', 'Design mobile onboarding', 'progress', 'm4', 'urgent', -1, ['design'], {
+  t('p1', 'Preparar tokens do sistema de design', 'todo', 'm1', 'medium', 6, ['design'], { est: '2d', len: 4 });
+  t('p1', 'Revisar layouts responsivos', 'todo', 'm4', 'medium', 8, ['qa', 'design'], { est: '1d', len: 3 });
+  t('p1', 'Preparar a entrega para desenvolvimento', 'todo', 'm2', 'high', 14, ['frontend'], { est: '2d', len: 4, deps: ['t3', 't5'] });
+  t('p1', 'Desenhar a introdução do aplicativo', 'progress', 'm4', 'urgent', -1, ['design'], {
     est: '3d',
     len: 6,
     subtasks: [
-      { id: 's10', title: 'Welcome screens', done: true },
-      { id: 's11', title: 'Permission prompts', done: false },
-      { id: 's12', title: 'Empty states', done: false },
+      { id: 's10', title: 'Telas de boas-vindas', done: true },
+      { id: 's11', title: 'Solicitações de permissão', done: false },
+      { id: 's12', title: 'Estados vazios', done: false },
     ],
   });
-  t('p1', 'Write homepage copy', 'backlog', 'm5', 'low', 18, ['content'], { est: '2d' });
-  t('p1', 'Set up analytics events', 'backlog', 'm6', 'medium', 20, ['backend', 'growth'], { est: '1d' });
-  t('p1', 'Accessibility audit of templates', 'backlog', 'm7', 'high', 22, ['qa'], { est: '2d' });
-  t('p1', 'Build hero component', 'todo', 'm3', 'medium', 10, ['frontend'], { est: '2d', len: 3, deps: ['t3'] });
-  t('p1', 'Image optimization pipeline', 'review', 'm6', 'low', 2, ['backend'], { est: '1d', len: 5 });
-  t('p1', 'Weekly design sync notes', 'todo', 'm1', 'low', 2, ['content'], { recur: 'Weekly', est: '30m', len: 0 });
-  t('p1', 'Migrate blog to new CMS', 'backlog', 'm3', 'medium', 28, ['backend'], { est: '5d', len: 8 });
-  t('p1', 'Footer and legal pages', 'done', 'm5', 'low', -5, ['frontend'], { est: '1d' });
-  t('p1', 'Fix broken anchor links on pricing', 'done', 'm3', 'medium', -3, ['bug'], { est: '2h', len: 1 });
-  // Mobile App
-  t('p2', 'Onboarding flow prototype', 'progress', 'm4', 'high', 4, ['design'], { est: '3d', len: 6 });
-  t('p2', 'Push notification service', 'progress', 'm6', 'high', 6, ['backend'], { est: '5d', len: 9 });
-  t('p2', 'Offline mode sync', 'todo', 'm3', 'urgent', 5, ['frontend', 'backend'], { est: '8d', len: 10, deps: ['t20'] });
-  t('p2', 'App Store screenshots', 'backlog', 'm5', 'low', 40, ['content'], { est: '1d' });
-  t('p2', 'Crash reporting setup', 'done', 'm6', 'medium', -8, ['backend'], { est: '1d' });
-  t('p2', 'Biometric sign-in', 'review', 'm3', 'high', 2, ['frontend'], { est: '3d', len: 6 });
-  t('p2', 'Settings screen redesign', 'todo', 'm4', 'medium', 9, ['design'], { est: '2d' });
-  t('p2', 'Triage beta tester feedback', 'todo', 'm1', 'medium', 0, ['research'], { est: '4h', len: 1, recur: 'Weekly' });
-  t('p2', 'Crash on Android 12 when rotating', 'todo', 'm3', 'urgent', 1, ['bug'], { est: '1d', len: 1 });
-  // Marketing Campaign
-  t('p3', 'Campaign brief', 'done', 'm5', 'medium', -6, ['content'], { est: '1d' });
-  t('p3', 'Landing page copy', 'progress', 'm5', 'medium', 4, ['content'], { est: '2d' });
-  t('p3', 'Paid social creatives', 'todo', 'm4', 'high', 7, ['design', 'growth'], { est: '3d', len: 5 });
-  t('p3', 'Email nurture sequence', 'todo', 'm8', 'medium', 9, ['content'], { est: '2d' });
-  t('p3', 'Influencer outreach list', 'backlog', 'm7', 'low', null, ['growth']);
-  t('p3', 'Launch webinar deck', 'todo', 'm1', 'medium', 15, ['content'], { est: '2d' });
-  t('p3', 'Budget approval', 'review', 'm1', 'urgent', -2, [], { est: '1h', len: 1 });
-  // Product Launch
-  t('p4', 'Launch readiness checklist', 'progress', 'm1', 'urgent', 3, ['qa'], {
+  t('p1', 'Escrever o texto da página inicial', 'backlog', 'm5', 'low', 18, ['content'], { est: '2d' });
+  t('p1', 'Configurar eventos de análise', 'backlog', 'm6', 'medium', 20, ['backend', 'growth'], { est: '1d' });
+  t('p1', 'Auditar acessibilidade dos modelos', 'backlog', 'm7', 'high', 22, ['qa'], { est: '2d' });
+  t('p1', 'Construir a seção principal', 'todo', 'm3', 'medium', 10, ['frontend'], { est: '2d', len: 3, deps: ['t3'] });
+  t('p1', 'Otimizar o processamento de imagens', 'review', 'm6', 'low', 2, ['backend'], { est: '1d', len: 5 });
+  t('p1', 'Registrar a reunião semanal de design', 'todo', 'm1', 'low', 2, ['content'], { recur: 'Weekly', est: '30m', len: 0 });
+  t('p1', 'Migrar o blog para o novo CMS', 'backlog', 'm3', 'medium', 28, ['backend'], { est: '5d', len: 8 });
+  t('p1', 'Criar rodapé e páginas legais', 'done', 'm5', 'low', -5, ['frontend'], { est: '1d' });
+  t('p1', 'Corrigir links quebrados na página de preços', 'done', 'm3', 'medium', -3, ['bug'], { est: '2h', len: 1 });
+  // Aplicativo móvel
+  t('p2', 'Prototipar o fluxo de introdução', 'progress', 'm4', 'high', 4, ['design'], { est: '3d', len: 6 });
+  t('p2', 'Implementar notificações push', 'progress', 'm6', 'high', 6, ['backend'], { est: '5d', len: 9 });
+  t('p2', 'Sincronizar o modo offline', 'todo', 'm3', 'urgent', 5, ['frontend', 'backend'], { est: '8d', len: 10, deps: ['t20'] });
+  t('p2', 'Preparar imagens para a App Store', 'backlog', 'm5', 'low', 40, ['content'], { est: '1d' });
+  t('p2', 'Configurar relatórios de falhas', 'done', 'm6', 'medium', -8, ['backend'], { est: '1d' });
+  t('p2', 'Implementar acesso por biometria', 'review', 'm3', 'high', 2, ['frontend'], { est: '3d', len: 6 });
+  t('p2', 'Redesenhar a tela de configurações', 'todo', 'm4', 'medium', 9, ['design'], { est: '2d' });
+  t('p2', 'Avaliar comentários dos usuários beta', 'todo', 'm1', 'medium', 0, ['research'], { est: '4h', len: 1, recur: 'Weekly' });
+  t('p2', 'Corrigir falha ao girar a tela no Android 12', 'todo', 'm3', 'urgent', 1, ['bug'], { est: '1d', len: 1 });
+  // Campanha de marketing
+  t('p3', 'Preparar o briefing da campanha', 'done', 'm5', 'medium', -6, ['content'], { est: '1d' });
+  t('p3', 'Escrever o texto da página de campanha', 'progress', 'm5', 'medium', 4, ['content'], { est: '2d' });
+  t('p3', 'Criar peças para mídia paga', 'todo', 'm4', 'high', 7, ['design', 'growth'], { est: '3d', len: 5 });
+  t('p3', 'Preparar a sequência de emails', 'todo', 'm8', 'medium', 9, ['content'], { est: '2d' });
+  t('p3', 'Listar influenciadores para contato', 'backlog', 'm7', 'low', null, ['growth']);
+  t('p3', 'Preparar os slides de lançamento', 'todo', 'm1', 'medium', 15, ['content'], { est: '2d' });
+  t('p3', 'Aprovar o orçamento', 'review', 'm1', 'urgent', -2, [], { est: '1h', len: 1 });
+  // Lançamento do produto
+  t('p4', 'Conferir a preparação do lançamento', 'progress', 'm1', 'urgent', 3, ['qa'], {
     est: '1d',
     len: 10,
     subtasks: [
-      { id: 's20', title: 'Docs published', done: true },
-      { id: 's21', title: 'Pricing live', done: false },
-      { id: 's22', title: 'Support trained', done: false },
-      { id: 's23', title: 'Status page updated', done: true },
+      { id: 's20', title: 'Documentação publicada', done: true },
+      { id: 's21', title: 'Preços publicados', done: false },
+      { id: 's22', title: 'Suporte treinado', done: false },
+      { id: 's23', title: 'Página de status atualizada', done: true },
     ],
   });
-  t('p4', 'Pricing page update', 'todo', 'm2', 'high', 6, ['design', 'frontend'], { est: '2d' });
-  t('p4', 'Press release draft', 'review', 'm5', 'medium', 1, ['content'], { est: '1d' });
-  t('p4', 'Sales enablement docs', 'todo', 'm7', 'medium', 8, ['content'], { est: '2d' });
-  t('p4', 'Release notes', 'backlog', 'm3', 'low', 11, ['content'], { est: '4h' });
-  t('p4', 'Go / no-go meeting', 'todo', 'm1', 'high', 11, [], { est: '1h', len: 0 });
-  // Design System
-  t('p5', 'Color tokens v2', 'done', 'm2', 'high', -4, ['design'], { est: '3d' });
-  t('p5', 'Button component audit', 'progress', 'm2', 'medium', 5, ['design', 'frontend'], { est: '2d' });
-  t('p5', 'Form field states', 'todo', 'm4', 'medium', 12, ['design'], { est: '3d' });
-  t('p5', 'Icon library cleanup', 'backlog', 'm4', 'low', null, ['design']);
-  t('p5', 'Documentation site', 'todo', 'm3', 'medium', 20, ['frontend'], { est: '5d', len: 8 });
-  t('p5', 'Dark mode palette', 'review', 'm2', 'high', 2, ['design'], { est: '2d' });
-  // Marketing Website (complete)
-  t('p7', 'Launch site QA', 'done', 'm3', 'high', -20, ['qa']);
-  t('p7', 'Spring release hero video', 'done', 'm5', 'medium', -24, ['content']);
+  t('p4', 'Atualizar a página de preços', 'todo', 'm2', 'high', 6, ['design', 'frontend'], { est: '2d' });
+  t('p4', 'Escrever o comunicado à imprensa', 'review', 'm5', 'medium', 1, ['content'], { est: '1d' });
+  t('p4', 'Preparar materiais para vendas', 'todo', 'm7', 'medium', 8, ['content'], { est: '2d' });
+  t('p4', 'Escrever as notas da versão', 'backlog', 'm3', 'low', 11, ['content'], { est: '4h' });
+  t('p4', 'Realizar a reunião de decisão', 'todo', 'm1', 'high', 11, [], { est: '1h', len: 0 });
+  // Sistema de design
+  t('p5', 'Atualizar tokens de cores', 'done', 'm2', 'high', -4, ['design'], { est: '3d' });
+  t('p5', 'Auditar os componentes de botão', 'progress', 'm2', 'medium', 5, ['design', 'frontend'], { est: '2d' });
+  t('p5', 'Definir estados dos campos de formulário', 'todo', 'm4', 'medium', 12, ['design'], { est: '3d' });
+  t('p5', 'Organizar a biblioteca de ícones', 'backlog', 'm4', 'low', null, ['design']);
+  t('p5', 'Criar o site de documentação', 'todo', 'm3', 'medium', 20, ['frontend'], { est: '5d', len: 8 });
+  t('p5', 'Definir a paleta do modo escuro', 'review', 'm2', 'high', 2, ['design'], { est: '2d' });
+  // Site institucional (complete)
+  t('p7', 'Validar o site de lançamento', 'done', 'm3', 'high', -20, ['qa']);
+  t('p7', 'Preparar o vídeo da nova versão', 'done', 'm5', 'medium', -24, ['content']);
   // Customer portal (restricted)
-  t('p6', 'Billing API contract', 'todo', 'm6', 'high', 30, ['backend']);
+  t('p6', 'Definir o contrato da integração de cobrança', 'todo', 'm6', 'high', 30, ['backend']);
 
   const tk = id => T.find(x => x.id === id);
   // completed metadata
@@ -381,24 +381,45 @@ export function seed() {
       task: 't3',
       by: 'm4',
       at: minsAgo(260),
-      text: 'Tablet layout feels crowded around the logo strip. Could we drop to four logos under 1024px?',
+      text: 'A faixa de marcas está apertada no tablet. Podemos mostrar quatro marcas abaixo de 1024px?',
       re: { '👍': ['m2', 'm3'] },
     },
-    { id: 'c2', task: 't3', by: 'm2', at: minsAgo(210), text: 'Good call. Updated in v3 — @Tanjim Islam can you review before Thursday?', re: {} },
+    { id: 'c2', task: 't3', by: 'm2', at: minsAgo(210), text: 'Ajustei na versão 3. @Rafael Costa, consegue revisar até quinta?', re: {} },
     {
       id: 'c3',
       task: 't3',
       by: 'm3',
       at: minsAgo(95),
-      text: 'Hero spacing maps cleanly to our 8pt scale. No blockers from engineering.',
+      text: 'O espaçamento segue a escala de 8 pontos. Não há impedimentos para o desenvolvimento.',
       re: { '🎉': ['m2'] },
     },
-    { id: 'c4', task: 't4', by: 'm3', at: minsAgo(400), text: "Mega-menu content still pending from marketing. I'll stub it for now.", re: {} },
-    { id: 'c5', task: 't4', by: 'm5', at: minsAgo(120), text: '@John Carter content is in the shared doc now — six columns max.', re: { '👍': ['m3'] } },
-    { id: 'c6', task: 't9', by: 'm1', at: minsAgo(55), text: 'This slipped past yesterday — @Emma Wilson anything blocking the permission prompts?', re: {} },
-    { id: 'c7', task: 't24', by: 'm7', at: minsAgo(700), text: 'Face ID fallback to passcode works on iOS 17; testing Android next.', re: {} },
-    { id: 'c8', task: 't34', by: 'm2', at: minsAgo(1500), text: 'Finance needs the channel split before approving.', re: {} },
-    { id: 'c9', task: 't35', by: 'm7', at: minsAgo(200), text: 'Support training moved to Monday. @Tanjim Islam please confirm the status page copy.', re: {} },
+    { id: 'c4', task: 't4', by: 'm3', at: minsAgo(400), text: 'Ainda falta o conteúdo do menu. Vou deixar uma versão provisória.', re: {} },
+    {
+      id: 'c5',
+      task: 't4',
+      by: 'm5',
+      at: minsAgo(120),
+      text: '@João Pereira, o conteúdo está no documento compartilhado. Máximo de seis colunas.',
+      re: { '👍': ['m3'] },
+    },
+    {
+      id: 'c6',
+      task: 't9',
+      by: 'm1',
+      at: minsAgo(55),
+      text: 'O prazo passou ontem. @Camila Santos, existe algum impedimento nas solicitações de permissão?',
+      re: {},
+    },
+    { id: 'c7', task: 't24', by: 'm7', at: minsAgo(700), text: 'A alternativa por senha ao Face ID funciona no iOS 17. Vou testar no Android.', re: {} },
+    { id: 'c8', task: 't34', by: 'm2', at: minsAgo(1500), text: 'O financeiro precisa da divisão por canal antes de aprovar.', re: {} },
+    {
+      id: 'c9',
+      task: 't35',
+      by: 'm7',
+      at: minsAgo(200),
+      text: 'O treinamento do suporte passou para segunda. @Rafael Costa, confirme o texto da página de status.',
+      re: {},
+    },
   ];
   const A = (by, verb, task, project, m, extra = '') => ({ id: uid('a'), by, verb, task, project, at: minsAgo(m), extra });
   const activity = [
@@ -408,7 +429,7 @@ export function seed() {
     A('m1', 'changed priority of', 't9', 'p1', 180, 'to Urgent'),
     A('m6', 'added a file to', 't14', 'p1', 260),
     A('m5', 'created', 't30', 'p3', 330),
-    A('m2', 'assigned', 't8', 'p1', 420, 'to Sarah Chen'),
+    A('m2', 'assigned', 't8', 'p1', 420, 'to Marina Alves'),
     A('m7', 'completed', 't23', 'p2', 1300),
     A('m3', 'moved', 't24', 'p2', 1500, 'to Review'),
     A('m1', 'created project', null, 'p4', 30000),
@@ -423,18 +444,18 @@ export function seed() {
       by: 'm2',
       task: 't3',
       text: 'mentioned you in',
-      snippet: 'Updated in v3 — @Tanjim Islam can you review before Thursday?',
+      snippet: 'Atualizei na versão 3. @Rafael Costa, consegue revisar até quinta?',
       at: minsAgo(210),
       read: false,
     },
-    { id: 'n2', type: 'assign', by: 'm3', task: 't28', text: 'assigned you', snippet: 'Due today · Medium priority', at: minsAgo(300), read: false },
+    { id: 'n2', type: 'assign', by: 'm3', task: 't28', text: 'assigned you', snippet: 'Vence hoje · Prioridade média', at: minsAgo(300), read: false },
     {
       id: 'n3',
       type: 'comment',
       by: 'm4',
       task: 't9',
       text: 'commented on',
-      snippet: 'Permission prompts need legal review — drafting now.',
+      snippet: 'Solicitações de permissão need legal review — drafting now.',
       at: minsAgo(40),
       read: false,
     },
@@ -444,7 +465,7 @@ export function seed() {
       by: 'm7',
       task: 't35',
       text: 'mentioned you in',
-      snippet: 'Support training moved to Monday. @Tanjim Islam please confirm the status page copy.',
+      snippet: 'O treinamento do suporte passou para segunda. @Rafael Costa, confirme o texto da página de status.',
       at: minsAgo(200),
       read: false,
     },
@@ -454,8 +475,8 @@ export function seed() {
       type: 'update',
       by: null,
       project: 'p4',
-      text: 'Product Launch is at risk',
-      snippet: '3 tasks due this week are not started',
+      text: 'Lançamento do produto está em risco',
+      snippet: '3 tarefas desta semana ainda não começaram',
       at: minsAgo(600),
       read: false,
     },
@@ -465,13 +486,22 @@ export function seed() {
       by: 'm2',
       task: 't34',
       text: 'commented on',
-      snippet: 'Finance needs the channel split before approving.',
+      snippet: 'O financeiro precisa da divisão por canal antes de aprovar.',
       at: minsAgo(1500),
       read: true,
     },
-    { id: 'n8', type: 'assign', by: 'm2', task: 't6', text: 'assigned you', snippet: 'Due in 6 days', at: minsAgo(2900), read: true },
-    { id: 'n9', type: 'update', by: 'm3', task: 't18', text: 'completed', snippet: 'Fix broken anchor links on pricing', at: minsAgo(90), read: true },
-    { id: 'n10', type: 'update', by: null, task: 't28', text: 'is due today', snippet: 'Triage beta tester feedback', at: minsAgo(20), read: false },
+    { id: 'n8', type: 'assign', by: 'm2', task: 't6', text: 'assigned you', snippet: 'Vence em 6 dias', at: minsAgo(2900), read: true },
+    {
+      id: 'n9',
+      type: 'update',
+      by: 'm3',
+      task: 't18',
+      text: 'completed',
+      snippet: 'Corrigir links quebrados na página de preços',
+      at: minsAgo(90),
+      read: true,
+    },
+    { id: 'n10', type: 'update', by: null, task: 't28', text: 'is due today', snippet: 'Avaliar comentários dos usuários beta', at: minsAgo(20), read: false },
   ];
   const files = [
     { id: 'f1', project: 'p1', name: 'homepage-wireframes-v3.fig', type: 'fig', size: '4.2 MB', by: 'm2', at: minsAgo(300), task: 't3' },
@@ -488,12 +518,12 @@ export function seed() {
     { id: 'f12', project: 'p4', name: 'launch-plan.docx', type: 'doc', size: '180 KB', by: 'm1', at: minsAgo(6000) },
   ];
   const events = [
-    { id: 'e1', title: 'Design review', date: dOff(1), time: '10:00', project: 'p1' },
-    { id: 'e2', title: 'Sprint planning', date: dOff(5), time: '09:30', project: 'p2' },
-    { id: 'e3', title: 'Launch sync', date: dOff(0), time: '15:00', project: 'p4' },
-    { id: 'e4', title: 'Stakeholder demo', date: dOff(9), time: '14:00', project: 'p1' },
-    { id: 'e5', title: 'Campaign kickoff', date: dOff(-3), time: '11:00', project: 'p3' },
-    { id: 'e6', title: 'Retro', date: dOff(12), time: '16:00', project: 'p2' },
+    { id: 'e1', title: 'Revisão de design', date: dOff(1), time: '10:00', project: 'p1' },
+    { id: 'e2', title: 'Planejamento da sprint', date: dOff(5), time: '09:30', project: 'p2' },
+    { id: 'e3', title: 'Alinhamento do lançamento', date: dOff(0), time: '15:00', project: 'p4' },
+    { id: 'e4', title: 'Apresentação para as áreas envolvidas', date: dOff(9), time: '14:00', project: 'p1' },
+    { id: 'e5', title: 'Início da campanha', date: dOff(-3), time: '11:00', project: 'p3' },
+    { id: 'e6', title: 'Retrospectiva', date: dOff(12), time: '16:00', project: 'p2' },
   ];
   const tmp = tk('t3');
   tmp.updated = minsAgo(38);
@@ -501,7 +531,7 @@ export function seed() {
     ws: { name: 'Gr8r Studio', url: 'gr8rstudio', c: '#1D1C1A', brand: true },
     workspaces: [
       { id: 'w1', name: 'Gr8r Studio', c: '#1D1C1A', plan: 'Team', brand: true },
-      { id: 'w2', name: 'Personal', c: '#3D8E5F', plan: 'Free' },
+      { id: 'w2', name: 'Pessoal', c: '#3D8E5F', plan: 'Free' },
       { id: 'w3', name: 'Acme Labs', c: '#3B82C4', plan: 'Business' },
     ],
     me: 'm1',
@@ -514,8 +544,8 @@ export function seed() {
     files,
     events,
     projOrder: projects.map(p => p.id),
-    savedViews: [{ id: 'v1', project: 'p1', name: 'High priority', type: 'list', filters: [{ f: 'priority', op: 'is', v: ['urgent', 'high'] }] }],
-    recentSearches: ['homepage', 'Sarah', 'wireframes'],
+    savedViews: [{ id: 'v1', project: 'p1', name: 'Alta prioridade', type: 'list', filters: [{ f: 'priority', op: 'is', v: ['urgent', 'high'] }] }],
+    recentSearches: ['página inicial', 'Marina', 'wireframes'],
     sessions: [
       { id: 'se1', dev: 'MacBook Pro · Chrome', loc: 'San Francisco, US', at: 'Active now', cur: true },
       { id: 'se2', dev: 'iPhone 15 · Gr8r app', loc: 'San Francisco, US', at: '2 hours ago' },

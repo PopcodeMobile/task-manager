@@ -1,0 +1,48 @@
+import { t } from './i18n.js';
+
+const labels = {
+  home: 'Home',
+  inbox: 'Inbox',
+  mytasks: 'My Tasks',
+  favorites: 'Favorites',
+  notifications: 'Notifications',
+  search: 'Search',
+  overview: 'Overview',
+  projects: 'Projects',
+  tasks: 'Tasks',
+  calendar: 'Calendar',
+  timeline: 'Timeline',
+  members: 'Members',
+  member: 'Member',
+  teams: 'Teams',
+  team: 'Team',
+  activity: 'Activity',
+  settings: 'Settings',
+  system: 'Design system',
+  states: 'System states',
+  archive: 'Archive',
+};
+export const ROUTE_NAMES = Object.defineProperties(
+  {},
+  Object.fromEntries(Object.entries(labels).map(([key, label]) => [key, { enumerable: true, get: () => t(label) }])),
+);
+export const ROUTE_ICONS = {
+  home: 'house',
+  inbox: 'inbox',
+  mytasks: 'circle-check',
+  favorites: 'star',
+  notifications: 'bell',
+  search: 'search',
+  overview: 'layout-dashboard',
+  projects: 'folder-kanban',
+  tasks: 'list-checks',
+  calendar: 'calendar',
+  timeline: 'chart-gantt',
+  members: 'users',
+  activity: 'activity',
+  teams: 'users',
+  settings: 'settings',
+  system: 'component',
+  states: 'layers',
+  archive: 'archive',
+};

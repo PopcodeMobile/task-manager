@@ -5,7 +5,7 @@ import { S } from '../core/store.js';
 import { go, render } from '../shell/render.js';
 import { closeModal } from '../overlays/modals.js';
 import { closePop } from '../overlays/popovers.js';
-import { A, KEY } from './actions.js';
+import { A, KEY } from './registry.js';
 
 export let gPending = 0;
 document.addEventListener('keydown', e => {

@@ -1,3 +1,4 @@
+import { t as tr } from '../core/i18n.js';
 /* =====================================================================
    SELECT: every <select class="select"> renders as the design-system
    dropdown (trigger button + .pop menu) instead of the browser's native list.
@@ -18,7 +19,7 @@ export function enhanceSelects(root = document) {
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute(
       'aria-label',
-      sel.getAttribute('aria-label') || (sel.id && document.querySelector(`label[for="${CSS.escape(sel.id)}"]`)?.textContent) || 'Choose',
+      sel.getAttribute('aria-label') || (sel.id && document.querySelector(`label[for="${CSS.escape(sel.id)}"]`)?.textContent) || tr('Choose'),
     );
     if (sel.id) btn.dataset.for = sel.id;
     const sync = () => {

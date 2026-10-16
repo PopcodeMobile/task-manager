@@ -1,3 +1,4 @@
+import { t as tr } from '../core/i18n.js';
 /* =====================================================================
    ACTIONS · SUBTASKS: open, navigate, rename, notes, promote
    ===================================================================== */
@@ -70,11 +71,11 @@ A.promoteSub = el => {
         desc: s.note ? `<p>${esc(s.note)}</p>` : '',
       });
       t.subtasks = t.subtasks.filter(x => x !== s);
-      logAct('converted a subtask of', t, `into ${n.key}`);
+      logAct('converted a subtask of', t, { kind: 'into', value: n.key });
     })
   )
     return;
   S.ui.subOpen = null;
   render();
-  toast(`Converted to ${n.key}`, { action: 'Open', onAction: () => A.openTask({ dataset: { id: n.id } }) });
+  toast(tr('Converted to {value1}', { value1: n.key }), { action: tr('Open'), onAction: () => A.openTask({ dataset: { id: n.id } }) });
 };
