@@ -8,7 +8,7 @@ import { ConnectionsPage } from './integrations/ConnectionsPage';
 import { WorkspacePanel } from './shell/WorkspacePanel';
 import { supabase } from './integrations/client';
 export function App() {
-  const { session, loading, recovery, authError } = useAuth();
+  const { session, loading, recovery, authError, sessionBoundary } = useAuth();
   const [locale, setLocale] = useState(() => localStorage.getItem('gr8r-react-locale') ?? 'pt-BR'),
     [dark, setDark] = useState(() => localStorage.getItem('gr8r-react-theme') === 'dark'),
     [logoutError, setLogoutError] = useState(false);
@@ -56,7 +56,7 @@ export function App() {
     !recovery &&
     (location.pathname.startsWith('/app') || location.pathname === '/react.html' || location.pathname === '/login' || location.pathname === '/auth/callback')
   )
-    return <WorkspacePanel key={session.access_token} session={session} t={t} controls={controls} />;
+    return <WorkspacePanel key={sessionBoundary!} session={session} t={t} controls={controls} />;
   return (
     <div className="react-shell">
       <header className="shell-header">

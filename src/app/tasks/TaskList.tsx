@@ -125,25 +125,31 @@ export function TaskList({
       ) : (
         <div className="task-table" role="table" aria-label={t('Tarefas', 'Tasks')}>
           <div className="task-row task-head" role="row">
-            <span>{t('Título', 'Title')}</span>
-            <span>{t('Projeto', 'Project')}</span>
-            <span>{t('Prioridade', 'Priority')}</span>
-            <span>{t('Responsável', 'Assignee')}</span>
-            <span>{t('Prazo', 'Due date')}</span>
+            <span role="columnheader">{t('Título', 'Title')}</span>
+            <span role="columnheader">{t('Projeto', 'Project')}</span>
+            <span role="columnheader">{t('Prioridade', 'Priority')}</span>
+            <span role="columnheader">{t('Responsável', 'Assignee')}</span>
+            <span role="columnheader">{t('Prazo', 'Due date')}</span>
           </div>
           {tasks.map(task => (
             <div className="task-row" role="row" key={task.id}>
-              <Button variant="ghost" className="task-title" onClick={() => open(task.id)}>
-                {icon(task)}
-                <small>{task.key}</small>
-                <span>{task.title}</span>
-              </Button>
-              <span className="task-project">{projects.find(p => p.id === task.projectId)?.name ?? task.projectId}</span>
-              <span className={`priority priority-${task.priority}`}>{priorityLabel(task.priority, t)}</span>
-              <span className="task-assignee">
+              <span role="cell" className="task-title-cell">
+                <Button variant="ghost" className="task-title" onClick={() => open(task.id)}>
+                  {icon(task)}
+                  <small>{task.key}</small>
+                  <span>{task.title}</span>
+                </Button>
+              </span>
+              <span role="cell" className="task-project">
+                {projects.find(p => p.id === task.projectId)?.name ?? task.projectId}
+              </span>
+              <span role="cell" className={`priority priority-${task.priority}`}>
+                {priorityLabel(task.priority, t)}
+              </span>
+              <span role="cell" className="task-assignee">
                 {task.executorAgentId && <Bot size={14} />} {label(task)}
               </span>
-              <span>
+              <span role="cell">
                 {task.dueDate
                   ? new Intl.DateTimeFormat(document.documentElement.lang, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(
                       new Date(task.dueDate + 'T00:00:00Z'),

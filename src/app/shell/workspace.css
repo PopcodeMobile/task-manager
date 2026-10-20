@@ -897,3 +897,7 @@
 .ui-alert-dialog {
   z-index: calc(var(--z-modal) + 3);
 }
+
+.task-title-cell .task-title {
+  width: 100%;
+}

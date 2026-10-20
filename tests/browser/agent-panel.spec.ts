@@ -2,7 +2,11 @@ import { test, expect, type Page } from '@playwright/test';
 const userId = '11111111-1111-4111-8111-111111111111',
   workspace = '22222222-2222-4222-8222-222222222222',
   other = '33333333-3333-4333-8333-333333333333';
-const token = [{ alg: 'HS256', typ: 'JWT' }, { sub: userId, role: 'authenticated', exp: 4102444800 }, 'signature']
+const token = [
+  { alg: 'HS256', typ: 'JWT' },
+  { sub: userId, session_id: '44444444-4444-4444-8444-444444444444', role: 'authenticated', exp: 4102444800 },
+  'signature',
+]
   .map(x => (typeof x === 'string' ? x : Buffer.from(JSON.stringify(x)).toString('base64url')))
   .join('.');
 const user = {
@@ -212,6 +216,8 @@ test('login, workspace, create, edit, board, drawer, comment and agent supervisi
   const f = await fixture(page);
   await login(page);
   await expect(page.getByText('Revisar navegação', { exact: true })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Tarefas' }).getByRole('columnheader')).toHaveCount(5);
+  await expect(page.getByRole('table', { name: 'Tarefas' }).getByRole('cell')).toHaveCount(5);
   await page.getByRole('button', { name: 'Nova tarefa', exact: true }).click();
   await page.getByLabel('Título', { exact: true }).fill('Publicar pesquisa');
   await page.getByRole('button', { name: 'Criar tarefa', exact: true }).click();
@@ -518,4 +524,258 @@ test('an event committed during initial hydration cannot be skipped by the polli
   f.external();
   release();
   await expect(page.getByText('Atualizada pelo MCP', { exact: true })).toBeVisible({ timeout: 1500 });
+});
+
+test('same-session token rotation preserves dirty draft, original CAS and failed-command retry identity', async ({ page }) => {
+  const f = await fixture(page);
+  await login(page);
+  await page.getByText('Revisar navegação', { exact: true }).click();
+  await page.getByLabel('Título', { exact: true }).fill('Rascunho após rotação');
+  const attempts: Record<string, unknown>[] = [];
+  let fail = true;
+  await page.route('**/rest/v1/rpc/execute_operation', async route => {
+    attempts.push(route.request().postDataJSON());
+    if (fail) {
+      fail = false;
+      await route.abort('failed');
+    } else await route.fallback();
+  });
+  await page.getByRole('button', { name: 'Salvar alterações' }).click();
+  await expect(page.getByRole('alert')).toContainText('conexão');
+  const rotate = async (sessionId: string, identity = user) => {
+    const access = [
+      { alg: 'HS256', typ: 'JWT' },
+      { sub: identity.id, session_id: sessionId, role: 'authenticated', exp: 4102444800, iat: Date.now() },
+      'signature',
+    ]
+      .map(x => (typeof x === 'string' ? x : Buffer.from(JSON.stringify(x)).toString('base64url')))
+      .join('.');
+    await page.route('**/auth/v1/token?grant_type=refresh_token', route =>
+      route.fulfill({ json: { ...session, user: identity, access_token: access, refresh_token: 'rotated-refresh' } }),
+    );
+    await page.evaluate(async () => {
+      const path = '/src/app/integrations/client.ts';
+      const { supabase } = await import(path);
+      await supabase.auth.refreshSession();
+    });
+  };
+  await rotate('44444444-4444-4444-8444-444444444444');
+  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Rascunho após rotação');
+  await page.getByRole('button', { name: 'Salvar alterações' }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  expect(attempts).toHaveLength(2);
+  expect(attempts[1].p_idempotency_key === attempts[0].p_idempotency_key).toBeTruthy();
+  expect(attempts[1].p_expected_version).toBe(1);
+  expect(f.commands.at(-1)?.p_operation).toBe('update_task');
+  await page.getByLabel('Título', { exact: true }).fill('Não transferir para nova sessão');
+  await rotate('55555555-5555-4555-8555-555555555555');
+  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Rascunho após rotação');
+  await page.getByLabel('Título', { exact: true }).fill('Não transferir para outra pessoa');
+  await rotate('66666666-6666-4666-8666-666666666666', {
+    ...user,
+    id: '77777777-7777-4777-8777-777777777777',
+    email: 'other@example.test',
+    user_metadata: { name: 'Outra pessoa' },
+  });
+  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Rascunho após rotação');
+});
+
+test('actual OAuth MCP agent write reaches already-open task and agent activity by polling', async ({ page }) => {
+  test.skip(!process.env.TEST_SUPABASE_URL || !process.env.TEST_SUPABASE_SERVICE_ROLE_KEY, 'Requires dedicated local Auth and Edge MCP');
+  test.setTimeout(60000);
+  const { createClient } = await import('@supabase/supabase-js');
+  const base = process.env.TEST_SUPABASE_URL!,
+    key = process.env.TEST_SUPABASE_ANON_KEY!;
+  const service = createClient(base, process.env.TEST_SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } }),
+    human = createClient(base, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const suffix = crypto.randomUUID(),
+    email = `task5-mcp-${suffix}@example.test`,
+    password = `Task5-${crypto.randomUUID()}!`;
+  let uid = '',
+    ws = '',
+    clientId = '',
+    connectionId = '',
+    taskId = '',
+    failed = false;
+  let mcp: import('@modelcontextprotocol/client').Client | undefined;
+  const cleanupErrors: string[] = [];
+  try {
+    const created = await service.auth.admin.createUser({ email, password, email_confirm: true });
+    expect(!!created.error).toBeFalsy();
+    uid = created.data.user!.id;
+    expect(!!(await human.auth.signInWithPassword({ email, password })).error).toBeFalsy();
+    const made = await human.rpc('create_workspace_v2', { p_name: 'MCP transport real', p_slug: `mcp-ui-${suffix}`, p_idempotency_key: suffix });
+    expect(!!made.error).toBeFalsy();
+    ws = made.data.data.id;
+    const command = async (operation: string, input: Record<string, unknown>, version?: number) => {
+      const result = await human.rpc('execute_operation', {
+        p_workspace_id: ws,
+        p_operation: operation,
+        p_command: input,
+        p_expected_version: version ?? null,
+        p_idempotency_key: crypto.randomUUID(),
+      });
+      expect(!!result.error).toBeFalsy();
+      return result.data.data;
+    };
+    const project = await command('create_project', { name: 'Projeto MCP' }),
+      task = await command('create_task', { projectId: project.id, title: 'Antes da ação MCP' });
+    taskId = task.id;
+    await page.goto(`/app/w/${ws}/tasks`);
+    await page.getByLabel('E-mail').fill(email);
+    await page.getByLabel('Senha', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await expect(page.getByText('Antes da ação MCP', { exact: true })).toBeVisible();
+    let navigations = 0;
+    page.on('request', request => {
+      if (request.isNavigationRequest() && request.frame() === page.mainFrame()) navigations++;
+    });
+    const registered = await fetch(`${base}/auth/v1/oauth/clients/register`, {
+      method: 'POST',
+      headers: { apikey: key, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        client_name: 'Agente MCP do painel',
+        redirect_uris: ['http://127.0.0.1:5180/callback'],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+      }),
+    });
+    expect(registered.status).toBe(201);
+    clientId = (await registered.json()).client_id;
+    const verifier = crypto.randomUUID() + crypto.randomUUID(),
+      state = crypto.randomUUID(),
+      challenge = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))).toString('base64url');
+    const authUrl = new URL(`${base}/auth/v1/oauth/authorize`);
+    for (const [name, value] of Object.entries({
+      client_id: clientId,
+      response_type: 'code',
+      redirect_uri: 'http://127.0.0.1:5180/callback',
+      scope: 'openid',
+      state,
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      prompt: 'consent',
+    }))
+      authUrl.searchParams.set(name, value);
+    const authorization = await fetch(authUrl, { redirect: 'manual' });
+    expect(authorization.status).toBe(302);
+    await authorization.body?.cancel();
+    const authorizationId = new URL(authorization.headers.get('location')!).searchParams.get('authorization_id')!;
+    const details = await human.auth.oauth.getAuthorizationDetails(authorizationId);
+    expect(!!details.error).toBeFalsy();
+    const prepared = await human.rpc('prepare_integration_consent', {
+      p_authorization_id: authorizationId,
+      p_grants: [{ workspaceId: ws, capability: 'write' }],
+    });
+    expect(!!prepared.error).toBeFalsy();
+    connectionId = prepared.data.connectionId;
+    const approved = await human.auth.oauth.approveAuthorization(authorizationId, { skipBrowserRedirect: true });
+    expect(!!approved.error).toBeFalsy();
+    const callback = new URL(approved.data!.redirect_url);
+    expect(callback.searchParams.get('state')).toBe(state);
+    expect(
+      !!(await human.rpc('activate_integration_consent', { p_authorization_id: authorizationId, p_attempt_id: prepared.data.attemptId })).error,
+    ).toBeFalsy();
+    const exchanged = await fetch(`${base}/auth/v1/oauth/token`, {
+      method: 'POST',
+      headers: { apikey: key, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: clientId,
+        redirect_uri: 'http://127.0.0.1:5180/callback',
+        code: callback.searchParams.get('code')!,
+        code_verifier: verifier,
+      }),
+    });
+    expect(exchanged.status).toBe(200);
+    const oauth = await exchanged.json();
+    expect(typeof oauth.access_token === 'string').toBeTruthy();
+    const { Client, StreamableHTTPClientTransport } = await import('@modelcontextprotocol/client');
+    mcp = new Client({ name: 'task5-browser-acceptance', version: '1.0.0' });
+    await mcp.connect(
+      new StreamableHTTPClientTransport(new URL(`${base}/functions/v1/mcp`), { requestInit: { headers: { authorization: `Bearer ${oauth.access_token}` } } }),
+    );
+    const claimed = await mcp.callTool({
+      name: 'claim_task',
+      arguments: { workspace_id: ws, idempotency_key: crypto.randomUUID(), expected_version: task.version, input: { id: task.id } },
+    });
+    expect(!!claimed.isError).toBeFalsy();
+    const lease = (claimed.structuredContent as { data: { task: { version: number; executorAgentId: string }; claimToken: string } }).data;
+    expect(typeof lease.claimToken === 'string').toBeTruthy();
+    const changed = await mcp.callTool({
+      name: 'update_task',
+      arguments: {
+        workspace_id: ws,
+        idempotency_key: crypto.randomUUID(),
+        expected_version: lease.task.version,
+        input: { id: task.id, title: 'Alterada pelo MCP real', claimToken: lease.claimToken },
+      },
+    });
+    expect(!!changed.isError).toBeFalsy();
+    await expect(page.getByText('Alterada pelo MCP real', { exact: true })).toBeVisible({ timeout: 18000 });
+    await page.screenshot({ path: '/tmp/task5-r1-real-mcp-task.png', fullPage: true });
+    await page.getByRole('link', { name: 'Atividade', exact: true }).click();
+    await expect(page.getByText('Agente alterou a tarefa', { exact: false })).toBeVisible({ timeout: 1500 });
+    expect(navigations).toBe(0);
+    const audit = await human.rpc('read_operation', { p_workspace_id: ws, p_operation: 'list_domain_events', p_query: { limit: 100 } });
+    expect(!!audit.error).toBeFalsy();
+    expect(
+      audit.data.items.some(
+        (event: { operation: string; actorAgentId: string; actorClientId: string }) =>
+          event.operation === 'update_task' && event.actorAgentId === lease.task.executorAgentId && event.actorClientId === clientId,
+      ),
+    ).toBeTruthy();
+    await page.screenshot({ path: '/tmp/task5-r1-real-mcp-activity.png', fullPage: true });
+  } catch (error) {
+    failed = true;
+    throw error;
+  } finally {
+    const clean = async (name: string, run: () => Promise<unknown>) => {
+      try {
+        await run();
+      } catch {
+        cleanupErrors.push(name);
+      }
+    };
+    await clean('mcp-close', async () => {
+      await mcp?.close();
+    });
+    if (ws && taskId)
+      await clean('human-release', async () => {
+        const current = await human.rpc('read_operation', { p_workspace_id: ws, p_operation: 'get_task', p_query: { id: taskId } });
+        if (current.error) throw new Error('read_failed');
+        if (current.data.data.executorAgentId || current.data.data.reservation) {
+          const released = await human.rpc('execute_operation', {
+            p_workspace_id: ws,
+            p_operation: 'intervene_task',
+            p_command: { id: taskId, action: 'release' },
+            p_expected_version: current.data.data.version,
+            p_idempotency_key: crypto.randomUUID(),
+          });
+          if (released.error) throw new Error('release_failed');
+        }
+      });
+    if (connectionId)
+      await clean('connection', async () => {
+        if ((await human.rpc('revoke_integration_connection', { p_connection_id: connectionId })).error) throw new Error('revoke_failed');
+      });
+    if (clientId)
+      await clean('oauth-client', async () => {
+        if ((await service.auth.admin.oauth.deleteClient(clientId)).error) throw new Error('delete_failed');
+      });
+    if (ws)
+      await clean('workspace', async () => {
+        if ((await service.from('workspaces').delete().eq('id', ws)).error) throw new Error('delete_failed');
+      });
+    if (uid)
+      await clean('user', async () => {
+        if ((await service.auth.admin.deleteUser(uid)).error) throw new Error('delete_failed');
+      });
+    await clean('sign-out', async () => {
+      await human.auth.signOut();
+    });
+    if (cleanupErrors.length && failed) test.info().annotations.push({ type: 'fixture-cleanup', description: cleanupErrors.join(', ') });
+  }
+  if (cleanupErrors.length) throw new Error('Fixture cleanup failed: ' + cleanupErrors.join(', '));
 });
