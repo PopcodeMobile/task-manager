@@ -1,5 +1,10 @@
 # Workspace, language and design system
 
+Historical implementation plan (2026-10-16). For the proposed agent platform and
+React/Supabase migration, see [the current design](superpowers/specs/2026-10-20-agent-platform-design.md)
+and [implementation plan](superpowers/plans/2026-10-20-agent-platform.md). Their status
+distinguishes planned work from the JavaScript/snapshot implementation below.
+
 Date: 2026-10-16
 
 ## Intended result
