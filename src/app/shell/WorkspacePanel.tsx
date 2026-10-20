@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Session } from '@supabase/supabase-js';
 import { Activity, Bot, CheckCheck, ChevronRight, FolderKanban, ListTodo, Plug, Plus, RefreshCw, Star } from 'lucide-react';
-import type { Project, Task, Workspace, UserPreferences } from '../../domain/contracts';
-import { NormalizedRepository, eventCursor, type Agent, type DomainEvent, type Member } from '../../workspace/normalized';
-import { supabase } from '../integrations/client';
+import type { Workspace } from '../../domain/contracts';
+import type { RepositoryFactory } from '../../workspace/repository';
+import { useWorkspaceData, emptySnapshot } from './useWorkspaceData';
 import type { Translate } from '../auth/ConsentPage';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -11,22 +10,29 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from '../../compone
 import { WorkspacePicker } from '../workspaces/WorkspacePicker';
 import { TaskList } from '../tasks/TaskList';
 import { TaskDrawer, type DraftGuard } from '../tasks/TaskDrawer';
-import { ProjectsPage, type Execute } from '../projects/ProjectsPage';
+import { ProjectsPage } from '../projects/ProjectsPage';
 import { AgentsPage } from '../agents/AgentsPage';
 import { ActivityPage } from '../activity/ActivityPage';
 import { IntegrationsPanel } from '../agents/IntegrationsPanel';
 import { useNavigation } from './navigation';
 import { errorMessage } from './messages';
-type Snapshot = { tasks: Task[]; projects: Project[]; agents: Agent[]; members: Member[]; events: DomainEvent[]; preferences: UserPreferences['preferences'] };
-const empty: Snapshot = {
-  tasks: [],
-  projects: [],
-  agents: [],
-  members: [],
-  events: [],
-  preferences: { favoriteProjectIds: [], favoriteTaskIds: [], notificationReadStates: {} },
-};
-export function WorkspacePanel({ session, t, controls }: { session: Session; t: Translate; controls: ReactNode }) {
+export function WorkspacePanel({
+  identity,
+  repositoryFactory,
+  onSignOut,
+  density,
+  setDensity,
+  t,
+  controls,
+}: {
+  identity: { name: string; email?: string };
+  repositoryFactory: RepositoryFactory;
+  onSignOut?: () => Promise<void>;
+  density: string;
+  setDensity: (value: string) => void;
+  t: Translate;
+  controls: ReactNode;
+}) {
   const draft = useRef<DraftGuard | null>(null);
   const { url, navigate: commitNavigation } = useNavigation(async () => !draft.current?.dirty || (await draft.current.flush()));
   const registerDraft = useCallback((value: DraftGuard | null) => {
@@ -48,7 +54,7 @@ export function WorkspacePanel({ session, t, controls }: { session: Session; t: 
     [createWorkspace, setCreateWorkspace] = useState(false),
     [workspaceName, setWorkspaceName] = useState(''),
     [creating, setCreating] = useState(false);
-  const discoveryRepo = useMemo(() => new NormalizedRepository(supabase!, session.user.id, null), [session.user.id]);
+  const discoveryRepo = useMemo(() => repositoryFactory(null), [repositoryFactory]);
   useEffect(() => {
     discoveryRepo.activate();
     return () => discoveryRepo.dispose();
@@ -63,7 +69,18 @@ export function WorkspacePanel({ session, t, controls }: { session: Session; t: 
         if (alive) {
           setWorkspaces(rows);
           if (!rows.length) setCreateWorkspace(true);
-          else if (!workspaceId) navigate(`/app/w/${rows[0].id}/tasks`, true);
+          else if (!workspaceId) {
+            void (async () => {
+              const personal = await discoveryRepo.personal?.();
+              if (alive)
+                navigate(
+                  `${discoveryRepo.mode === 'local' ? '/app-local' : '/app'}/w/${rows.find(w => w.id === personal?.activeWorkspace)?.id ?? rows[0].id}/tasks`,
+                  true,
+                );
+            })().catch(err => {
+              if (alive) setDiscoveryError(errorMessage(err, t));
+            });
+          }
         }
       })
       .catch(err => {
@@ -76,125 +93,20 @@ export function WorkspacePanel({ session, t, controls }: { session: Session; t: 
       alive = false;
     };
   }, [discoveryRepo, discoveryAttempt, t]);
+  const routeRoot = discoveryRepo.mode === 'local' ? '/app-local' : '/app';
   const creationAttempt = useRef<{ name: string; key: string; slug: string } | null>(null);
   const current = workspaces.find(w => w.id === workspaceId);
-  const repo = useMemo(() => new NormalizedRepository(supabase!, session.user.id, workspaceId || null), [session.user.id, workspaceId]);
-  const [snapshot, setSnapshot] = useState<Snapshot>(empty),
-    [snapshotScope, setSnapshotScope] = useState(''),
-    [loading, setLoading] = useState(true),
-    [error, setError] = useState(''),
-    [revision, setRevision] = useState(0),
-    [search, setSearch] = useState('');
-  const [, tick] = useState(0);
-  const eventWatermark = useRef<string | undefined>(undefined),
-    refreshSerial = useRef(0),
-    idempotency = useRef(new Map<string, string>());
-  const refresh = useCallback(
-    async (initial = false) => {
-      const serial = ++refreshSerial.current;
-      try {
-        // Capture the event boundary BEFORE reading mutable rows. Later commits remain visible to polling.
-        const events = initial ? await repo.list<DomainEvent>('list_domain_events', {}, true) : null;
-        const [tasks, projects, agents, members, preferences] = await Promise.all([
-          repo.list<Task>('list_tasks', {}, true),
-          repo.list<Project>('list_projects', {}, true),
-          repo.list<Agent>('list_agents', {}, true),
-          initial ? repo.rpc<Member[]>('list_workspace_members', { p_workspace_id: repo.workspaceId }) : Promise.resolve(null),
-          initial ? repo.preferences() : Promise.resolve(null),
-        ]);
-        if (repo.controller.signal.aborted || serial !== refreshSerial.current) return;
-        setSnapshot(old => ({
-          tasks,
-          projects,
-          agents,
-          events: events ?? old.events,
-          members: members ?? old.members,
-          preferences: preferences ?? old.preferences,
-        }));
-        if (events?.length) eventWatermark.current = eventCursor(events.at(-1)!);
-        setSnapshotScope(workspaceId);
-        setRevision(value => value + 1);
-        setError('');
-        return true;
-      } catch (err) {
-        if (!repo.controller.signal.aborted && serial === refreshSerial.current) setError(errorMessage(err, t));
-      } finally {
-        if (!repo.controller.signal.aborted && serial === refreshSerial.current) setLoading(false);
-      }
-      return false;
-    },
-    [repo, workspaceId, t],
+  const repo = useMemo(() => repositoryFactory(workspaceId || null), [repositoryFactory, workspaceId]);
+  const { snapshot, snapshotScope, loading, error, setError, revision, search, setSearch, refresh, execute } = useWorkspaceData(
+    repo,
+    current?.id,
+    workspaceId,
+    t,
   );
   useEffect(() => {
-    repo.activate();
-    eventWatermark.current = undefined;
-    setSnapshot(empty);
-    setSnapshotScope('');
-    setLoading(true);
-    setError('');
-    setSearch('');
-    if (current) void refresh(true);
-    return () => {
-      repo.dispose();
-      idempotency.current.clear();
-    };
-  }, [repo, current?.id]);
-  useEffect(() => {
-    if (!current || loading) return;
-    let alive = true;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        tick(value => value + 1);
-        if (document.visibilityState !== 'hidden') {
-          const events = await repo.list<DomainEvent>('list_domain_events', eventWatermark.current ? { cursor: eventWatermark.current } : {}, true);
-          if (!alive) return;
-          if (events.length) {
-            setSnapshot(old => ({ ...old, events: [...new Map([...old.events, ...events].map(e => [e.id, e])).values()] }));
-            if (await refresh()) eventWatermark.current = eventCursor(events.at(-1)!);
-          }
-        }
-      } catch (err) {
-        if (alive && !repo.controller.signal.aborted) setError(errorMessage(err, t));
-      } finally {
-        if (alive) timer = setTimeout(() => void poll(), 10000);
-      }
-    };
-    timer = setTimeout(() => void poll(), 10000);
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-  }, [repo, current?.id, loading, refresh, t]);
-  const execute: Execute = async <T,>(operation: string, input: Record<string, unknown>, version?: number): Promise<T> => {
-    const signature = JSON.stringify([operation, input, version]);
-    const key = idempotency.current.get(signature) ?? crypto.randomUUID();
-    idempotency.current.set(signature, key);
-    const result = await repo.command<T>(operation, { input, expectedVersion: version, idempotencyKey: key });
-    idempotency.current.delete(signature);
-    // Apply only server-returned task DTOs; keep the current lease until a fresh read replaces it.
-    const data = result.data as unknown as Partial<Task>;
-    if (data && data.id && data.projectId && data.title)
-      setSnapshot(old => ({
-        ...old,
-        tasks: old.tasks.some(item => item.id === data.id)
-          ? old.tasks.map(item => (item.id === data.id ? { ...item, ...data } : item))
-          : [...old.tasks, data as Task],
-      }));
-    let events: DomainEvent[] = [];
-    try {
-      events = await repo.list<DomainEvent>('list_domain_events', eventWatermark.current ? { cursor: eventWatermark.current } : {}, true);
-    } catch (err) {
-      if (!repo.controller.signal.aborted) setError(errorMessage(err, t));
-    }
-    const updated = await refresh();
-    if (events.length && !repo.controller.signal.aborted) {
-      setSnapshot(old => ({ ...old, events: [...new Map([...old.events, ...events].map(e => [e.id, e])).values()] }));
-      if (updated) eventWatermark.current = eventCursor(events.at(-1)!);
-    }
-    return result.data;
-  };
-  const base = `/app/w/${workspaceId}`;
+    if (current && repo.savePersonal) void repo.savePersonal({ activeWorkspace: current.id }).catch(err => setError(errorMessage(err, t)));
+  }, [repo, current?.id, t]);
+  const base = `${routeRoot}/w/${workspaceId}`;
   const taskHref = (params: Record<string, string>) => {
     const q = new URLSearchParams(url.search);
     for (const [key, value] of Object.entries(params)) {
@@ -204,7 +116,7 @@ export function WorkspacePanel({ session, t, controls }: { session: Session; t: 
     return `${base}/tasks${q.size ? '?' + q.toString() : ''}`;
   };
   const openTask = (id: string) => navigate(taskHref({ task: id }));
-  const shown = snapshotScope === workspaceId ? snapshot : empty;
+  const shown = snapshotScope === workspaceId ? snapshot : emptySnapshot;
   const projectId = url.searchParams.get('project') ?? '',
     filterProject = shown.projects.find(p => p.id === projectId),
     taskId = url.searchParams.get('task'),
@@ -235,7 +147,7 @@ export function WorkspacePanel({ session, t, controls }: { session: Session; t: 
       <aside className="work-sidebar">
         <div className="work-brand">
           {workspaces.length ? (
-            <WorkspacePicker items={workspaces} value={workspaceId} onChange={id => navigate(`/app/w/${id}/tasks`)} t={t} />
+            <WorkspacePicker items={workspaces} value={workspaceId} onChange={id => navigate(`${routeRoot}/w/${id}/tasks`)} t={t} />
           ) : (
             <span className="brand">Gr8r Studio</span>
           )}
@@ -302,11 +214,11 @@ export function WorkspacePanel({ session, t, controls }: { session: Session; t: 
           </Button>
           <span className="account-name">
             <span className="account-avatar">
-              {String(session.user.user_metadata?.name ?? session.user.email ?? '?')
+              {String(identity.name || identity.email || '?')
                 .slice(0, 2)
                 .toUpperCase()}
             </span>
-            {session.user.user_metadata?.name ?? session.user.email}
+            {identity.name || identity.email}
           </span>
         </div>
       </aside>
@@ -325,8 +237,11 @@ export function WorkspacePanel({ session, t, controls }: { session: Session; t: 
                 event.stopPropagation();
                 void (async () => {
                   if (await draft.current!.flush()) {
-                    const result = await supabase!.auth.signOut();
-                    if (result.error) setError(errorMessage(result.error, t));
+                    try {
+                      await onSignOut?.();
+                    } catch (err) {
+                      setError(errorMessage(err, t));
+                    }
                   }
                 })();
               }
@@ -337,16 +252,15 @@ export function WorkspacePanel({ session, t, controls }: { session: Session; t: 
         </header>
         <div className="work-status">
           <span className="sync-dot" />
-          {t('Organização na nuvem', 'Cloud workspace')}
+          {repo.mode === 'local' ? t('Armazenado neste dispositivo', 'Stored on this device') : t('Organização na nuvem', 'Cloud workspace')}
           <span>{readOnly ? t('Somente leitura', 'Read only') : t('Alterações por versão', 'Versioned changes')}</span>
           <label className="density-label">
             {t('Densidade', 'Density')}
             <select
               aria-label={t('Densidade', 'Density')}
-              defaultValue={localStorage.getItem('gr8r-react-density') ?? 'comfortable'}
+              value={density}
               onChange={e => {
-                document.documentElement.dataset.density = e.target.value;
-                localStorage.setItem('gr8r-react-density', e.target.value);
+                setDensity(e.target.value);
               }}
             >
               <option value="comfortable">{t('Confortável', 'Comfortable')}</option>
@@ -449,11 +363,23 @@ export function WorkspacePanel({ session, t, controls }: { session: Session; t: 
                   />
                 </>
               ) : route === 'agents' ? (
-                <AgentsPage agents={shown.agents} tasks={shown.tasks} openTask={openTask} t={t} />
+                repo.mode === 'local' ? (
+                  <p role="status" className="configuration-note">
+                    {t('Agentes exigem uma organização na nuvem.', 'Agents require a cloud workspace.')}
+                  </p>
+                ) : (
+                  <AgentsPage agents={shown.agents} tasks={shown.tasks} openTask={openTask} t={t} />
+                )
               ) : route === 'activity' ? (
                 <ActivityPage events={shown.events} members={shown.members} agents={shown.agents} tasks={shown.tasks} openTask={openTask} t={t} />
               ) : route === 'integrations' ? (
-                <IntegrationsPanel repo={repo} t={t} admin={admin} />
+                repo.mode === 'local' ? (
+                  <p role="status" className="configuration-note">
+                    {t('OAuth, agentes e webhooks exigem uma organização na nuvem.', 'OAuth, agents and webhooks require a cloud workspace.')}
+                  </p>
+                ) : (
+                  <IntegrationsPanel repo={repo} t={t} admin={admin} />
+                )
               ) : null}
               {taskId && !loading && route === 'tasks' && (selected || taskId === 'new') && (
                 <TaskDrawer
@@ -524,7 +450,7 @@ export function WorkspacePanel({ session, t, controls }: { session: Session; t: 
                 setWorkspaces(rows => [...rows.filter(row => row.id !== result.data.id), result.data]);
                 creationAttempt.current = null;
                 setCreateWorkspace(false);
-                navigate(`/app/w/${result.data.id}/tasks`);
+                navigate(`${routeRoot}/w/${result.data.id}/tasks`);
               } catch (err) {
                 setDiscoveryError(errorMessage(err, t));
               } finally {

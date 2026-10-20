@@ -1,7 +1,7 @@
+import type { WorkspaceRepository } from '../../workspace/repository';
 import { useEffect, useState } from 'react';
 import { Button } from '../../components/ui/button';
 import type { Connection } from '../integrations/client';
-import { NormalizedRepository } from '../../workspace/normalized';
 import type { Translate } from '../auth/ConsentPage';
 import { errorMessage } from '../shell/messages';
 type Subscription = {
@@ -15,7 +15,7 @@ type Subscription = {
   active: boolean;
 };
 type Delivery = { id: string; state: string; attempt: number; lastCategory: string; lastStatus: number | null; createdAt: string };
-export function IntegrationsPanel({ repo, t, admin }: { repo: NormalizedRepository; t: Translate; admin: boolean }) {
+export function IntegrationsPanel({ repo, t, admin }: { repo: WorkspaceRepository; t: Translate; admin: boolean }) {
   const [connections, setConnections] = useState<Connection[]>([]),
     [subscriptions, setSubscriptions] = useState<Subscription[]>([]),
     [deliveries, setDeliveries] = useState<Delivery[]>([]),

@@ -1,7 +1,13 @@
 import type { Translate } from '../auth/ConsentPage';
 import { RepositoryError } from '../../workspace/normalized';
 export function errorMessage(error: unknown, t: Translate): string {
-  const code = error instanceof RepositoryError ? error.code : '';
+  const code = error instanceof RepositoryError || (error && typeof error === 'object' && 'code' in error) ? String(error.code) : '';
+  if (code === 'corrupt' || code === 'storage')
+    return t(
+      'O armazenamento deste dispositivo está indisponível ou contém dados inválidos. Seus dados foram mantidos. Tente novamente.',
+      'Device storage is unavailable or contains invalid data. Your data was kept. Try again.',
+    );
+  if (code === 'cloud_required') return t('Este recurso exige uma organização na nuvem.', 'This feature requires a cloud workspace.');
   if (code === 'version_conflict')
     return t(
       'Esta tarefa mudou. Seu rascunho foi mantido. Recarregue a versão antes de salvar novamente.',

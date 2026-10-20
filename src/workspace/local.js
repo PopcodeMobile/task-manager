@@ -7,7 +7,10 @@ export function createLocalRepository({ storage, seed, blank, lock = globalThis.
   const readJSON = key => {
     try {
       const raw = storage.getItem(key);
-      return raw ? JSON.parse(raw) : null;
+      if (raw === null) return null;
+      const value = JSON.parse(raw);
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new WorkspaceError('corrupt');
+      return value;
     } catch {
       throw new WorkspaceError('corrupt');
     }
@@ -23,6 +26,19 @@ export function createLocalRepository({ storage, seed, blank, lock = globalThis.
     const current = readJSON(KEY);
     if (current) {
       if (current.version !== 1 || !Array.isArray(current.order) || !current.records) throw new WorkspaceError('corrupt');
+      for (const id of current.order) {
+        const record = current.records[id];
+        if (
+          !record ||
+          record.id !== id ||
+          record.data?.ws?.id !== id ||
+          !Array.isArray(record.data?.tasks) ||
+          !Array.isArray(record.data?.projects) ||
+          !Number.isSafeInteger(record.revision) ||
+          record.revision < 0
+        )
+          throw new WorkspaceError('corrupt');
+      }
       return current;
     }
     const legacy = readJSON('gr8r.v2');
@@ -69,6 +85,14 @@ export function createLocalRepository({ storage, seed, blank, lock = globalThis.
         return { ...clone(record), membership: { role: 'owner', userId: record.data.me } };
       });
     },
+    async loadPanel(id) {
+      return guarded(() => {
+        const state = read();
+        const record = state.records[id];
+        if (!record) throw new WorkspaceError('not_found');
+        return { ...clone(record), reactPanel: clone(state.reactPanels?.[id] ?? null) };
+      });
+    },
     async save(id, data, revision) {
       return guarded(() => {
         const state = read();
@@ -78,15 +102,38 @@ export function createLocalRepository({ storage, seed, blank, lock = globalThis.
         if (data.ws?.id !== id) throw new WorkspaceError('stale_scope');
         const content = clone(data);
         delete content.workspaces;
-        state.records[id] = { id, data: content, revision: revision + 1 };
+        state.records[id] = { ...previous, id, data: content, revision: revision + 1 };
         write(state);
         return revision + 1;
       });
     },
-    async create({ name, url }) {
+    // The callback is synchronous and the whole read/change/write runs under the
+    // same browser lock as the legacy writer. Throwing leaves storage untouched.
+    async transact(id, change) {
+      return guarded(() => {
+        const state = read();
+        const record = state.records[id];
+        if (!record) throw new WorkspaceError('not_found');
+        const context = { ...record, reactPanel: clone(state.reactPanels?.[id] ?? null) };
+        const result = change(record.data, record.revision, context);
+        if (result.changed) {
+          if (context.reactPanel) (state.reactPanels ??= {})[id] = context.reactPanel;
+          record.revision++;
+          write(state);
+        }
+        return clone(result.value);
+      });
+    },
+    async create({ name, url, idempotencyKey }) {
       if (!name?.trim()) throw new WorkspaceError('invalid');
       return guarded(() => {
         const state = read();
+        const signature = JSON.stringify([name.trim(), url]);
+        const prior = idempotencyKey && state.creationRequests?.[idempotencyKey];
+        if (prior) {
+          if (prior.signature !== signature) throw new WorkspaceError('conflict');
+          return { ...clone(prior.record), membership: { role: 'owner', userId: prior.record.data.me } };
+        }
         const id = crypto.randomUUID();
         const source = state.records[state.order[0]].data;
         const data = blank(
@@ -97,6 +144,7 @@ export function createLocalRepository({ storage, seed, blank, lock = globalThis.
         const record = { id, data, revision: 0 };
         state.records[id] = record;
         state.order.push(id);
+        if (idempotencyKey) (state.creationRequests ??= {})[idempotencyKey] = { signature, record: clone(record) };
         write(state);
         return { ...clone(record), membership: { role: 'owner', userId: data.me } };
       });

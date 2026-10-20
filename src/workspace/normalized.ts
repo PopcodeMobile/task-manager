@@ -31,6 +31,7 @@ const codes = new Set([
 ]);
 /** One instance per authenticated session and workspace. No shared identity cache or private executor credentials. */
 export class NormalizedRepository {
+  readonly mode = 'cloud' as const;
   controller = new AbortController();
   activate() {
     if (this.controller.signal.aborted) this.controller = new AbortController();

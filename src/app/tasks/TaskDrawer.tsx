@@ -1,8 +1,10 @@
+import { TaskExecutionSection } from './TaskExecutionSection';
+import type { WorkspaceRepository } from '../../workspace/repository';
 import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
-import { Bot, Check, MessageSquare, Plus, Unlink } from 'lucide-react';
+import { MessageSquare, Plus, Unlink } from 'lucide-react';
 import type { Task, Project, Comment, Subtask, TaskDependency, TaskStatus, TaskPriority } from '../../domain/contracts';
-import { NormalizedRepository, type Agent, type Member } from '../../workspace/normalized';
+import { type Agent, type Member } from '../../workspace/normalized';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import {
   AlertDialog,
@@ -42,7 +44,7 @@ export function TaskDrawer({
   tasks: Task[];
   agents: Agent[];
   members: Member[];
-  repo: NormalizedRepository;
+  repo: WorkspaceRepository;
   execute: Execute;
   t: Translate;
   close: () => void;
@@ -314,66 +316,19 @@ export function TaskDrawer({
         )}
         {current && (
           <>
-            <section className="drawer-section">
-              <h3>
-                <Bot size={16} />
-                {t('Execução', 'Execution')}
-              </h3>
-              <p className={active ? 'reservation-warning' : 'permission-note'}>
-                {active
-                  ? t('Execução reservada', 'Execution reserved')
-                  : current.executorAgentId
-                    ? t('Atribuído, sem reserva ativa', 'Assigned, no active reservation')
-                    : t('Sem agente executor', 'No executor agent')}
-              </p>
-              {current.reservation && (
-                <p className="permission-note">
-                  {active ? t('Reserva até', 'Reserved until') : t('Reserva expirada em', 'Reservation expired on')}{' '}
-                  {new Intl.DateTimeFormat(document.documentElement.lang, { dateStyle: 'short', timeStyle: 'short' }).format(
-                    new Date(current.reservation.expiresAt),
-                  )}
-                </p>
-              )}
-              <label className="form-field">
-                {t('Agente executor', 'Executor agent')}
-                <select value={agent} onChange={e => setAgent(e.target.value)} disabled={readOnly || busy}>
-                  <option value="">{t('Nenhum', 'None')}</option>
-                  {agents.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="button-row">
-                <Button
-                  variant="outline"
-                  disabled={busy || readOnly || !agent}
-                  onClick={() => void action(() => execute('intervene_task', { id: current.id, action: 'reassign', executorAgentId: agent }, version))}
-                >
-                  {t('Atribuir agente', 'Assign agent')}
-                </Button>
-                <Button variant="outline" disabled={busy || readOnly || (!current.executorAgentId && !active)} onClick={() => setConfirm(true)}>
-                  {t('Retomar controle humano', 'Resume human control')}
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={busy || readOnly || active || current.status === 'done'}
-                  onClick={() => void action(() => execute('complete_task', { id: current.id }, version))}
-                >
-                  <Check size={15} />
-                  {t('Concluir tarefa', 'Complete task')}
-                </Button>
-              </div>
-              {active && (
-                <p className="permission-note">
-                  {t(
-                    'A conclusão está bloqueada enquanto o agente tem a reserva. A retomada libera a execução e registra sua intervenção.',
-                    'Completion is blocked while the agent holds its reservation. Resuming releases execution and records your intervention.',
-                  )}
-                </p>
-              )}
-            </section>
+            <TaskExecutionSection
+              current={current}
+              active={active}
+              agent={agent}
+              agents={agents}
+              setAgent={setAgent}
+              readOnly={readOnly}
+              busy={busy}
+              t={t}
+              onAssign={() => void action(() => execute('intervene_task', { id: current.id, action: 'reassign', executorAgentId: agent }, version))}
+              onResume={() => setConfirm(true)}
+              onComplete={() => void action(() => execute('complete_task', { id: current.id }, version))}
+            />
             <section className="drawer-section">
               <h3>{t('Subtarefas', 'Subtasks')}</h3>
               {subtasks.map(item => (

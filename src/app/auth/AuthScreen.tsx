@@ -193,7 +193,7 @@ export function AuthScreen({ t }: { t: Translate }) {
       )}
       {!configured && (
         <p className="footnote">
-          <a href="/">{t('Continuar neste dispositivo', 'Continue on this device')}</a>
+          <a href="/app-local">{t('Continuar neste dispositivo', 'Continue on this device')}</a>
         </p>
       )}
     </>
