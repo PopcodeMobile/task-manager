@@ -1,5 +1,19 @@
 {
   "framework": "vite",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/oauth/consent",
+      "destination": "/react.html"
+    },
+    {
+      "source": "/integrations",
+      "destination": "/react.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/react.html"
+    }
+  ]
 }

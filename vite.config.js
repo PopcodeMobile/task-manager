@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite';
 import fs from 'node:fs';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 import { icons as lucide } from 'lucide';
 
@@ -47,7 +49,26 @@ function lucideSubset() {
   };
 }
 
+// Temporary MPA routing while the legacy entry remains the default.
+function reactRoutes() {
+  const rewrite = (req, _res, next) => {
+    if (/^\/(oauth\/consent|integrations|login)(?:[?]|$)/.test(req.url))
+      req.url = '/react.html' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+    next();
+  };
+  return {
+    name: 'react-auth-routes',
+    configureServer(server) {
+      server.middlewares.use(rewrite);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(rewrite);
+    },
+  };
+}
 export default defineConfig({
-  plugins: [lucideSubset()],
+  plugins: [reactRoutes(), react(), tailwindcss(), lucideSubset()],
+  resolve: { alias: { '@': path.resolve('src') } },
+  build: { rollupOptions: { input: { legacy: path.resolve('index.html'), react: path.resolve('react.html') } } },
   server: { port: 5173 },
 });

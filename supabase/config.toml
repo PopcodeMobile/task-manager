@@ -20,8 +20,9 @@ enabled = false
 
 [auth]
 enabled = true
-site_url = "http://localhost:5173"
-additional_redirect_urls = ["http://localhost:5173", "http://localhost:5173/#reset"]
+site_url = "http://127.0.0.1:5180"
+signing_keys_path = "./.temp/task3-signing-keys.json"
+additional_redirect_urls = ["http://127.0.0.1:5180", "http://localhost:5180", "http://localhost:5173", "http://localhost:5173/#reset"]
 jwt_expiry = 3600
 enable_signup = true
 minimum_password_length = 10
@@ -55,3 +56,11 @@ verify_jwt = false
 [analytics]
 enabled = false
 port = 61927
+
+[auth.oauth_server]
+enabled = true
+allow_dynamic_registration = true
+authorization_url_path = "/oauth/consent"
+
+[functions.mcp]
+verify_jwt = false
