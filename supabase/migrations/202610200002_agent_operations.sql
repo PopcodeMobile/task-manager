@@ -179,12 +179,30 @@ begin
 end $$;
 revoke all on function public.operation_assert_claim(uuid,text,jsonb,text) from public,anon,authenticated;
 
+-- Deletion may remove only the complete owned graph being deleted. Surviving task
+-- relations must first be unlinked by their own explicit CAS/lease-checked commands.
+create function public.operation_delete_tasks(p_workspace uuid,p_task_ids text[],p_project text default null) returns void
+language plpgsql set search_path='' as $$
+begin
+ if exists(select 1 from public.task_dependencies dep where dep.workspace_id=p_workspace and dep.depends_on_task_id=any(p_task_ids) and not(dep.task_id=any(p_task_ids)))
+ or exists(select 1 from public.files file_row join public.task_attachments attachment on attachment.workspace_id=file_row.workspace_id and attachment.file_id=file_row.id
+   where file_row.workspace_id=p_workspace and (file_row.task_id=any(p_task_ids) or file_row.project_id=p_project) and not(attachment.task_id=any(p_task_ids)))
+ or (p_project is not null and (
+   exists(select 1 from public.files file_row where file_row.workspace_id=p_workspace and file_row.project_id=p_project and file_row.task_id is not null and not(file_row.task_id=any(p_task_ids)))
+   or exists(select 1 from public.calendar_events calendar_row where calendar_row.workspace_id=p_workspace and calendar_row.project_id=p_project and calendar_row.task_id is not null and not(calendar_row.task_id=any(p_task_ids)))
+   or exists(select 1 from public.activity_entries activity_row where activity_row.workspace_id=p_workspace and activity_row.project_id=p_project and activity_row.task_id is not null and not(activity_row.task_id=any(p_task_ids)))
+   or exists(select 1 from public.notifications notification_row where notification_row.workspace_id=p_workspace and notification_row.project_id=p_project and notification_row.task_id is not null and not(notification_row.task_id=any(p_task_ids)))
+ )) then raise exception 'validation_error' using errcode='PT422';end if;
+ delete from public.calendar_events where workspace_id=p_workspace and task_id=any(p_task_ids);
+ delete from public.activity_entries where workspace_id=p_workspace and task_id=any(p_task_ids);
+ delete from public.notifications where workspace_id=p_workspace and task_id=any(p_task_ids);
+ delete from public.tasks where workspace_id=p_workspace and id=any(p_task_ids);
+end $$;
+revoke all on function public.operation_delete_tasks(uuid,text[],text) from public,anon,authenticated;
+
 create function public.operation_delete_task(p_workspace uuid,p_task text) returns void language plpgsql set search_path='' as $$
 begin
- delete from public.calendar_events where workspace_id=p_workspace and task_id=p_task;
- delete from public.activity_entries where workspace_id=p_workspace and task_id=p_task;
- delete from public.notifications where workspace_id=p_workspace and task_id=p_task;
- delete from public.tasks where workspace_id=p_workspace and id=p_task;
+ perform public.operation_delete_tasks(p_workspace,array[p_task]);
 end $$;
 revoke all on function public.operation_delete_task(uuid,text) from public,anon,authenticated;
 
@@ -214,6 +232,7 @@ begin
   if p_actor->>'agentId' is not null then perform public.operation_assert_claim(p_workspace,task_id,p_actor,p_input->>'claimToken');end if;
  else
   if p_actor->>'agentId' is not null and ((tbl='labels' and mode='delete' and exists(select 1 from public.task_labels where workspace_id=p_workspace and label_id=ident)) or (tbl='files' and exists(select 1 from public.task_attachments where workspace_id=p_workspace and file_id=ident))) then raise exception 'forbidden' using errcode='PT403';end if;
+  if mode='delete' and ((tbl='labels' and exists(select 1 from public.task_labels where workspace_id=p_workspace and label_id=ident)) or (tbl='files' and exists(select 1 from public.task_attachments where workspace_id=p_workspace and file_id=ident))) then raise exception 'validation_error' using errcode='PT422';end if;
   if p_actor->>'agentId' is not null and tbl in ('files','calendar_events') and coalesce(p_input->>'taskId',old_data->>'task_id') is not null then raise exception 'forbidden' using errcode='PT403';end if;
   if mode<>'create' and (p_expected is null or p_expected<>(old_data->>'version')::bigint) then raise exception 'version_conflict' using errcode='PT409';end if;
  end if;
@@ -244,7 +263,7 @@ create function public.execute_operation(p_workspace_id uuid,p_operation text,p_
 language plpgsql security definer set search_path='' as $$
 declare
  a jsonb; cached public.idempotency_requests; fp text; result jsonb; data jsonb; event uuid:=gen_random_uuid();
- t public.tasks; p public.projects; claim public.task_claims; ident text; next_id text; has_claim boolean; child record;
+ t public.tasks; p public.projects; claim public.task_claims; ident text; next_id text; has_claim boolean; delete_ids text[];
 begin
  -- Authorization precedes validation, rate checks and idempotent replay. Membership row lock protects revocation races.
  a:=public.operation_authorize(p_workspace_id,true);
@@ -344,9 +363,10 @@ begin
   if not found then raise exception 'not_found' using errcode='PT404';end if;
   if p_expected_version is null or p_expected_version<>p.version then raise exception 'version_conflict' using errcode='PT409';end if;
   if p_operation='delete_project' then
-   if exists(select 1 from public.task_claims c join public.tasks t on t.workspace_id=c.workspace_id and t.id=c.task_id where t.workspace_id=p_workspace_id and t.project_id=ident and c.expires_at>clock_timestamp()) then raise exception 'already_claimed' using errcode='PT409';end if;
+   if exists(select 1 from public.task_claims c join public.tasks claimed_task on claimed_task.workspace_id=c.workspace_id and claimed_task.id=c.task_id where claimed_task.workspace_id=p_workspace_id and claimed_task.project_id=ident and c.expires_at>clock_timestamp()) then raise exception 'already_claimed' using errcode='PT409';end if;
    if a->>'agentId' is not null and exists(select 1 from public.tasks where workspace_id=p_workspace_id and project_id=ident) then raise exception 'forbidden' using errcode='PT403';end if;
-   for child in select id from public.tasks where workspace_id=p_workspace_id and project_id=ident loop perform public.operation_delete_task(p_workspace_id,child.id);end loop;
+   select coalesce(array_agg(id),'{}'::text[]) into delete_ids from public.tasks where workspace_id=p_workspace_id and project_id=ident;
+   perform public.operation_delete_tasks(p_workspace_id,delete_ids,ident);
    delete from public.files where workspace_id=p_workspace_id and project_id=ident;
    delete from public.calendar_events where workspace_id=p_workspace_id and project_id=ident;
    delete from public.saved_views where workspace_id=p_workspace_id and project_id=ident;

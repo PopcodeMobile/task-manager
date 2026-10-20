@@ -291,3 +291,116 @@ test('direct RPCs validate personal-state schemas and paginate immutable workspa
     await db.close();
   }
 });
+
+test('authenticated project deletion succeeds for empty/internal graphs and rejects an active descendant claim', async () => {
+  const { db, ws } = await setup();
+  try {
+    await db.exec('set role authenticated');
+    await command(db, ws, 'delete_task', { id: 't1' }, 1);
+    const empty = await command(db, ws, 'delete_project', { id: 'p1' }, 1);
+    assert.equal(empty.data.deleted, true);
+    const project = await command(db, ws, 'create_project', { name: 'Internal graph' });
+    const first = await command(db, ws, 'create_task', { projectId: project.data.id, title: 'First' });
+    const second = await command(db, ws, 'create_task', { projectId: project.data.id, title: 'Second' });
+    await command(db, ws, 'set_task_dependency', { id: second.data.id, dependsOnTaskId: first.data.id }, 1);
+    const file = await command(db, ws, 'create_file', { name: 'Internal file', taskId: first.data.id, projectId: project.data.id });
+    await command(db, ws, 'set_task_attachment', { id: second.data.id, fileId: file.data.id }, 2);
+    assert.equal((await command(db, ws, 'delete_project', { id: project.data.id }, 1)).data.deleted, true);
+    const reservedProject = await command(db, ws, 'create_project', { name: 'Reserved' });
+    const reserved = await command(db, ws, 'create_task', { projectId: reservedProject.data.id, title: 'Reserved' });
+    await db.exec('reset role');
+    await db.query("insert into public.agents(workspace_id,id,name,auth_user_id) values($1,'a1','Agent',$2)", [ws, owner]);
+    await db.exec('set role authenticated');
+    await command(db, ws, 'claim_task', { id: reserved.data.id }, 1);
+    await rejects(command(db, ws, 'delete_project', { id: reservedProject.data.id }, 1), 'already_claimed');
+    assert.equal(
+      (await db.query('select count(*)::integer n from public.projects where workspace_id=$1 and id=$2', [ws, reservedProject.data.id])).rows[0].n,
+      1,
+    );
+  } finally {
+    await db.close();
+  }
+});
+
+async function deletionBoundaryState(db, ws) {
+  await db.exec('reset role');
+  const state = (
+    await db.query(
+      `select jsonb_build_object(
+    'tasks',(select jsonb_agg(to_jsonb(x) order by id) from public.tasks x where workspace_id=$1),
+    'dependencies',(select jsonb_agg(to_jsonb(x) order by task_id,depends_on_task_id) from public.task_dependencies x where workspace_id=$1),
+    'attachments',(select jsonb_agg(to_jsonb(x) order by task_id,file_id) from public.task_attachments x where workspace_id=$1),
+    'files',(select jsonb_agg(to_jsonb(x) order by id) from public.files x where workspace_id=$1),
+    'claims',(select jsonb_agg(to_jsonb(x) order by task_id) from public.task_claims x where workspace_id=$1),
+    'events',(select jsonb_agg(to_jsonb(x) order by id) from public.domain_events x where workspace_id=$1),
+    'replays',(select jsonb_agg(to_jsonb(x) order by key) from public.idempotency_requests x where workspace_id=$1)
+  ) state`,
+      [ws],
+    )
+  ).rows[0].state;
+  await db.exec('set role authenticated');
+  return state;
+}
+
+test('authenticated task/intervention/project deletion cannot cascade into another executor task', async () => {
+  const { db, ws } = await setup();
+  try {
+    const project = await command(db, ws, 'create_project', { id: 'p2', name: 'Other project' });
+    const survivor = await command(db, ws, 'create_task', { id: 't2', projectId: project.data.id, title: 'Survivor' });
+    await command(db, ws, 'set_task_dependency', { id: survivor.data.id, dependsOnTaskId: 't1' }, 1);
+    const file = await command(db, ws, 'create_file', { taskId: 't1', projectId: 'p1', name: 'Shared' });
+    await command(db, ws, 'set_task_attachment', { id: survivor.data.id, fileId: file.data.id }, 2);
+    await db.query("insert into public.agents(workspace_id,id,name,auth_user_id) values($1,'a1','One',$2),($1,'a2','Two',$3)", [ws, owner, other]);
+    await db.exec('set role authenticated');
+    await actor(db, other);
+    await command(db, ws, 'claim_task', { id: survivor.data.id }, 3);
+    await actor(db, owner);
+    const claimed = await command(db, ws, 'claim_task', { id: 't1' }, 1);
+    const before = await deletionBoundaryState(db, ws);
+    await rejects(command(db, ws, 'delete_task', { id: 't1', claimToken: claimed.data.claimToken }, 2), 'validation_error');
+    assert.deepEqual(await deletionBoundaryState(db, ws), before);
+    await db.exec('reset role');
+    await db.query("update public.agents set auth_user_id=null where workspace_id=$1 and id='a1'", [ws]);
+    await db.exec('set role authenticated');
+    await rejects(command(db, ws, 'intervene_task', { id: 't1', action: 'delete' }, 2), 'validation_error');
+    assert.deepEqual(await deletionBoundaryState(db, ws), before);
+    await command(db, ws, 'intervene_task', { id: 't1', action: 'release' }, 2);
+    const released = await deletionBoundaryState(db, ws);
+    await rejects(command(db, ws, 'delete_project', { id: 'p1' }, 1), 'validation_error');
+    assert.deepEqual(await deletionBoundaryState(db, ws), released);
+  } finally {
+    await db.close();
+  }
+});
+
+test('shared files and labels require explicit parent-CAS unlink before cascading deletion', async () => {
+  const { db, ws } = await setup();
+  try {
+    const project = await command(db, ws, 'create_project', { id: 'p2', name: 'Surviving project' });
+    await command(db, ws, 'create_task', { id: 't2', projectId: project.data.id, title: 'Survivor' });
+    const file = await command(db, ws, 'create_file', { taskId: 't1', projectId: 'p1', name: 'Shared' });
+    await command(db, ws, 'set_task_attachment', { id: 't2', fileId: file.data.id }, 1);
+    const label = await command(db, ws, 'create_label', { name: 'Shared label' });
+    await command(db, ws, 'set_task_label', { id: 't2', labelId: label.data.id }, 2);
+    await db.exec('set role authenticated');
+    const before = await deletionBoundaryState(db, ws);
+    for (const [op, input, version] of [
+      ['delete_task', { id: 't1' }, 1],
+      ['intervene_task', { id: 't1', action: 'delete' }, 1],
+      ['delete_project', { id: 'p1' }, 1],
+      ['delete_file', { id: file.data.id }, 1],
+      ['delete_label', { id: label.data.id }, 1],
+    ]) {
+      await rejects(command(db, ws, op, input, version), 'validation_error');
+      assert.deepEqual(await deletionBoundaryState(db, ws), before);
+    }
+    await rejects(command(db, ws, 'remove_task_attachment', { id: 't2', fileId: file.data.id }, 2), 'version_conflict');
+    await command(db, ws, 'remove_task_attachment', { id: 't2', fileId: file.data.id }, 3);
+    await command(db, ws, 'remove_task_label', { id: 't2', labelId: label.data.id }, 4);
+    assert.equal((await command(db, ws, 'delete_label', { id: label.data.id }, 1)).data.deleted, true);
+    assert.equal((await command(db, ws, 'delete_task', { id: 't1' }, 1)).data.deleted, true);
+    assert.equal((await command(db, ws, 'delete_project', { id: 'p1' }, 1)).data.deleted, true);
+  } finally {
+    await db.close();
+  }
+});

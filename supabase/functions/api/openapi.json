@@ -411,7 +411,8 @@
           "503": {
             "$ref": "#/components/responses/PublicError"
           }
-        }
+        },
+        "description": "Deletion is rejected with validation_error if a surviving task would lose a dependency, attachment, or other task relation. Remove such relations explicitly using the surviving task expectedVersion and, for agents, its valid claim token before retrying. Project deletion may remove relations wholly internal to its deleted task set; any active descendant claim must first be explicitly released by human intervention."
       }
     },
     "/v1/workspaces/{workspaceId}/commands/archive_task": {
@@ -824,7 +825,8 @@
           "503": {
             "$ref": "#/components/responses/PublicError"
           }
-        }
+        },
+        "description": "Deletion is rejected with validation_error if a surviving task would lose a dependency, attachment, or other task relation. Remove such relations explicitly using the surviving task expectedVersion and, for agents, its valid claim token before retrying. Project deletion may remove relations wholly internal to its deleted task set; any active descendant claim must first be explicitly released by human intervention."
       }
     },
     "/v1/workspaces/{workspaceId}/commands/add_task_comment": {
@@ -1060,7 +1062,8 @@
           "503": {
             "$ref": "#/components/responses/PublicError"
           }
-        }
+        },
+        "description": "Deletion is rejected with validation_error if a surviving task would lose a dependency, attachment, or other task relation. Remove such relations explicitly using the surviving task expectedVersion and, for agents, its valid claim token before retrying. Project deletion may remove relations wholly internal to its deleted task set; any active descendant claim must first be explicitly released by human intervention."
       }
     },
     "/v1/workspaces/{workspaceId}/commands/archive_project": {
@@ -2417,7 +2420,8 @@
           "503": {
             "$ref": "#/components/responses/PublicError"
           }
-        }
+        },
+        "description": "Deletion is rejected with validation_error if a surviving task would lose a dependency, attachment, or other task relation. Remove such relations explicitly using the surviving task expectedVersion and, for agents, its valid claim token before retrying. Project deletion may remove relations wholly internal to its deleted task set; any active descendant claim must first be explicitly released by human intervention."
       }
     },
     "/v1/workspaces/{workspaceId}/commands/create_view": {
@@ -2948,7 +2952,8 @@
           "503": {
             "$ref": "#/components/responses/PublicError"
           }
-        }
+        },
+        "description": "Deletion is rejected with validation_error if a surviving task would lose a dependency, attachment, or other task relation. Remove such relations explicitly using the surviving task expectedVersion and, for agents, its valid claim token before retrying. Project deletion may remove relations wholly internal to its deleted task set; any active descendant claim must first be explicitly released by human intervention."
       }
     },
     "/v1/workspaces/{workspaceId}/commands/set_preferences": {
