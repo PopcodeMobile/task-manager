@@ -17,6 +17,7 @@ export default [
       'src/workspace/normalized.ts',
       'src/workspace/repository.ts',
       'src/workspace/local-panel-repository.ts',
+      'src/workspace/local-panel-types.ts',
       'playwright.local.config.ts',
       'tests/browser/local-panel.spec.ts',
     ],

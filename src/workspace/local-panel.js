@@ -1,3 +1,4 @@
+// @ts-check
 import { RepositoryError } from './normalized.ts';
 import { localDTO, localWorkspaceDTO, entityVersion } from './local-dto.js';
 import { localCommandRules as commandRules } from './local-command-rules.js';
@@ -6,9 +7,11 @@ import { mutateProject } from './local-mutations/projects.js';
 import { mutateComment } from './local-mutations/comments.js';
 import { mutateSubtask } from './local-mutations/subtasks.js';
 import { mutateDependency } from './local-mutations/dependencies.js';
+/** @param {string} code @returns {never} */
 const fail = code => {
   throw new RepositoryError(code);
 };
+/** @type {Record<string, string>} */
 const collections = {
   task: 'tasks',
   project: 'projects',
@@ -20,9 +23,14 @@ const collections = {
   label: 'labels',
 };
 const emptyPreferences = () => ({ favoriteProjectIds: [], favoriteTaskIds: [], notificationReadStates: {} });
+/** @param {AbortController} controller */
 const abortCheck = controller => {
   if (controller.signal.aborted) throw new DOMException('Disposed', 'AbortError');
 };
+/** @param {Pick<Storage, 'getItem'>} storage
+ * @param {string} identity
+ * @returns {import('./local-panel-types').LocalPersonalRecord}
+ */
 function readPersonal(storage, identity) {
   try {
     const raw = storage.getItem(`gr8r.preferences.${identity}`);
@@ -34,6 +42,10 @@ function readPersonal(storage, identity) {
     fail('storage');
   }
 }
+/** @param {Pick<Storage, 'setItem'>} storage
+ * @param {string} identity
+ * @param {import('./local-panel-types').LocalPersonalRecord} value
+ */
 function writePersonal(storage, identity, value) {
   try {
     storage.setItem(`gr8r.preferences.${identity}`, JSON.stringify(value));
@@ -41,9 +53,15 @@ function writePersonal(storage, identity, value) {
     fail('storage');
   }
 }
-/** Local identity is a device namespace, never a fabricated Supabase session. */
+/** Local identity is a device namespace, never a fabricated Supabase session.
+ * @param {import('./local-panel-types').LocalRepositoryOptions} options
+ */
 export function createLocalPanelAdapter({ persistence, workspaceId, storage, identity = 'local' }) {
   let controller = new AbortController();
+  /** @template T
+   * @param {(controller: AbortController) => T | Promise<T>} run
+   * @returns {Promise<T>}
+   */
   const guarded = async run => {
     const captured = controller;
     abortCheck(captured);
@@ -53,7 +71,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
       return result;
     } catch (error) {
       abortCheck(captured);
-      if (error.code === 'conflict') fail('version_conflict');
+      if (/** @type {{code?: string}} */ (error).code === 'conflict') fail('version_conflict');
       throw error;
     }
   };
@@ -65,16 +83,17 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
         value = { prefs: legacy.prefs, collapsed: legacy.collapsed, views: {} };
         // Legacy views belong to the original graph, even on a first-entry deep link.
         const rows = await persistence.list();
-        if (rows[0]) value.views[rows[0].id] = legacy.views;
+        if (rows[0]) /** @type {NonNullable<import('./local-panel-types').LocalPersonalRecord['views']>} */ (value.views)[rows[0].id] = legacy.views;
         // Another bootstrap may have saved personal choices while the reads awaited.
         // Fill only missing legacy defaults; current workspace views/choices win.
         const latest = readPersonal(storage, identity);
         value = { ...value, ...latest, prefs: { ...value.prefs, ...latest.prefs }, views: { ...value.views, ...latest.views } };
         writePersonal(storage, identity, value);
       }
-      return { ...value, prefs: value.prefs ?? {}, views: value.views?.[workspaceId] ?? {} };
+      return { ...value, prefs: value.prefs ?? {}, views: value.views?.[/** @type {string} */ (workspaceId)] ?? {} };
     });
   }
+  /** @param {Partial<import('./repository').PersonalState>} patch */
   async function savePersonal(patch) {
     return guarded(async () => {
       await personal();
@@ -84,14 +103,19 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
       writePersonal(storage, identity, next);
     });
   }
+  /** @param {string} operation
+   * @param {Record<string, string | number>} query
+   * @returns {Promise<Record<string, unknown>[]>}
+   */
   async function rows(operation, query = {}) {
     const record = await persistence.loadPanel(workspaceId);
+    /** @type {Record<string, any> & {tasks: any[], members?: any[], comments?: any[], projects: any[], _panel: import('./local-panel-types').LocalPanelBookkeeping}} */
     const data = { ...record.data, _panel: panelState(record) };
     if (operation === 'list_agents') return [];
     if (operation === 'list_domain_events') {
       let events = data._panel?.events ?? [];
       if (query.cursor) {
-        const [at, id] = JSON.parse(query.cursor);
+        const [at, id] = JSON.parse(/** @type {string} */ (query.cursor));
         events = events.filter(e => e.createdAt > at || (e.createdAt === at && e.id > id));
       }
       return events;
@@ -99,28 +123,33 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     if (operation === 'list_members')
       return (data.members ?? []).map(m => ({ user_id: m.id, name: m.name, email: m.email, role: String(m.role).toLowerCase() }));
     if (operation === 'list_subtasks')
-      return data.tasks.flatMap(t => (t.subtasks ?? []).map(s => localDTO(data, workspaceId, 'subtask', { ...s, taskId: t.id })));
-    if (operation === 'list_dependencies') return data.tasks.flatMap(t => (t.deps ?? []).map(id => ({ workspaceId, taskId: t.id, dependsOnTaskId: id })));
-    if (operation === 'list_task_labels') return data.tasks.flatMap(t => (t.labels ?? []).map(id => ({ workspaceId, taskId: t.id, labelId: id })));
-    if (operation === 'list_attachments') return data.tasks.flatMap(t => (t.attachments ?? []).map(f => ({ workspaceId, taskId: t.id, fileId: f.id })));
+      return data.tasks.flatMap(t => (t.subtasks ?? []).map(/** @param {any} s */ s => localDTO(data, workspaceId, 'subtask', { ...s, taskId: t.id })));
+    if (operation === 'list_dependencies')
+      return data.tasks.flatMap(t => (t.deps ?? []).map(/** @param {string} id */ id => ({ workspaceId, taskId: t.id, dependsOnTaskId: id })));
+    if (operation === 'list_task_labels')
+      return data.tasks.flatMap(t => (t.labels ?? []).map(/** @param {string} id */ id => ({ workspaceId, taskId: t.id, labelId: id })));
+    if (operation === 'list_attachments')
+      return data.tasks.flatMap(t => (t.attachments ?? []).map(/** @param {any} f */ f => ({ workspaceId, taskId: t.id, fileId: f.id })));
     if (operation === 'list_reactions')
       return (data.comments ?? []).flatMap(c =>
         Object.entries(c.re ?? {}).flatMap(([reaction, users]) =>
-          users.map(user => ({ workspaceId, commentId: c.id, reaction, legacyUserId: user, userId: user })),
+          /** @type {string[]} */ (users).map(user => ({ workspaceId, commentId: c.id, reaction, legacyUserId: user, userId: user })),
         ),
       );
     if (operation === 'list_team_members' || operation === 'list_project_members') {
       const team = operation === 'list_team_members';
-      return (data[team ? 'teams' : 'projects'] ?? []).flatMap(row =>
-        (row.members ?? []).map(userId => ({ workspaceId, [team ? 'teamId' : 'projectId']: row.id, userId })),
+      return (data[team ? 'teams' : 'projects'] ?? []).flatMap(
+        /** @param {any} row */ row =>
+          (row.members ?? []).map(/** @param {string} userId */ userId => ({ workspaceId, [team ? 'teamId' : 'projectId']: row.id, userId })),
       );
     }
     if (operation === 'list_notifications' || operation === 'list_activity' || operation === 'list_task_activity')
       return structuredClone(data[operation === 'list_notifications' ? 'notifs' : 'activity'] ?? []);
     const kind = Object.keys(collections).find(k => `list_${k === 'calendar_event' ? 'calendar_events' : k === 'view' ? 'views' : `${k}s`}` === operation);
     if (!kind) fail('validation_error');
-    return (data[collections[kind]] ?? []).map(row => localDTO(data, workspaceId, kind, row));
+    return (data[collections[kind]] ?? []).map(/** @param {any} row */ row => localDTO(data, workspaceId, kind, row));
   }
+  /** @type {import('./local-panel-types').LocalPanelTransport} */
   const adapter = {
     mode: /** @type {const} */ ('local'),
     userId: identity,
@@ -141,7 +170,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     },
     async preferences() {
       const value = await personal();
-      return { ...emptyPreferences(), ...value.preferences?.[workspaceId] };
+      return { ...emptyPreferences(), ...value.preferences?.[/** @type {string} */ (workspaceId)] };
     },
     async list(operation, query = {}) {
       return guarded(async () => {
@@ -158,7 +187,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     async query(operation, query = {}) {
       if (operation === 'get_preferences') return { data: { userId: identity, workspaceId, preferences: await adapter.preferences() } };
       if (operation === 'get_task' || operation === 'get_project') {
-        const values = await adapter.list(operation === 'get_task' ? 'list_tasks' : 'list_projects');
+        const values = /** @type {Record<string, unknown>[]} */ (await adapter.list(operation === 'get_task' ? 'list_tasks' : 'list_projects'));
         return { data: values.find(row => row.id === query.id) ?? fail('not_found') };
       }
       const items = await adapter.list(operation, query);
@@ -180,6 +209,9 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
         }));
       fail('cloud_required');
     },
+    /** @param {string} operation
+     * @param {Omit<import('../domain/contracts').Command<Record<string, unknown>>, 'workspaceId'>} command
+     */
     async command(operation, command) {
       return guarded(captured =>
         persistence.transact(workspaceId, (data, revision, record) => {
@@ -197,6 +229,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
               return { changed: false, value: previous.result };
             }
             if (!command.idempotencyKey) fail('validation_error');
+            /** @param {string} op @param {Record<string, unknown>} input @param {number | undefined} expectedVersion */
             const apply = (op, input, expectedVersion) => mutate(data, workspaceId, op, input, expectedVersion);
             let value;
             if (operation === 'batch') {
@@ -222,6 +255,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
   };
   return adapter;
 }
+/** @param {any} data @param {string} operation @param {Record<string, unknown>} input */
 function appendEvent(data, operation, input) {
   const events = data._panel.events;
   const createdAt = new Date(Math.max(Date.now(), events.length ? Date.parse(events.at(-1).createdAt) + 1 : 0)).toISOString();
@@ -237,32 +271,39 @@ function appendEvent(data, operation, input) {
   });
   return id;
 }
+/** @param {any} data @param {string | null} workspaceId @param {string} operation @param {Record<string, any>} input @param {number | undefined} expectedVersion */
 function mutate(data, workspaceId, operation, input, expectedVersion) {
   if (/claim|intervene|executor|webhook|connection/.test(operation)) fail('cloud_required');
   validateLocalInput(data, operation, input);
-  const find = (kind, id) => (data[collections[kind]] ?? []).find(row => row.id === id) ?? fail('not_found');
+  /** @param {string} kind @param {string} id */
+  const find = (kind, id) => (data[collections[kind]] ?? []).find(/** @param {any} row */ row => row.id === id) ?? fail('not_found');
+  /** @param {string} kind @param {any} row */
   const cas = (kind, row) => {
     if (expectedVersion !== entityVersion(data, kind, row.id)) fail('version_conflict');
   };
+  /** @param {string} kind @param {any} row */
   const bump = (kind, row) => {
     data._panel.versions[`${kind}:${row.id}`] = entityVersion(data, kind, row.id) + 1;
     row.updated = Date.now();
   };
+  /** @param {string} kind @param {any} row */
   const dto = (kind, row) => localDTO(data, workspaceId, kind, row);
+  /** @param {string} kind @param {any} row */
   const initialize = (kind, row) => {
     data._panel.versions[`${kind}:${row.id}`] = 1;
     if (kind === 'task') for (const subtask of row.subtasks ?? []) initialize('subtask', subtask);
     return row;
   };
+  /** @param {string} project */
   const keyFor = project => {
     const p = find('project', project);
     p.seq =
       Math.max(
         Number(p.seq) || 0,
         ...data.tasks
-          .filter(t => t.project === project)
+          .filter(/** @param {any} t */ t => t.project === project)
           .map(
-            t =>
+            /** @param {any} t */ t =>
               Number(
                 String(t.key ?? '')
                   .split('-')
@@ -282,8 +323,10 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
   if (operation === 'set_task_dependency' || operation === 'remove_task_dependency') return mutateDependency(context, operation, input);
   fail('validation_error');
 }
+/** @param {any} data @param {string} operation @param {Record<string, any>} input */
 function validateLocalInput(data, operation, input) {
-  const rule = Object.hasOwn(commandRules, operation) && commandRules[operation];
+  const rule = Object.hasOwn(commandRules, operation) && /** @type {Record<string, {fields: string[], required: string[]}>} */ (commandRules)[operation];
+  /** @param {unknown} value @returns {boolean} */
   const safe = value => {
     if (!value || typeof value !== 'object') return value === null || ['string', 'boolean', 'number'].includes(typeof value);
     if (Array.isArray(value)) return value.every(safe);
@@ -332,7 +375,7 @@ function validateLocalInput(data, operation, input) {
       (typeof value !== 'string' || value.length > (key === 'description' ? 100000 : key === 'body' ? 20000 : 500))
     )
       fail('validation_error');
-    if (key === 'teamId' && !data.teams?.some(t => t.id === value)) fail('validation_error');
+    if (key === 'teamId' && !data.teams?.some(/** @param {any} t */ t => t.id === value)) fail('validation_error');
     if (['title', 'name', 'body'].includes(key) && (typeof value !== 'string' || !value.trim())) fail('validation_error');
     if (
       ['dueDate', 'startDate', 'eventDate'].includes(key) &&
@@ -342,7 +385,7 @@ function validateLocalInput(data, operation, input) {
         new Date(value).toISOString().slice(0, 10) !== value)
     )
       fail('validation_error');
-    if (['assigneeUserId', 'leadUserId', 'userId'].includes(key) && !data.members?.some(m => m.id === value)) fail('validation_error');
+    if (['assigneeUserId', 'leadUserId', 'userId'].includes(key) && !data.members?.some(/** @param {any} m */ m => m.id === value)) fail('validation_error');
     if (
       key === 'status' &&
       !(operation.endsWith('project') ? ['planning', 'active', 'risk', 'hold', 'complete'] : ['backlog', 'todo', 'progress', 'review', 'done']).includes(value)
@@ -355,11 +398,15 @@ function validateLocalInput(data, operation, input) {
 
 // A legacy whole-workspace write has no entity versions. Conservatively advance
 // every known entity version when that writer changes the storage revision.
+/** @param {any} record @returns {import('./local-panel-types').LocalPanelBookkeeping} */
 function panelState(record) {
   const panel = structuredClone(record.reactPanel ?? { versions: {}, events: [], requests: {}, storageRevision: record.revision });
   const drift = Math.max(0, record.revision - panel.storageRevision);
-  for (const [kind, collection] of Object.entries({ ...collections, subtask: null })) {
-    const rows = kind === 'subtask' ? record.data.tasks.flatMap(task => task.subtasks ?? []) : (record.data[collection] ?? []);
+  for (const [kind, collection] of Object.entries(/** @type {Record<string, string | null>} */ ({ ...collections, subtask: null }))) {
+    const rows =
+      kind === 'subtask'
+        ? record.data.tasks.flatMap(/** @param {any} task */ task => task.subtasks ?? [])
+        : (record.data[/** @type {string} */ (collection)] ?? []);
     for (const row of rows) {
       panel.versions[`${kind}:${row.id}`] = (panel.versions[`${kind}:${row.id}`] ?? panel.storageRevision + 1) + drift;
     }

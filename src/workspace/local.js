@@ -66,6 +66,7 @@ export function createLocalRepository({ storage, seed, blank, lock = globalThis.
   }
   return {
     mode: 'local',
+    /** @returns {Promise<import('./local-panel-types').LocalWorkspaceRecord[]>} */
     async list() {
       return guarded(() => {
         const state = read();
@@ -109,6 +110,11 @@ export function createLocalRepository({ storage, seed, blank, lock = globalThis.
     },
     // The callback is synchronous and the whole read/change/write runs under the
     // same browser lock as the legacy writer. Throwing leaves storage untouched.
+    /** @template T
+     * @param {string | null} id
+     * @param {(data: any, revision: number, record: any) => {changed: boolean, value: T}} change
+     * @returns {Promise<T>}
+     */
     async transact(id, change) {
       return guarded(() => {
         const state = read();

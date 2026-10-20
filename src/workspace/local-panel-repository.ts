@@ -1,21 +1,14 @@
 import { createLocalPanelAdapter } from './local-panel.js';
-import type { createLocalRepository } from './local.js';
+import type { LocalPanelTransport, LocalRepositoryOptions } from './local-panel-types';
 import type { Command, CommandResult, Workspace } from '../domain/contracts';
 import type { PersonalState, WorkspaceRepository } from './repository';
-
-type LocalRepositoryOptions = {
-  persistence: ReturnType<typeof createLocalRepository>;
-  storage: Pick<Storage, 'getItem' | 'setItem'>;
-  workspaceId: string | null;
-  identity?: string;
-};
 
 /** Checked shell boundary over the existing device transaction adapter.
  * Generic payload assertions mirror the cloud repository's operation contract;
  * they do not cast away the repository's methods, lifecycle or result envelope.
  */
 export function createLocalWorkspaceRepository(options: LocalRepositoryOptions): WorkspaceRepository {
-  const adapter = createLocalPanelAdapter(options);
+  const adapter: LocalPanelTransport = createLocalPanelAdapter(options);
   return {
     mode: adapter.mode,
     userId: adapter.userId,
