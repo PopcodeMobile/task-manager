@@ -40,14 +40,12 @@ begin
  where o.authorization_id=p_authorization_id and o.user_id=uid and o.status::text='pending' and o.expires_at>now() and cl.deleted_at is null for share of o,cl;
  if not found then raise exception 'forbidden' using errcode='PT403'; end if;
  if jsonb_typeof(p_grants) is distinct from 'array' or jsonb_array_length(p_grants) not between 1 and 100 then raise exception 'validation_error' using errcode='PT422';end if;
- -- Validate and canonicalize the complete selection before changing connection state.
+ -- Pure validation/canonicalization takes no workspace row locks.
  for g in select value from jsonb_array_elements(p_grants) loop
   if jsonb_typeof(g) is distinct from 'object' or g->>'capability' not in ('read','write') or g->>'capability' is null or (g-'workspaceId'-'capability')<>'{}'::jsonb then raise exception 'validation_error' using errcode='PT422';end if;
   begin w:=(g->>'workspaceId')::uuid; exception when invalid_text_representation then raise exception 'validation_error' using errcode='PT422';end;
   if w is null or w=any(seen) then raise exception 'validation_error' using errcode='PT422';end if;
   seen:=array_append(seen,w);
-  select m.role into r from public.workspace_memberships m join public.workspaces ws on ws.id=m.workspace_id and ws.storage_version=2 where m.workspace_id=w and m.user_id=uid for share of m,ws;
-  if not found or (r='guest' and g->>'capability'='write') then raise exception 'forbidden' using errcode='PT403';end if;
   normalized:=normalized||jsonb_build_array(jsonb_build_object('workspaceId',w,'capability',g->>'capability'));
  end loop;
  select jsonb_agg(value order by value->>'workspaceId') into normalized from jsonb_array_elements(normalized);
@@ -57,6 +55,15 @@ begin
  inserted:=found;
  if not inserted then
   select * into c from public.integration_connections where user_id=uid and client_id=a.client_id for update;
+ end if;
+ -- Match execute_operation: connection authority lock precedes workspace locks.
+ -- Recheck membership/storage/capability under these locks before comparing or persisting grants.
+ for g in select value from jsonb_array_elements(normalized) loop
+  w:=(g->>'workspaceId')::uuid;
+  select m.role into r from public.workspace_memberships m join public.workspaces ws on ws.id=m.workspace_id and ws.storage_version=2 where m.workspace_id=w and m.user_id=uid for share of m,ws;
+  if not found or (r='guest' and g->>'capability'='write') then raise exception 'forbidden' using errcode='PT403';end if;
+ end loop;
+ if not inserted then
   if c.authorization_id=p_authorization_id then
    select coalesce(jsonb_agg(jsonb_build_object('workspaceId',workspace_id,'capability',capability) order by workspace_id::text),'[]') into existing from public.integration_grants where connection_id=c.id;
    -- One Auth request has one immutable selection. Identical pending retries share its nonce.
