@@ -64,3 +64,6 @@ authorization_url_path = "/oauth/consent"
 
 [functions.mcp]
 verify_jwt = false
+
+[functions.webhook-dispatch]
+verify_jwt = false
