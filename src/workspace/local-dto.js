@@ -56,7 +56,15 @@ export function localDTO(data, workspaceId, kind, row) {
   if (kind === 'view') return { ...common, projectId: row.project ?? null, name: row.name, viewType: row.type, filters: row.filters ?? [] };
   return { ...common, name: row.name, description: row.desc ?? '' };
 }
-export const localWorkspaceDTO = row => ({ id: row.id, name: row.name, slug: row.url ?? '', color: row.c, version: 1, storageVersion: 1, role: 'owner' });
+export const localWorkspaceDTO = row => ({
+  id: row.id,
+  name: row.name,
+  slug: row.url ?? '',
+  color: row.c,
+  version: 1,
+  storageVersion: 1,
+  role: /** @type {const} */ ('owner'),
+});
 export const fieldMap = {
   projectId: 'project',
   description: 'desc',

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createLocalRepository } from '../src/workspace/local.js';
 import { seed } from '../src/data/seed.js';
 import { emptyWorkspace } from '../src/data/workspace.js';
-import * as module from '../src/workspace/local-panel.js';
+import { createLocalWorkspaceRepository as createLocalPanelAdapter } from '../src/workspace/local-panel-repository.ts';
 function storage(initial = {}) {
   const values = new Map(Object.entries(initial));
   return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
@@ -19,12 +19,12 @@ function fixture() {
   return data;
 }
 async function setup(saved = fixture()) {
-  assert.equal(typeof module.createLocalPanelAdapter, 'function', 'local normalized adapter must exist');
+  assert.equal(typeof createLocalPanelAdapter, 'function', 'local normalized adapter must exist');
   const disk = storage({
     'gr8r.v2': JSON.stringify({ data: saved, prefs: { lang: 'en', theme: 'dark', custom: 5 }, views: { p1: { sort: 'due' } }, collapsed: true }),
   });
   const persistence = createLocalRepository({ storage: disk, seed, blank: emptyWorkspace });
-  const make = id => module.createLocalPanelAdapter({ persistence, workspaceId: id, storage: disk, identity: 'local' });
+  const make = id => createLocalPanelAdapter({ persistence, workspaceId: id, storage: disk, identity: 'local' });
   const discovery = make(null);
   const workspaces = await discovery.workspaces();
   return { disk, persistence, make, discovery, repo: make(workspaces[0].id), saved, workspaces };
@@ -105,7 +105,7 @@ test('existing workspace records and personal preferences retain unknown fields 
   assert.equal((await repo.personal()).prefs.custom, 5);
   assert.deepEqual((await repo.personal()).views, { special: { sort: 'title' } });
   assert.deepEqual((await second.personal()).views, { other: { filter: 'todo' } });
-  const other = module.createLocalPanelAdapter({
+  const other = createLocalPanelAdapter({
     persistence: createLocalRepository({ storage: disk, seed, blank: emptyWorkspace }),
     storage: disk,
     identity: 'other',
@@ -121,7 +121,7 @@ test('corrupt/unavailable storage fails without resets, and disposed in-flight w
   disk.setItem('gr8r.workspaces.v1', '{broken');
   await assert.rejects(repo.list('list_tasks'), { code: 'corrupt' });
   assert.equal(disk.getItem('gr8r.workspaces.v1'), '{broken');
-  const unavailable = module.createLocalPanelAdapter({
+  const unavailable = createLocalPanelAdapter({
     persistence,
     storage: {
       getItem() {
@@ -233,7 +233,7 @@ test('a disposed queued command cannot commit into a reactivated repository', as
       return persistence.transact(...args);
     },
   };
-  const repo = module.createLocalPanelAdapter({ persistence: delayed, storage: disk, workspaceId: source.workspaceId });
+  const repo = createLocalPanelAdapter({ persistence: delayed, storage: disk, workspaceId: source.workspaceId });
   const task = (await repo.list('list_tasks'))[0];
   const before = disk.getItem('gr8r.workspaces.v1');
   const pending = command(repo, 'update_task', { id: task.id, title: 'late' }, 1);
@@ -427,7 +427,7 @@ test('a delayed first-import preference read cannot overwrite a concurrently sav
   const gate = new Promise(resolve => {
     release = resolve;
   });
-  const delayed = module.createLocalPanelAdapter({
+  const delayed = createLocalPanelAdapter({
     persistence: {
       ...persistence,
       async legacyPreferences() {
@@ -458,7 +458,7 @@ test('an overlapping bootstrap preference write preserves both legacy migration 
   const gate = new Promise(resolve => {
     release = resolve;
   });
-  const delayed = module.createLocalPanelAdapter({
+  const delayed = createLocalPanelAdapter({
     persistence: {
       ...persistence,
       async legacyPreferences() {

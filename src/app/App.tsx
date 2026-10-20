@@ -9,7 +9,7 @@ import { WorkspacePanel } from './shell/WorkspacePanel';
 import { supabase } from './integrations/client';
 import { NormalizedRepository } from '../workspace/normalized';
 import type { RepositoryFactory } from '../workspace/repository';
-import { createLocalPanelAdapter } from '../workspace/local-panel.js';
+import { createLocalWorkspaceRepository } from '../workspace/local-panel-repository';
 import { createLocalRepository } from '../workspace/local.js';
 import { seed } from '../data/seed.js';
 import { emptyWorkspace } from '../data/workspace.js';
@@ -64,8 +64,7 @@ function AppearanceApp({ identityKey, local }: { identityKey: string; local: boo
   const repositoryFactory = useMemo<RepositoryFactory>(() => {
     if (local) {
       const persistence = createLocalRepository({ storage: localStorage, seed, blank: emptyWorkspace });
-      return workspaceId =>
-        createLocalPanelAdapter({ persistence, storage: localStorage, identity: 'local', workspaceId }) as unknown as ReturnType<RepositoryFactory>;
+      return workspaceId => createLocalWorkspaceRepository({ persistence, storage: localStorage, identity: 'local', workspaceId });
     }
     return workspaceId => new NormalizedRepository(supabase!, identityKey, workspaceId);
   }, [identityKey, local]);

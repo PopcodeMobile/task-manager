@@ -1,7 +1,11 @@
 import { RepositoryError } from './normalized.ts';
-import { localDTO, localWorkspaceDTO, entityVersion, patchLocal } from './local-dto.js';
+import { localDTO, localWorkspaceDTO, entityVersion } from './local-dto.js';
 import { localCommandRules as commandRules } from './local-command-rules.js';
-import { removeTasks, removeProject } from '../core/task-operations.js';
+import { mutateTask } from './local-mutations/tasks.js';
+import { mutateProject } from './local-mutations/projects.js';
+import { mutateComment } from './local-mutations/comments.js';
+import { mutateSubtask } from './local-mutations/subtasks.js';
+import { mutateDependency } from './local-mutations/dependencies.js';
 const fail = code => {
   throw new RepositoryError(code);
 };
@@ -118,7 +122,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     return (data[collections[kind]] ?? []).map(row => localDTO(data, workspaceId, kind, row));
   }
   const adapter = {
-    mode: 'local',
+    mode: /** @type {const} */ ('local'),
     userId: identity,
     workspaceId,
     get controller() {
@@ -268,179 +272,16 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
       ) + 1;
     return `${p.key ?? 'TASK'}-${p.seq}`;
   };
-  if (operation === 'create_task') {
-    find('project', input.projectId);
-    if (!input.title?.trim()) fail('validation_error');
-    const row = {
-      id: input.id ?? crypto.randomUUID(),
-      key: keyFor(input.projectId),
-      project: input.projectId,
-      title: input.title,
-      desc: '',
-      status: 'todo',
-      priority: 'none',
-      subtasks: [],
-      deps: [],
-      labels: [],
-      attachments: [],
-      created: Date.now(),
-    };
-    if (data.tasks.some(t => t.id === row.id)) fail('validation_error');
-    patchLocal(row, input);
-    initialize('task', row);
-    data.tasks.push(row);
-    return dto('task', row);
-  }
-  if (operation === 'add_task_comment') {
-    find('task', input.taskId);
-    if (!input.body?.trim()) fail('validation_error');
-    const row = { id: input.id ?? crypto.randomUUID(), task: input.taskId, text: input.body, by: data.me, at: Date.now(), re: {} };
-    if ((data.comments ?? []).some(c => c.id === row.id)) fail('validation_error');
-    initialize('comment', row);
-    (data.comments ??= []).push(row);
-    return dto('comment', row);
-  }
-  if (operation === 'delete_comment') {
-    const row = find('comment', input.id);
-    cas('comment', row);
-    if (row.by !== data.me) fail('forbidden');
-    data.comments = data.comments.filter(c => c.id !== row.id);
-    return { id: row.id, deleted: true };
-  }
-  if (/^(create|update|delete)_subtask$/.test(operation)) {
-    const task = find('task', input.taskId);
-    cas('task', task);
-    task.subtasks ??= [];
-    let row = task.subtasks.find(s => s.id === input.id);
-    if (operation === 'create_subtask') {
-      if (!input.title?.trim()) fail('validation_error');
-      row = { id: input.id ?? crypto.randomUUID(), title: input.title, done: false };
-      if (data.tasks.some(t => (t.subtasks ?? []).some(s => s.id === row.id))) fail('validation_error');
-      initialize('subtask', row);
-      task.subtasks.push(row);
-    } else if (!row) fail('not_found');
-    if (operation === 'delete_subtask') task.subtasks = task.subtasks.filter(s => s.id !== row.id);
-    else patchLocal(row, input);
-    bump('task', task);
-    return dto('subtask', { ...row, taskId: task.id });
-  }
-  if (operation === 'set_task_dependency' || operation === 'remove_task_dependency') {
-    const task = find('task', input.id);
-    cas('task', task);
-    find('task', input.dependsOnTaskId);
-    if (task.id === input.dependsOnTaskId) fail('validation_error');
-    const visits = new Set();
-    const reaches = id => {
-      if (id === task.id) return true;
-      if (visits.has(id)) return false;
-      visits.add(id);
-      return (find('task', id).deps ?? []).some(reaches);
-    };
-    if (operation === 'set_task_dependency' && reaches(input.dependsOnTaskId)) fail('validation_error');
-    task.deps =
-      operation === 'set_task_dependency'
-        ? [...new Set([...(task.deps ?? []), input.dependsOnTaskId])]
-        : (task.deps ?? []).filter(id => id !== input.dependsOnTaskId);
-    bump('task', task);
-    return dto('task', task);
-  }
-  if (['update_task', 'complete_task', 'move_task', 'duplicate_task', 'delete_task', 'archive_task', 'restore_task'].includes(operation)) {
-    const task = find('task', input.id);
-    cas('task', task);
-    if (input.title !== undefined && !input.title.trim()) fail('validation_error');
-    if (operation === 'delete_task') {
-      protectRemoval(data, new Set([task.id]));
-      removeTasks(data, [task.id]);
-      return { id: task.id, deleted: true };
-    }
-    if (operation === 'move_task') {
-      find('project', input.projectId);
-      if (task.project !== input.projectId) task.key = keyFor(input.projectId);
-    }
-    if (operation === 'archive_task' || operation === 'restore_task') {
-      task.archived = operation === 'archive_task';
-      task.archivedAt = task.archived ? Date.now() : null;
-    }
-    if (operation === 'duplicate_task') {
-      const next = copyTask(task, input.projectId ?? task.project, keyFor);
-      next.title = input.title ?? task.title;
-      initialize('task', next);
-      data.tasks.push(next);
-      return dto('task', next);
-    }
-    const completing = operation === 'complete_task' || (input.status === 'done' && task.status !== 'done');
-    if (operation === 'complete_task' && task.status === 'done') fail('validation_error');
-    patchLocal(task, input);
-    if (completing) {
-      task.status = 'done';
-      task.completedAt = Date.now();
-      if (task.recur && task.due) {
-        const next = copyTask(task, task.project, keyFor);
-        const date = new Date(`${task.due}T12:00:00Z`);
-        date.setUTCDate(date.getUTCDate() + ({ Daily: 1, Weekly: 7, 'Every 2 weeks': 14, Monthly: 30 }[task.recur] ?? 7));
-        next.due = next.start = date.toISOString().slice(0, 10);
-        initialize('task', next);
-        data.tasks.push(next);
-      }
-    }
-    bump('task', task);
-    return dto('task', task);
-  }
-  if (/^(create|update|delete|archive|restore)_project$/.test(operation)) {
-    let project;
-    if (operation === 'create_project') {
-      if (!input.name?.trim()) fail('validation_error');
-      project = {
-        id: input.id ?? crypto.randomUUID(),
-        name: input.name,
-        key:
-          input.key ??
-          input.name
-            .replace(/[^a-z]/gi, '')
-            .slice(0, 4)
-            .toUpperCase(),
-        status: 'active',
-        seq: 0,
-      };
-      if (data.projects.some(p => p.id === project.id)) fail('validation_error');
-      initialize('project', project);
-      data.projects.push(project);
-      (data.projOrder ??= []).push(project.id);
-    } else {
-      project = find('project', input.id);
-      cas('project', project);
-    }
-    if (operation === 'delete_project') {
-      const ids = new Set(data.tasks.filter(t => t.project === project.id).map(t => t.id));
-      protectRemoval(data, ids, project.id);
-      removeProject(data, project.id);
-      return { id: project.id, deleted: true };
-    }
-    if (operation === 'archive_project' || operation === 'restore_project') project.archived = operation === 'archive_project';
-    patchLocal(project, input);
-    if (operation !== 'create_project') bump('project', project);
-    return dto('project', project);
-  }
+  const context = { data, find, cas, bump, dto, initialize, keyFor };
+  if (['create_task', 'update_task', 'complete_task', 'move_task', 'duplicate_task', 'delete_task', 'archive_task', 'restore_task'].includes(operation))
+    return mutateTask(context, operation, input);
+  if (['create_project', 'update_project', 'delete_project', 'archive_project', 'restore_project'].includes(operation))
+    return mutateProject(context, operation, input);
+  if (operation === 'add_task_comment' || operation === 'delete_comment') return mutateComment(context, operation, input);
+  if (['create_subtask', 'update_subtask', 'delete_subtask'].includes(operation)) return mutateSubtask(context, operation, input);
+  if (operation === 'set_task_dependency' || operation === 'remove_task_dependency') return mutateDependency(context, operation, input);
   fail('validation_error');
 }
-function copyTask(task, project, keyFor) {
-  return {
-    ...structuredClone(task),
-    id: crypto.randomUUID(),
-    project,
-    key: keyFor(project),
-    status: 'todo',
-    completedAt: null,
-    archived: false,
-    archivedAt: null,
-    subtasks: (task.subtasks ?? []).map(s => ({ ...s, id: crypto.randomUUID(), done: false })),
-    deps: [],
-    attachments: [],
-    created: Date.now(),
-    updated: Date.now(),
-  };
-}
-
 function validateLocalInput(data, operation, input) {
   const rule = Object.hasOwn(commandRules, operation) && commandRules[operation];
   const safe = value => {
@@ -525,10 +366,4 @@ function panelState(record) {
   }
   panel.storageRevision = record.revision;
   return panel;
-}
-
-function protectRemoval(data, taskIds, projectId) {
-  const fileIds = new Set((data.files ?? []).filter(f => taskIds.has(f.task) || (projectId && f.project === projectId)).map(f => f.id));
-  if (data.tasks.some(t => !taskIds.has(t.id) && ((t.deps ?? []).some(id => taskIds.has(id)) || (t.attachments ?? []).some(f => fileIds.has(f.id)))))
-    fail('validation_error');
 }

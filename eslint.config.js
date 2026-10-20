@@ -16,6 +16,7 @@ export default [
       'playwright.agent.config.ts',
       'src/workspace/normalized.ts',
       'src/workspace/repository.ts',
+      'src/workspace/local-panel-repository.ts',
       'playwright.local.config.ts',
       'tests/browser/local-panel.spec.ts',
     ],
