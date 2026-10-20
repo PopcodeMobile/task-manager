@@ -17,7 +17,8 @@
     "check": "npm run lint && npm run format:check && npm test && npm run check:tokens && npm run build",
     "typecheck": "tsc --noEmit",
     "test:oauth:ui": "playwright test --config playwright.oauth.config.ts",
-    "local:oauth:key": "node scripts/setup-local-oauth.mjs"
+    "local:oauth:key": "node scripts/setup-local-oauth.mjs",
+    "test:agent:ui": "playwright test --config playwright.agent.config.ts"
   },
   "engines": {
     "node": ">=22"
@@ -43,6 +44,8 @@
   "dependencies": {
     "@modelcontextprotocol/client": "2.3.1",
     "@modelcontextprotocol/server": "2.3.1",
+    "@radix-ui/react-alert-dialog": "^1.2.1",
+    "@radix-ui/react-dialog": "^1.3.1",
     "@radix-ui/react-slot": "1.5.0",
     "@supabase/middleware": "1.0.0",
     "@supabase/server": "1.9.2",
@@ -50,6 +53,7 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "dompurify": "^3.4.17",
+    "lucide-react": "^0.460.0",
     "react": "19.2.9",
     "react-dom": "19.2.9",
     "tailwind-merge": "3.7.0",

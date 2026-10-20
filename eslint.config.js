@@ -7,7 +7,15 @@ export default [
   js.configs.recommended,
   ...tseslint.configs.recommended.map(config => ({
     ...config,
-    files: ['src/app/**/*.{ts,tsx}', 'src/components/**/*.{ts,tsx}', 'playwright.oauth.config.ts', 'tests/browser/oauth-consent.spec.ts'],
+    files: [
+      'src/app/**/*.{ts,tsx}',
+      'src/components/**/*.{ts,tsx}',
+      'playwright.oauth.config.ts',
+      'tests/browser/oauth-consent.spec.ts',
+      'tests/browser/agent-panel.spec.ts',
+      'playwright.agent.config.ts',
+      'src/workspace/normalized.ts',
+    ],
   })),
   { files: ['src/app/**/*.{ts,tsx}', 'src/components/**/*.{ts,tsx}'], languageOptions: { globals: { ...globals.browser } } },
   {

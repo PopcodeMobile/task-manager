@@ -52,7 +52,7 @@ function lucideSubset() {
 // Temporary MPA routing while the legacy entry remains the default.
 function reactRoutes() {
   const rewrite = (req, _res, next) => {
-    if (/^\/(oauth\/consent|integrations|login)(?:[?]|$)/.test(req.url))
+    if (/^\/(oauth\/consent|auth\/callback|integrations|login|app(?:\/[^?]*)?)(?:[?]|$)/.test(req.url))
       req.url = '/react.html' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
     next();
   };

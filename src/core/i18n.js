@@ -1,3 +1,4 @@
+import { supervisionPtBR, supervisionEn } from '../locales/supervision.js';
 import ptBR from '../locales/pt-BR.js';
 import en from '../locales/en.js';
 import designSystemPtBR from '../locales/design-system.pt-BR.js';
@@ -8,8 +9,8 @@ export const LOCALES = [
   { id: 'en', name: 'English' },
 ];
 export const catalogs = {
-  'pt-BR': { ...ptBR, ...designSystemPtBR, ...workspacePtBR },
-  en: { ...en, ...Object.fromEntries(Object.keys(designSystemPtBR).map(key => [key, key])), ...workspaceEn },
+  'pt-BR': { ...supervisionPtBR, ...ptBR, ...designSystemPtBR, ...workspacePtBR },
+  en: { ...supervisionEn, ...en, ...Object.fromEntries(Object.keys(designSystemPtBR).map(key => [key, key])), ...workspaceEn },
 };
 let locale = 'pt-BR';
 

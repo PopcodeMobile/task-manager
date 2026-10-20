@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import '../styles/tokens.css';
+@import './shell/workspace.css';
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--text);
@@ -398,4 +399,11 @@ legend {
   h1 {
     font-size: var(--fs-2xl);
   }
+}
+
+.auth-links {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
 }
