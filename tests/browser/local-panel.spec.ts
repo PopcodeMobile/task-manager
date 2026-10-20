@@ -122,3 +122,24 @@ test('stored system theme follows media changes and a pre-auth locale survives r
   await page.emulateMedia({ colorScheme: 'light' });
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });
+test('fresh secondary-workspace deep link preserves selection and migrates original legacy views only once', async ({ page }) => {
+  await prepare(page);
+  const originalId = data.workspaces[0].id,
+    selectedId = data.workspaces[1].id;
+  await page.goto(`/app-local/w/${selectedId}/tasks`);
+  await expect(page.getByLabel('Workspace', { exact: true })).toHaveValue(selectedId);
+  await expect(page.getByText('No tasks here yet')).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.preferences.local')!)))
+    .toEqual({
+      prefs: { lang: 'en', theme: 'dark', density: 'compact', custom: 'keep' },
+      collapsed: true,
+      views: { [originalId]: { p1: { sort: 'due' } } },
+      activeWorkspace: selectedId,
+    });
+  await page.reload();
+  await expect(page.getByLabel('Workspace', { exact: true })).toHaveValue(selectedId);
+  await page.getByLabel('Workspace', { exact: true }).selectOption(originalId);
+  await expect(page.getByRole('button', { name: firstTitle })).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.preferences.local')!).views)).toEqual({ [originalId]: { p1: { sort: 'due' } } });
+});

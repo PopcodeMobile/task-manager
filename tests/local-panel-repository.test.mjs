@@ -287,3 +287,206 @@ test('an existing identity language takes precedence over the shared pre-auth fa
   assert.equal(loadAppearance(disk, 'alice').lang, 'pt-BR');
   assert.equal(loadAppearance(disk, 'new-account').lang, 'en');
 });
+test('fresh first entry into a secondary workspace imports legacy views only under the original workspace', async () => {
+  const { make, disk, workspaces } = await setup();
+  assert.equal(disk.getItem('gr8r.preferences.local'), null);
+  const originalId = workspaces[0].id,
+    selectedId = workspaces[1].id;
+  const second = make(selectedId);
+  await second.savePersonal({ activeWorkspace: selectedId });
+  const personal = JSON.parse(disk.getItem('gr8r.preferences.local'));
+  assert.equal(personal.activeWorkspace, selectedId);
+  assert.deepEqual(personal.views, { [originalId]: { p1: { sort: 'due' } } });
+  assert.deepEqual((await second.personal()).views, {});
+  assert.deepEqual((await make(originalId).personal()).views, { p1: { sort: 'due' } });
+  await second.savePersonal({ views: { secondary: { sort: 'title' } } });
+  assert.deepEqual((await make(originalId).personal()).views, { p1: { sort: 'due' } });
+  assert.deepEqual((await second.personal()).views, { secondary: { sort: 'title' } });
+});
+for (const kind of ['task', 'project', 'comment']) {
+  test(`newly created ${kind} returns a stable version usable by the next CAS command`, async () => {
+    const { repo } = await setup();
+    const original = (await repo.list('list_tasks'))[0];
+    const spec = {
+      task: {
+        operation: 'create_task',
+        input: { projectId: original.projectId, title: 'Created' },
+        list: 'list_tasks',
+        next: 'update_task',
+        patch: { title: 'Immediate edit' },
+      },
+      project: {
+        operation: 'create_project',
+        input: { name: 'Created project' },
+        list: 'list_projects',
+        next: 'update_project',
+        patch: { name: 'Immediate edit' },
+      },
+      comment: {
+        operation: 'add_task_comment',
+        input: { taskId: original.id, body: 'Created comment' },
+        list: 'list_comments',
+        next: 'delete_comment',
+        patch: {},
+      },
+    }[kind];
+    const created = (await command(repo, spec.operation, spec.input)).data;
+    const read = (await repo.list(spec.list)).find(row => row.id === created.id);
+    assert.equal(read.version, created.version);
+    assert.equal(created.version, 1);
+    const edited = await command(repo, spec.next, { id: created.id, ...spec.patch }, created.version);
+    assert.equal(edited.data.id, created.id);
+  });
+}
+for (const operation of ['duplicate_task', 'complete_task']) {
+  test(`generated tasks from ${operation} start with stable versions and support immediate CAS`, async () => {
+    const { repo } = await setup();
+    const source = (await repo.list('list_tasks'))[0];
+    const result = await command(repo, operation, { id: source.id }, source.version);
+    const next = (await repo.list('list_tasks')).at(-1);
+    assert.notEqual(next.id, source.id);
+    assert.equal(next.version, 1);
+    if (operation === 'duplicate_task') assert.equal(result.data.version, next.version);
+    const subtask = (await repo.list('list_subtasks', { taskId: next.id }))[0];
+    assert.equal(subtask.version, 1);
+    await command(repo, 'update_task', { id: next.id, title: 'Immediate edit' }, next.version);
+    assert.equal((await repo.query('get_task', { id: next.id })).data.version, 2);
+  });
+}
+test('a genuinely external legacy creation retains conservative revision-derived CAS initialization', async () => {
+  const { repo, persistence } = await setup();
+  const existing = (await repo.list('list_tasks'))[0];
+  await command(repo, 'update_task', { id: existing.id, title: 'React write' }, existing.version);
+  const record = await persistence.load(repo.workspaceId);
+  record.data.tasks.push({ ...record.data.tasks[0], id: 'external-created' });
+  await persistence.save(record.id, record.data, record.revision);
+  const external = (await repo.query('get_task', { id: 'external-created' })).data;
+  assert.ok(external.version > 1);
+  await assert.rejects(command(repo, 'update_task', { id: external.id, title: 'stale' }, 1), { code: 'version_conflict' });
+  await command(repo, 'update_task', { id: external.id, title: 'current' }, external.version);
+});
+for (const scenario of [
+  {
+    name: 'rescheduled weekly task',
+    patch: { dueDate: '2026-11-20', title: 'Effective title', description: '<b>Effective</b>', priority: 'high', assigneeUserId: 'm2' },
+    nextDue: '2026-11-27',
+  },
+  { name: 'changed recurrence', patch: { recurrence: 'Daily' }, nextDue: '2026-10-21' },
+  { name: 'removed recurrence', patch: { recurrence: null }, nextDue: null },
+  { name: 'removed due date', patch: { dueDate: null }, nextDue: null },
+  { name: 'newly enabled recurrence', previousRecurrence: null, patch: { recurrence: 'Weekly', dueDate: '2026-11-20' }, nextDue: '2026-11-27' },
+]) {
+  test(`combined completion uses effective fields for ${scenario.name} and retries only once`, async () => {
+    const saved = fixture();
+    if ('previousRecurrence' in scenario) saved.tasks[0].recur = scenario.previousRecurrence;
+    const { repo, disk } = await setup(saved);
+    const tasks = await repo.list('list_tasks'),
+      original = tasks[0];
+    const input = { id: original.id, status: 'done', ...scenario.patch };
+    const result = await command(repo, 'update_task', input, original.version, 'combined-retry');
+    assert.deepEqual(await command(repo, 'update_task', input, original.version, 'combined-retry'), result);
+    const after = await repo.list('list_tasks');
+    assert.equal(after.length, tasks.length + (scenario.nextDue ? 1 : 0));
+    const completed = after.find(row => row.id === original.id);
+    assert.equal(completed.status, 'done');
+    assert.equal(completed.dueDate, Object.hasOwn(scenario.patch, 'dueDate') ? scenario.patch.dueDate : original.dueDate);
+    if (scenario.nextDue) {
+      const next = after.at(-1);
+      assert.equal(next.dueDate, scenario.nextDue);
+      assert.equal(next.startDate, scenario.nextDue);
+      assert.equal(next.status, 'todo');
+      assert.equal(next.recurrence, scenario.patch.recurrence ?? original.recurrence);
+      assert.equal(next.title, scenario.patch.title ?? original.title);
+      assert.equal(next.description, scenario.patch.description ?? original.description);
+      assert.equal(next.priority, scenario.patch.priority ?? original.priority);
+      assert.equal(next.assigneeUserId, scenario.patch.assigneeUserId ?? original.assigneeUserId);
+      assert.equal(next.version, 1);
+    }
+    assert.equal(JSON.parse(disk.getItem('gr8r.workspaces.v1')).records[repo.workspaceId].revision, 1);
+  });
+}
+test('combined recurring completion rolls back its generated graph when a later batch child conflicts', async () => {
+  const { repo, disk } = await setup();
+  const original = (await repo.list('list_tasks'))[0];
+  const before = disk.getItem('gr8r.workspaces.v1');
+  await assert.rejects(
+    command(repo, 'batch', {
+      commands: [
+        { operation: 'update_task', input: { id: original.id, status: 'done', dueDate: '2026-11-20' }, expectedVersion: original.version },
+        { operation: 'update_task', input: { id: original.id, title: 'Stale after completion' }, expectedVersion: original.version },
+      ],
+    }),
+    { code: 'version_conflict' },
+  );
+  assert.equal(disk.getItem('gr8r.workspaces.v1'), before);
+});
+test('a delayed first-import preference read cannot overwrite a concurrently saved selection or workspace views', async () => {
+  const { make, persistence, disk, workspaces } = await setup();
+  const selectedId = workspaces[1].id;
+  let release;
+  const gate = new Promise(resolve => {
+    release = resolve;
+  });
+  const delayed = module.createLocalPanelAdapter({
+    persistence: {
+      ...persistence,
+      async legacyPreferences() {
+        const value = await persistence.legacyPreferences();
+        await gate;
+        return value;
+      },
+    },
+    storage: disk,
+    workspaceId: selectedId,
+  });
+  const pending = delayed.personal();
+  await make(selectedId).savePersonal({ activeWorkspace: selectedId, views: { secondary: { sort: 'title' } }, prefs: { additional: 'keep', theme: 'light' } });
+  release();
+  const latest = await pending;
+  const stored = JSON.parse(disk.getItem('gr8r.preferences.local'));
+  assert.equal(stored.activeWorkspace, selectedId);
+  assert.equal(stored.prefs.additional, 'keep');
+  assert.equal(stored.prefs.theme, 'light');
+  assert.deepEqual(stored.views, { [workspaces[0].id]: { p1: { sort: 'due' } }, [selectedId]: { secondary: { sort: 'title' } } });
+  assert.deepEqual(latest.views, { secondary: { sort: 'title' } });
+});
+test('an overlapping bootstrap preference write preserves both legacy migration and canonical current choices', async () => {
+  const { persistence, disk, workspaces } = await setup();
+  const originalId = workspaces[0].id,
+    selectedId = workspaces[1].id;
+  let release;
+  const gate = new Promise(resolve => {
+    release = resolve;
+  });
+  const delayed = module.createLocalPanelAdapter({
+    persistence: {
+      ...persistence,
+      async legacyPreferences() {
+        const value = await persistence.legacyPreferences();
+        await gate;
+        return value;
+      },
+    },
+    storage: disk,
+    workspaceId: selectedId,
+  });
+  const pending = delayed.personal();
+  disk.setItem(
+    'gr8r.preferences.local',
+    JSON.stringify({
+      prefs: { theme: 'light', additional: 'keep' },
+      collapsed: false,
+      activeWorkspace: selectedId,
+      views: { [selectedId]: { secondary: { sort: 'title' } } },
+      unknown: ['retain'],
+    }),
+  );
+  release();
+  await pending;
+  const stored = JSON.parse(disk.getItem('gr8r.preferences.local'));
+  assert.deepEqual(stored.prefs, { lang: 'en', theme: 'light', custom: 5, additional: 'keep' });
+  assert.equal(stored.activeWorkspace, selectedId);
+  assert.equal(stored.collapsed, false);
+  assert.deepEqual(stored.unknown, ['retain']);
+  assert.deepEqual(stored.views, { [originalId]: { p1: { sort: 'due' } }, [selectedId]: { secondary: { sort: 'title' } } });
+});

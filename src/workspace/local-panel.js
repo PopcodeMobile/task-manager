@@ -58,12 +58,14 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
       let value = readPersonal(storage, identity);
       if (!storage.getItem(`gr8r.preferences.${identity}`) && identity === 'local') {
         const legacy = await persistence.legacyPreferences();
-        value = { prefs: legacy.prefs, collapsed: legacy.collapsed, views: { ...(workspaceId ? { [workspaceId]: legacy.views } : {}) } };
-        // Discovery imports views to the original workspace only, exactly once.
-        if (!workspaceId) {
-          const rows = await persistence.list();
-          if (rows[0]) value.views[rows[0].id] = legacy.views;
-        }
+        value = { prefs: legacy.prefs, collapsed: legacy.collapsed, views: {} };
+        // Legacy views belong to the original graph, even on a first-entry deep link.
+        const rows = await persistence.list();
+        if (rows[0]) value.views[rows[0].id] = legacy.views;
+        // Another bootstrap may have saved personal choices while the reads awaited.
+        // Fill only missing legacy defaults; current workspace views/choices win.
+        const latest = readPersonal(storage, identity);
+        value = { ...value, ...latest, prefs: { ...value.prefs, ...latest.prefs }, views: { ...value.views, ...latest.views } };
         writePersonal(storage, identity, value);
       }
       return { ...value, prefs: value.prefs ?? {}, views: value.views?.[workspaceId] ?? {} };
@@ -243,6 +245,11 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
     row.updated = Date.now();
   };
   const dto = (kind, row) => localDTO(data, workspaceId, kind, row);
+  const initialize = (kind, row) => {
+    data._panel.versions[`${kind}:${row.id}`] = 1;
+    if (kind === 'task') for (const subtask of row.subtasks ?? []) initialize('subtask', subtask);
+    return row;
+  };
   const keyFor = project => {
     const p = find('project', project);
     p.seq =
@@ -280,6 +287,7 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
     };
     if (data.tasks.some(t => t.id === row.id)) fail('validation_error');
     patchLocal(row, input);
+    initialize('task', row);
     data.tasks.push(row);
     return dto('task', row);
   }
@@ -288,6 +296,7 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
     if (!input.body?.trim()) fail('validation_error');
     const row = { id: input.id ?? crypto.randomUUID(), task: input.taskId, text: input.body, by: data.me, at: Date.now(), re: {} };
     if ((data.comments ?? []).some(c => c.id === row.id)) fail('validation_error');
+    initialize('comment', row);
     (data.comments ??= []).push(row);
     return dto('comment', row);
   }
@@ -307,6 +316,7 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
       if (!input.title?.trim()) fail('validation_error');
       row = { id: input.id ?? crypto.randomUUID(), title: input.title, done: false };
       if (data.tasks.some(t => (t.subtasks ?? []).some(s => s.id === row.id))) fail('validation_error');
+      initialize('subtask', row);
       task.subtasks.push(row);
     } else if (!row) fail('not_found');
     if (operation === 'delete_subtask') task.subtasks = task.subtasks.filter(s => s.id !== row.id);
@@ -354,22 +364,25 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
     if (operation === 'duplicate_task') {
       const next = copyTask(task, input.projectId ?? task.project, keyFor);
       next.title = input.title ?? task.title;
+      initialize('task', next);
       data.tasks.push(next);
       return dto('task', next);
     }
-    if (operation === 'complete_task' || (input.status === 'done' && task.status !== 'done')) {
-      if (task.status === 'done') fail('validation_error');
+    const completing = operation === 'complete_task' || (input.status === 'done' && task.status !== 'done');
+    if (operation === 'complete_task' && task.status === 'done') fail('validation_error');
+    patchLocal(task, input);
+    if (completing) {
+      task.status = 'done';
       task.completedAt = Date.now();
       if (task.recur && task.due) {
         const next = copyTask(task, task.project, keyFor);
         const date = new Date(`${task.due}T12:00:00Z`);
         date.setUTCDate(date.getUTCDate() + ({ Daily: 1, Weekly: 7, 'Every 2 weeks': 14, Monthly: 30 }[task.recur] ?? 7));
         next.due = next.start = date.toISOString().slice(0, 10);
+        initialize('task', next);
         data.tasks.push(next);
       }
-      task.status = 'done';
     }
-    patchLocal(task, input);
     bump('task', task);
     return dto('task', task);
   }
@@ -390,6 +403,7 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
         seq: 0,
       };
       if (data.projects.some(p => p.id === project.id)) fail('validation_error');
+      initialize('project', project);
       data.projects.push(project);
       (data.projOrder ??= []).push(project.id);
     } else {
@@ -503,8 +517,9 @@ function validateLocalInput(data, operation, input) {
 function panelState(record) {
   const panel = structuredClone(record.reactPanel ?? { versions: {}, events: [], requests: {}, storageRevision: record.revision });
   const drift = Math.max(0, record.revision - panel.storageRevision);
-  for (const [kind, collection] of Object.entries(collections)) {
-    for (const row of record.data[collection] ?? []) {
+  for (const [kind, collection] of Object.entries({ ...collections, subtask: null })) {
+    const rows = kind === 'subtask' ? record.data.tasks.flatMap(task => task.subtasks ?? []) : (record.data[collection] ?? []);
+    for (const row of rows) {
       panel.versions[`${kind}:${row.id}`] = (panel.versions[`${kind}:${row.id}`] ?? panel.storageRevision + 1) + drift;
     }
   }
