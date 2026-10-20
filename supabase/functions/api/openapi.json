@@ -1,0 +1,6829 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Task Manager transactional API",
+    "version": "1.0.0",
+    "description": "All writes require a unique idempotencyKey; updates require expectedVersion. Identity comes exclusively from the validated Supabase JWT. Claim tokens are private credentials returned only to their executor. A direct human must use intervene_task to complete, move, reassign or delete claimed work. Generic commands and REST aliases share the same SQL authorization."
+  },
+  "servers": [
+    {
+      "url": "/functions/v1/api"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/v1/workspaces": {
+      "get": {
+        "operationId": "list_workspaces",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Safe workspace identity, name, slug, color, storageVersion and role; direct humans see v1 migration candidates, OAuth requires a normalized grant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "create_workspace",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create_workspace"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created normalized workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/create_task": {
+      "post": {
+        "operationId": "create_task",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create_task"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/update_task": {
+      "post": {
+        "operationId": "update_task",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/update_task"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/move_task": {
+      "post": {
+        "operationId": "move_task",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/move_task"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/duplicate_task": {
+      "post": {
+        "operationId": "duplicate_task",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/duplicate_task"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/delete_task": {
+      "post": {
+        "operationId": "delete_task",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/delete_task"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/archive_task": {
+      "post": {
+        "operationId": "archive_task",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/archive_task"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/restore_task": {
+      "post": {
+        "operationId": "restore_task",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/restore_task"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/claim_task": {
+      "post": {
+        "operationId": "claim_task",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/claim_task"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/renew_task_claim": {
+      "post": {
+        "operationId": "renew_task_claim",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/renew_task_claim"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/release_task_claim": {
+      "post": {
+        "operationId": "release_task_claim",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/release_task_claim"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/complete_task": {
+      "post": {
+        "operationId": "complete_task",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/complete_task"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/intervene_task": {
+      "post": {
+        "operationId": "intervene_task",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/intervene_task"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/add_task_comment": {
+      "post": {
+        "operationId": "add_task_comment",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/add_task_comment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/create_project": {
+      "post": {
+        "operationId": "create_project",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create_project"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/update_project": {
+      "post": {
+        "operationId": "update_project",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/update_project"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/delete_project": {
+      "post": {
+        "operationId": "delete_project",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/delete_project"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/archive_project": {
+      "post": {
+        "operationId": "archive_project",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/archive_project"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/restore_project": {
+      "post": {
+        "operationId": "restore_project",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/restore_project"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/create_subtask": {
+      "post": {
+        "operationId": "create_subtask",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create_subtask"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/update_subtask": {
+      "post": {
+        "operationId": "update_subtask",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/update_subtask"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/delete_subtask": {
+      "post": {
+        "operationId": "delete_subtask",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/delete_subtask"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/set_task_dependency": {
+      "post": {
+        "operationId": "set_task_dependency",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/set_task_dependency"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/remove_task_dependency": {
+      "post": {
+        "operationId": "remove_task_dependency",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/remove_task_dependency"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/set_task_label": {
+      "post": {
+        "operationId": "set_task_label",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/set_task_label"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/remove_task_label": {
+      "post": {
+        "operationId": "remove_task_label",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/remove_task_label"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/set_task_attachment": {
+      "post": {
+        "operationId": "set_task_attachment",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/set_task_attachment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/remove_task_attachment": {
+      "post": {
+        "operationId": "remove_task_attachment",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/remove_task_attachment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/add_reaction": {
+      "post": {
+        "operationId": "add_reaction",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/add_reaction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/remove_reaction": {
+      "post": {
+        "operationId": "remove_reaction",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/remove_reaction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/create_team": {
+      "post": {
+        "operationId": "create_team",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create_team"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/update_team": {
+      "post": {
+        "operationId": "update_team",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/update_team"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/delete_team": {
+      "post": {
+        "operationId": "delete_team",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/delete_team"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/set_team_member": {
+      "post": {
+        "operationId": "set_team_member",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/set_team_member"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/remove_team_member": {
+      "post": {
+        "operationId": "remove_team_member",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/remove_team_member"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/set_project_member": {
+      "post": {
+        "operationId": "set_project_member",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/set_project_member"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/remove_project_member": {
+      "post": {
+        "operationId": "remove_project_member",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/remove_project_member"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/create_label": {
+      "post": {
+        "operationId": "create_label",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create_label"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/update_label": {
+      "post": {
+        "operationId": "update_label",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/update_label"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/delete_label": {
+      "post": {
+        "operationId": "delete_label",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/delete_label"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/create_view": {
+      "post": {
+        "operationId": "create_view",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create_view"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/update_view": {
+      "post": {
+        "operationId": "update_view",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/update_view"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/delete_view": {
+      "post": {
+        "operationId": "delete_view",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/delete_view"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/create_calendar_event": {
+      "post": {
+        "operationId": "create_calendar_event",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create_calendar_event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/update_calendar_event": {
+      "post": {
+        "operationId": "update_calendar_event",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/update_calendar_event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/delete_calendar_event": {
+      "post": {
+        "operationId": "delete_calendar_event",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/delete_calendar_event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/create_file": {
+      "post": {
+        "operationId": "create_file",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create_file"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/update_file": {
+      "post": {
+        "operationId": "update_file",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/update_file"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/delete_file": {
+      "post": {
+        "operationId": "delete_file",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/delete_file"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/set_preferences": {
+      "post": {
+        "operationId": "set_preferences",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/set_preferences"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/projects": {
+      "get": {
+        "operationId": "list_projects",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/tasks": {
+      "get": {
+        "operationId": "list_tasks",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/subtasks": {
+      "get": {
+        "operationId": "list_subtasks",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/comments": {
+      "get": {
+        "operationId": "list_comments",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/teams": {
+      "get": {
+        "operationId": "list_teams",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/labels": {
+      "get": {
+        "operationId": "list_labels",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/files": {
+      "get": {
+        "operationId": "list_files",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/calendar-events": {
+      "get": {
+        "operationId": "list_calendar_events",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/views": {
+      "get": {
+        "operationId": "list_views",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/agents": {
+      "get": {
+        "operationId": "list_agents",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/notifications": {
+      "get": {
+        "operationId": "list_notifications",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/activity": {
+      "get": {
+        "operationId": "list_activity",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/domain-events": {
+      "get": {
+        "operationId": "list_domain_events",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/dependencies": {
+      "get": {
+        "operationId": "list_dependencies",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/task-labels": {
+      "get": {
+        "operationId": "list_task_labels",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/reactions": {
+      "get": {
+        "operationId": "list_reactions",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/team-members": {
+      "get": {
+        "operationId": "list_team_members",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/project-members": {
+      "get": {
+        "operationId": "list_project_members",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/members": {
+      "get": {
+        "operationId": "list_members",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/attachments": {
+      "get": {
+        "operationId": "list_attachments",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/tasks/{taskId}": {
+      "get": {
+        "operationId": "get_task",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Task"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}": {
+      "get": {
+        "operationId": "get_workspace",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Explicit safe workspace fields"
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/preferences": {
+      "get": {
+        "operationId": "get_preferences",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user preferences only"
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/tasks/{taskId}/activity": {
+      "get": {
+        "operationId": "list_task_activity",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "taskId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chronological page of immutable domain events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "PublicError": {
+        "description": "Stable public error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Task": {
+        "type": "object",
+        "required": [
+          "id",
+          "workspaceId",
+          "projectId",
+          "title",
+          "description",
+          "status",
+          "priority",
+          "version",
+          "assigneeUserId",
+          "executorAgentId",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": ["string", "null"]
+          },
+          "workspaceId": {
+            "type": ["string", "null"]
+          },
+          "projectId": {
+            "type": ["string", "null"]
+          },
+          "title": {
+            "type": ["string", "null"]
+          },
+          "description": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "type": ["string", "null"]
+          },
+          "priority": {
+            "type": ["string", "null"]
+          },
+          "assigneeUserId": {
+            "type": ["string", "null"]
+          },
+          "executorAgentId": {
+            "type": ["string", "null"]
+          },
+          "recurrence": {
+            "type": ["string", "null"]
+          },
+          "dueDate": {
+            "type": ["string", "null"]
+          },
+          "startDate": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": ["string", "null"]
+          },
+          "updatedAt": {
+            "type": ["string", "null"]
+          },
+          "completedAt": {
+            "type": ["string", "null"]
+          },
+          "archivedAt": {
+            "type": ["string", "null"]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "legacyMetadata": {
+            "type": "object"
+          }
+        }
+      },
+      "CommandResult": {
+        "type": "object",
+        "required": ["data", "eventId", "requestId"],
+        "properties": {
+          "data": {
+            "type": "object"
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "required": ["items", "nextCursor"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "nextCursor": {
+            "type": ["string", "null"]
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message", "requestId"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "unauthorized",
+                  "forbidden",
+                  "not_found",
+                  "validation_error",
+                  "version_conflict",
+                  "already_claimed",
+                  "claim_expired",
+                  "idempotency_conflict",
+                  "rate_limited",
+                  "temporarily_unavailable"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        }
+      },
+      "create_task": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["projectId", "title"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "projectId": {
+                "type": ["string", "null"]
+              },
+              "title": {
+                "type": ["string", "null"]
+              },
+              "description": {
+                "type": ["string", "null"]
+              },
+              "status": {
+                "type": ["string", "null"]
+              },
+              "priority": {
+                "type": ["string", "null"]
+              },
+              "assigneeUserId": {
+                "type": ["string", "null"]
+              },
+              "recurrence": {
+                "type": ["string", "null"]
+              },
+              "dueDate": {
+                "type": ["string", "null"]
+              },
+              "startDate": {
+                "type": ["string", "null"]
+              },
+              "sortOrder": {
+                "type": "number"
+              },
+              "attributes": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "update_task": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "title": {
+                "type": ["string", "null"]
+              },
+              "description": {
+                "type": ["string", "null"]
+              },
+              "status": {
+                "type": ["string", "null"]
+              },
+              "priority": {
+                "type": ["string", "null"]
+              },
+              "assigneeUserId": {
+                "type": ["string", "null"]
+              },
+              "recurrence": {
+                "type": ["string", "null"]
+              },
+              "dueDate": {
+                "type": ["string", "null"]
+              },
+              "startDate": {
+                "type": ["string", "null"]
+              },
+              "sortOrder": {
+                "type": "number"
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              },
+              "attributes": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "move_task": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "projectId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "projectId": {
+                "type": ["string", "null"]
+              },
+              "sortOrder": {
+                "type": "number"
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "duplicate_task": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "projectId": {
+                "type": ["string", "null"]
+              },
+              "title": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "delete_task": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "archive_task": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "restore_task": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "claim_task": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "renew_task_claim": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "claimToken"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "release_task_claim": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "claimToken"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "complete_task": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "intervene_task": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "action"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "action": {
+                "type": ["string", "null"]
+              },
+              "executorAgentId": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "add_task_comment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["taskId", "body"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "taskId": {
+                "type": ["string", "null"]
+              },
+              "body": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "create_project": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "key": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              },
+              "description": {
+                "type": ["string", "null"]
+              },
+              "status": {
+                "type": ["string", "null"]
+              },
+              "teamId": {
+                "type": ["string", "null"]
+              },
+              "leadUserId": {
+                "type": ["string", "null"]
+              },
+              "dueDate": {
+                "type": ["string", "null"]
+              },
+              "startDate": {
+                "type": ["string", "null"]
+              },
+              "sortOrder": {
+                "type": "number"
+              },
+              "attributes": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "update_project": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "key": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              },
+              "description": {
+                "type": ["string", "null"]
+              },
+              "status": {
+                "type": ["string", "null"]
+              },
+              "teamId": {
+                "type": ["string", "null"]
+              },
+              "leadUserId": {
+                "type": ["string", "null"]
+              },
+              "dueDate": {
+                "type": ["string", "null"]
+              },
+              "startDate": {
+                "type": ["string", "null"]
+              },
+              "sortOrder": {
+                "type": "number"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "attributes": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "delete_project": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "archive_project": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "restore_project": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "create_subtask": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["taskId", "title"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "taskId": {
+                "type": ["string", "null"]
+              },
+              "title": {
+                "type": ["string", "null"]
+              },
+              "done": {
+                "type": "boolean"
+              },
+              "sortOrder": {
+                "type": "number"
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "update_subtask": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "taskId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "taskId": {
+                "type": ["string", "null"]
+              },
+              "title": {
+                "type": ["string", "null"]
+              },
+              "done": {
+                "type": "boolean"
+              },
+              "sortOrder": {
+                "type": "number"
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "delete_subtask": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "taskId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "taskId": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "set_task_dependency": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "dependsOnTaskId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "dependsOnTaskId": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "remove_task_dependency": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "dependsOnTaskId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "dependsOnTaskId": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "set_task_label": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "labelId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "labelId": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "remove_task_label": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "labelId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "labelId": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "set_task_attachment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "fileId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "fileId": {
+                "type": ["string", "null"]
+              },
+              "sortOrder": {
+                "type": "number"
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "remove_task_attachment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "fileId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "fileId": {
+                "type": ["string", "null"]
+              },
+              "claimToken": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "add_reaction": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["commentId", "reaction"],
+            "properties": {
+              "commentId": {
+                "type": ["string", "null"]
+              },
+              "reaction": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "remove_reaction": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["commentId", "reaction"],
+            "properties": {
+              "commentId": {
+                "type": ["string", "null"]
+              },
+              "reaction": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "create_team": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              },
+              "description": {
+                "type": ["string", "null"]
+              },
+              "attributes": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "update_team": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              },
+              "description": {
+                "type": ["string", "null"]
+              },
+              "attributes": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "delete_team": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "set_team_member": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "userId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "userId": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "remove_team_member": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "userId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "userId": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "set_project_member": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "userId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "userId": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "remove_project_member": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "userId"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "userId": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "create_label": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "update_label": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "delete_label": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "create_view": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "viewType"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "projectId": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              },
+              "viewType": {
+                "type": ["string", "null"]
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "update_view": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "projectId": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              },
+              "viewType": {
+                "type": ["string", "null"]
+              },
+              "filters": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete_view": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "create_calendar_event": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["title"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "projectId": {
+                "type": ["string", "null"]
+              },
+              "taskId": {
+                "type": ["string", "null"]
+              },
+              "title": {
+                "type": ["string", "null"]
+              },
+              "eventDate": {
+                "type": ["string", "null"]
+              },
+              "eventTime": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "update_calendar_event": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "projectId": {
+                "type": ["string", "null"]
+              },
+              "taskId": {
+                "type": ["string", "null"]
+              },
+              "title": {
+                "type": ["string", "null"]
+              },
+              "eventDate": {
+                "type": ["string", "null"]
+              },
+              "eventTime": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "delete_calendar_event": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "create_file": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "projectId": {
+                "type": ["string", "null"]
+              },
+              "taskId": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              },
+              "fileType": {
+                "type": ["string", "null"]
+              },
+              "sizeLabel": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "update_file": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              },
+              "projectId": {
+                "type": ["string", "null"]
+              },
+              "taskId": {
+                "type": ["string", "null"]
+              },
+              "name": {
+                "type": ["string", "null"]
+              },
+              "fileType": {
+                "type": ["string", "null"]
+              },
+              "sizeLabel": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "delete_file": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      },
+      "set_preferences": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["preferences"],
+            "properties": {
+              "preferences": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "create_workspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "slug"],
+            "properties": {
+              "name": {
+                "type": ["string", "null"]
+              },
+              "slug": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
