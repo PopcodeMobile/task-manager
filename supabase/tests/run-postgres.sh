@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"
+suite="${1:-legacy}"
+case "$suite" in
+  legacy|normalized|all) ;;
+  *) printf 'Usage: %s [legacy|normalized|all]\n' "$0" >&2; exit 2 ;;
+esac
 container_name="task-manager-rls-${RANDOM}-${RANDOM}"
 trap 'docker rm -f "$container_name" >/dev/null 2>&1 || true' EXIT
 docker run --rm -d --name "$container_name" -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17-alpine >/dev/null
@@ -22,4 +27,10 @@ if [ "$ready" != true ]; then
 fi
 docker exec -i "$container_name" psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 < "$repo_root/supabase/tests/bootstrap.sql"
 docker exec -i "$container_name" psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 < "$repo_root/supabase/migrations/202610160001_workspaces.sql"
-docker exec -i "$container_name" psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 < "$repo_root/supabase/tests/rls.sql"
+if [ "$suite" = legacy ] || [ "$suite" = all ]; then
+  docker exec -i "$container_name" psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 < "$repo_root/supabase/tests/rls.sql"
+fi
+if [ "$suite" = normalized ] || [ "$suite" = all ]; then
+  docker exec -i "$container_name" psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 < "$repo_root/supabase/migrations/202610200001_normalized_work.sql"
+  docker exec -i "$container_name" psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 < "$repo_root/supabase/tests/normalized-rls.sql"
+fi
