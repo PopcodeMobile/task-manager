@@ -102,7 +102,8 @@ update public.integration_connections set status='active';
 -- Scheduler stores actual Vault IDs in executable Cron text; no plaintext credential.
 select public.configure_webhook_scheduler('https://project.supabase.co/functions/v1/webhook-dispatch',repeat('scheduler-fixture-',3));
 select public.test_assert((select schedule='30 seconds' and command like '%net.http_post%' and command not like '%scheduler-fixture%' from cron.job where jobname='task-manager-webhooks'),'real Cron/Vault/pg_net command');
-select cron.unschedule('task-manager-webhooks');
+select public.test_assert((select username='postgres' from cron.job where jobname='task-manager-webhooks'),'scheduler executes as restricted application owner');
+select cron.unschedule(jobid) from cron.job where jobname='task-manager-webhooks';
 -- Leave exactly one visible event for independent concurrent session reservation.
 select public.execute_operation(w,'update_task','{"id":"t1","title":"Concurrent"}','concurrent-hook',4) from public.webhook_fixture;
 select 'SQL assertions passed';

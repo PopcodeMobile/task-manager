@@ -44,10 +44,10 @@ alter table public.webhook_deliveries enable row level security;
 alter table public.webhook_delivery_attempts enable row level security;
 alter table public.webhook_manual_replays enable row level security;
 revoke all on public.webhook_subscriptions,public.webhook_deliveries,public.webhook_delivery_attempts,public.webhook_manual_replays from public,anon,authenticated;
--- Secrets and generic queue primitives have no browser/OAuth access.
-revoke all on schema vault,pgmq,cron,net from public,anon,authenticated;
-revoke all on all tables in schema vault,pgmq,cron,net from public,anon,authenticated;
-revoke all on all functions in schema vault,pgmq,cron,net from public,anon,authenticated;
+-- Restrict application-owned queue objects. Vendor Vault/Cron/net ACLs stay managed
+-- by Supabase; those schemas must remain outside the configured Data API surface.
+revoke all on schema pgmq from public,anon,authenticated;
+revoke all on pgmq.q_webhook_delivery,pgmq.a_webhook_delivery from public,anon,authenticated;
 
 create function public.webhook_admin(p_workspace_id uuid) returns uuid language plpgsql security definer set search_path='' as $$
 declare uid uuid:=public.integration_human();

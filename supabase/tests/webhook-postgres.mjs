@@ -8,6 +8,8 @@ import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 const container = `task-manager-webhooks-${process.pid}`;
+const apiSchemas = ['public', 'graphql_public'],
+  apiExtraSearchPath = ['public', 'extensions'];
 function docker(args, input) {
   const result = spawnSync('docker', args, { input, encoding: 'utf8', timeout: 120000, maxBuffer: 5 * 1024 * 1024 });
   assert.equal(result.status, 0, result.stderr + '\n' + result.stdout);
@@ -15,8 +17,8 @@ function docker(args, input) {
 }
 const network = `${container}-network`,
   rest = `${container}-rest`;
-function sql(input) {
-  return docker(['exec', '-i', container, 'psql', '-XqAt', '-h', '127.0.0.1', '-U', 'supabase_admin', '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'], input);
+function sql(input, role = 'supabase_admin') {
+  return docker(['exec', '-i', container, 'psql', '-XqAt', '-h', '127.0.0.1', '-U', role, '-d', 'postgres', '-v', 'ON_ERROR_STOP=1'], input);
 }
 try {
   docker(['network', 'create', network]);
@@ -37,6 +39,16 @@ try {
     '-c',
     'cron.database_name=postgres',
     '-c',
+    'session_preload_libraries=supautils',
+    '-c',
+    'supautils.privileged_role=supabase_privileged_role',
+    '-c',
+    'supautils.superuser=supabase_admin',
+    '-c',
+    'supautils.privileged_extensions_superuser=supabase_admin',
+    '-c',
+    'supautils.privileged_extensions=pg_net,pg_cron,supabase_vault',
+    '-c',
     'listen_addresses=*',
   ]);
   let ready = false;
@@ -53,17 +65,58 @@ try {
   sql(
     'create table auth.oauth_clients(id uuid primary key,client_name text,deleted_at timestamptz);create table auth.oauth_authorizations(authorization_id text primary key,user_id uuid,client_id uuid,status text,expires_at timestamptz);create table auth.oauth_consents(user_id uuid,client_id uuid,revoked_at timestamptz);',
   );
-  for (const file of [
-    '202610160001_workspaces',
-    '202610200001_normalized_work',
-    '202610200002_agent_operations',
-    '202610200003_integration_grants',
-    '202610200004_webhook_delivery',
-  ])
-    sql(await readFile(`supabase/migrations/${file}.sql`, 'utf8'));
+  // Match Supabase's real Auth table grants without elevating the application migration role.
+  sql('grant usage on schema auth to postgres;grant all on all tables in schema auth to postgres;');
+  sql(`create extension if not exists pg_graphql;comment on schema public is '@graphql({"introspection": true})';`);
+  assert.equal(sql("select current_user='postgres' and not rolsuper from pg_roles where rolname=current_user;", 'postgres').trim(), 't');
+  assert.equal(
+    sql(
+      "select count(*)>0 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='vault' and pg_get_userbyid(p.proowner)='supabase_admin' and not has_function_privilege('postgres',p.oid,'execute');",
+    ).trim(),
+    't',
+    'fixture must retain vendor-owned crypto primitives inaccessible to the migration role',
+  );
+  const vendorAclQuery =
+    "select jsonb_agg(jsonb_build_object('name',p.proname,'args',pg_get_function_identity_arguments(p.oid),'owner',pg_get_userbyid(p.proowner),'acl',p.proacl::text) order by p.oid) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='vault';";
+  const vendorAcl = sql(vendorAclQuery).trim();
+  for (const file of ['202610160001_workspaces', '202610200001_normalized_work', '202610200002_agent_operations', '202610200003_integration_grants'])
+    sql(await readFile(`supabase/migrations/${file}.sql`, 'utf8'), 'postgres');
+  const webhookMigration = await readFile('supabase/migrations/202610200004_webhook_delivery.sql', 'utf8');
+  sql(webhookMigration, 'postgres');
+  assert.equal(sql(vendorAclQuery).trim(), vendorAcl, 'application migration must preserve all vendor Vault function owners and ACLs');
+  console.log(sql(await readFile('supabase/tests/webhook-acl.sql', 'utf8')));
+  const { auditWebhookApiSurface, verifyWebhookApiBoundary } = await import('./webhook-api-boundary.mjs');
+  const productionSurface = auditWebhookApiSurface({ sql, exposedSchemas: apiSchemas, extraSearchPath: apiExtraSearchPath });
+  assert.throws(() => auditWebhookApiSurface({ sql }), /unknown Data API/);
+  assert.throws(() => auditWebhookApiSurface({ sql, exposedSchemas: ['public', 'net'] }), /unreviewed exposed schema/);
+  assert.throws(() => auditWebhookApiSurface({ sql, exposedSchemas: ['public'] }), /unknown or unreviewed API/);
+  assert.throws(() => auditWebhookApiSurface({ sql, exposedSchemas: ['public'], extraSearchPath: ['public', 'net'] }), /unknown or unreviewed API/);
+  for (const [create, drop] of [
+    [
+      'create function public.test_unsafe_invoker() returns jsonb language sql as $$select jsonb_agg(headers) from net.http_request_queue$$;',
+      'drop function public.test_unsafe_invoker();',
+    ],
+    [
+      'create function public.test_unsafe_private() returns jsonb language sql as $$select jsonb_agg(headers) from net.http_request_queue$$;revoke all on function public.test_unsafe_private() from public;create function public.test_unsafe_chain() returns jsonb language sql security definer as $$select public.test_unsafe_private()$$;',
+      'drop function public.test_unsafe_chain();drop function public.test_unsafe_private();',
+    ],
+    [
+      'create view public.test_unsafe_view as select headers from net.http_request_queue;grant select on public.test_unsafe_view to authenticated;',
+      'drop view public.test_unsafe_view;',
+    ],
+  ]) {
+    sql(create);
+    try {
+      assert.throws(() => auditWebhookApiSurface({ sql, exposedSchemas: apiSchemas, extraSearchPath: apiExtraSearchPath }), /sensitive API bridge/);
+    } finally {
+      sql(drop);
+    }
+  }
+  console.log('PASS boundary audit rejects unknown/exposed vendor schemas, INVOKER, indirect DEFINER helper and view bridges');
+
   console.log(
     sql(
-      "select extname||':'||extversion from pg_extension where extname in ('pgmq','supabase_vault','pg_cron','pg_net') order by extname;select p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='pgmq' and p.proname in ('read','send','archive','set_vt');",
+      "select extname||':'||extversion from pg_extension where extname in ('pgmq','supabase_vault','pg_cron','pg_net','pg_graphql') order by extname;select p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='pgmq' and p.proname in ('read','send','archive','set_vt');",
     ),
   );
   console.log(sql(await readFile('supabase/tests/webhook-delivery.sql', 'utf8')));
@@ -137,6 +190,8 @@ try {
  select jsonb_build_object('missed',exists(select 1 from net._http_response where status_code=503),'recovered',exists(select 1 from net._http_response where status_code=200),'failedTarget',exists(select 1 from public.webhook_deliveries where state='failed' and last_category='target_rejected'),'runs',(select count(*) from cron.job_run_details where status='succeeded'));
  $$;
  create function public.test_stop_scheduler() returns void language sql security definer set search_path='' as $$select cron.unschedule('task-manager-webhooks');$$;
+ alter function public.test_prepare_scheduler(text) owner to postgres;
+ alter function public.test_stop_scheduler() owner to postgres;
  revoke all on function public.test_prepare_scheduler(text),public.test_scheduler_result(),public.test_stop_scheduler() from public,anon,authenticated;
  grant execute on function public.test_prepare_scheduler(text),public.test_scheduler_result(),public.test_stop_scheduler() to service_role;
  `);
@@ -156,22 +211,40 @@ try {
       '-e',
       'PGRST_DB_ANON_ROLE=anon',
       '-e',
+      `PGRST_DB_SCHEMAS=${apiSchemas.join(',')}`,
+      '-e',
+      `PGRST_DB_EXTRA_SEARCH_PATH=${apiExtraSearchPath.join(',')}`,
+      '-e',
+      'PGRST_DB_CONFIG=false',
+      '-e',
       `PGRST_JWT_SECRET=${jwtSecret}`,
       'public.ecr.aws/supabase/postgrest:v14.18',
     ]);
     const port = docker(['port', rest, '3000/tcp']).trim().split(':').at(-1);
     const base = `http://127.0.0.1:${port}`;
+    let restReady = false;
     for (let i = 0; i < 100; i++) {
       try {
-        await globalThis.fetch(base);
-        break;
+        const response = await globalThis.fetch(base);
+        await response.body?.cancel();
+        if (response.ok) {
+          restReady = true;
+          break;
+        }
       } catch {
-        await delay(100);
+        /* Connection may start before PostgREST finishes its schema cache. */
       }
+      await delay(100);
     }
+    assert.ok(restReady, 'disposable PostgREST schema cache did not become ready');
     const encoded = value => Buffer.from(JSON.stringify(value)).toString('base64url');
     const unsigned = encoded({ alg: 'HS256', typ: 'JWT' }) + '.' + encoded({ role: 'service_role', exp: Math.floor(Date.now() / 1000) + 600 });
     const token = unsigned + '.' + createHmac('sha256', jwtSecret).update(unsigned).digest('base64url');
+    const signToken = claims => {
+      const value = encoded({ alg: 'HS256', typ: 'JWT' }) + '.' + encoded({ ...claims, exp: Math.floor(Date.now() / 1000) + 600 });
+      return value + '.' + createHmac('sha256', jwtSecret).update(value).digest('base64url');
+    };
+    await verifyWebhookApiBoundary({ base, signToken, productionSurface });
     // Production store includes /rest/v1; this standalone PostgREST has no Kong prefix.
     const live = spawnSync(
       'deno',
