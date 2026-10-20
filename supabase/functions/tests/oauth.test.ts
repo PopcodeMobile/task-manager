@@ -117,15 +117,49 @@ Deno.test({
           p_grants: [{ workspaceId: user.workspace, capability }],
         });
         assertEquals(prepared.status, 200);
+        const duplicate = await rpc(user.token, 'prepare_integration_consent', {
+          p_authorization_id: flow.authorizationId,
+          p_grants: [{ workspaceId: user.workspace, capability }, { workspaceId: user.workspace, capability }],
+        });
+        assertEquals(duplicate.status, 422);
+        assertEquals(duplicate.data.code, 'PT422');
+        assertEquals(duplicate.data.message, 'validation_error');
+        assertEquals(duplicate.data.details, null);
+        assertEquals(duplicate.data.hint, null);
+        const conflicting = await rpc(user.token, 'prepare_integration_consent', {
+          p_authorization_id: flow.authorizationId,
+          p_grants: [{ workspaceId: user.workspace, capability: capability === 'read' ? 'write' : 'read' }],
+        });
+        assertEquals(conflicting.status, 409);
+        assertEquals(conflicting.data.message, 'idempotency_conflict');
+        const retry = await rpc(user.token, 'prepare_integration_consent', {
+          p_authorization_id: flow.authorizationId,
+          p_grants: [{ workspaceId: user.workspace, capability }],
+        });
+        assertEquals(retry.status, 200);
+        assertEquals(retry.data.attemptId, prepared.data.attemptId);
+        assertEquals(
+          (await rpc(user.token, 'activate_integration_consent', { p_authorization_id: flow.authorizationId })).status,
+          404,
+        );
+        assertEquals(
+          (await rpc(user.token, 'cancel_integration_consent', { p_authorization_id: flow.authorizationId })).status,
+          404,
+        );
+
         // Other principal cannot activate this request or substitute its own identity.
         assertEquals(
           (await rpc(users.find((x) => x !== user)!.token, 'activate_integration_consent', {
             p_authorization_id: flow.authorizationId,
+            p_attempt_id: prepared.data.attemptId,
           })).status,
           403,
         );
         assertEquals(
-          (await rpc(user.token, 'activate_integration_consent', { p_authorization_id: flow.authorizationId })).status,
+          (await rpc(user.token, 'activate_integration_consent', {
+            p_authorization_id: flow.authorizationId,
+            p_attempt_id: prepared.data.attemptId,
+          })).status,
           403,
         );
         const approved = await user.client.auth.oauth.approveAuthorization(flow.authorizationId, {
@@ -135,7 +169,10 @@ Deno.test({
         const callback = new URL(approved.data.redirect_url);
         assertEquals(callback.searchParams.get('state'), flow.state);
         assertEquals(
-          (await rpc(user.token, 'activate_integration_consent', { p_authorization_id: flow.authorizationId })).status,
+          (await rpc(user.token, 'activate_integration_consent', {
+            p_authorization_id: flow.authorizationId,
+            p_attempt_id: prepared.data.attemptId,
+          })).status,
           200,
         );
         const response = await fetch(`${base}/auth/v1/oauth/token`, {

@@ -49,7 +49,10 @@ export function ConsentPage({ t }: { t: Translate }) {
       location.assign(safeOAuthRedirect(redirect));
     } catch {
       setError(
-        t('Não foi possível concluir a conexão. Inicie um novo pedido no aplicativo.', 'Could not finish the connection. Start a new request in the app.'),
+        t(
+          'Não foi possível confirmar a conexão. Confira o acesso em Conexões antes de tentar novamente.',
+          'Could not confirm the connection. Review access in Connections before trying again.',
+        ),
       );
       setBusy(false);
     }
@@ -151,7 +154,7 @@ export function ConsentPage({ t }: { t: Translate }) {
       </p>
       {error && (
         <p role="alert" className="error-message">
-          {error}
+          {error} <a href="/integrations">{t('Ver conexões', 'View connections')}</a>
         </p>
       )}
       <div className="actions">

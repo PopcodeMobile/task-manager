@@ -159,7 +159,7 @@ test.describe('real OAuth consent', () => {
       route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'PT503', message: 'temporarily_unavailable' }) }),
     );
     await page.getByRole('button', { name: 'Permitir acesso' }).click();
-    await expect(page.getByRole('alert')).toContainText('Não foi possível concluir');
+    await expect(page.getByRole('alert')).toContainText('Não foi possível confirmar');
     const connections = await human.rpc('list_integration_connections');
     expect(connections.error).toBeNull();
     const connection = connections.data.items.find((c: { clientId: string }) => c.clientId === flow.clientId);
@@ -167,5 +167,99 @@ test.describe('real OAuth consent', () => {
     const agents = await human.rpc('read_operation', { p_workspace_id: workspace, p_operation: 'list_agents' });
     expect(agents.error).toBeNull();
     expect(agents.data.items.filter((a: { clientId: string }) => a.clientId === flow.clientId)).toHaveLength(0);
+  });
+  test('two tabs with the same request preserve the first read selection when the write tab fails', async ({ page, context }) => {
+    const flow = await request('Consentimento entre abas');
+    await page.goto(flow.consentUrl);
+    await login(page);
+    await expect(page.getByRole('heading', { name: 'Conectar Consentimento entre abas' })).toBeVisible();
+    const second = await context.newPage();
+    await second.goto(flow.consentUrl);
+    await expect(second.getByRole('heading', { name: 'Conectar Consentimento entre abas' })).toBeVisible();
+    await page.getByRole('checkbox', { name: /Design do produto/ }).check();
+    await second.getByRole('checkbox', { name: /Design do produto/ }).check();
+    await second.getByRole('combobox', { name: 'Acesso em Design do produto' }).selectOption('write');
+    let releaseApproval = () => {},
+      signalApproval = () => {};
+    const reached = new Promise<void>(resolve => {
+      signalApproval = resolve;
+    });
+    const release = new Promise<void>(resolve => {
+      releaseApproval = resolve;
+    });
+    await page.route('**/auth/v1/oauth/authorizations/*/consent', async route => {
+      signalApproval();
+      await release;
+      await route.continue();
+    });
+    try {
+      await page.getByRole('button', { name: 'Permitir acesso' }).click();
+      await reached;
+      await second.getByRole('button', { name: 'Permitir acesso' }).click();
+      await expect(second.getByRole('alert')).toContainText('Não foi possível confirmar');
+      releaseApproval();
+      await page.waitForURL(/\/callback\?code=/);
+      const callback = new URL(page.url());
+      expect(callback.searchParams.get('state')).toBe(flow.state);
+      const exchange = await fetch(`${base}/auth/v1/oauth/token`, {
+        method: 'POST',
+        headers: { apikey: key, 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: flow.clientId,
+          redirect_uri: 'http://127.0.0.1:5180/callback',
+          code: callback.searchParams.get('code')!,
+          code_verifier: flow.verifier,
+        }),
+      });
+      expect(exchange.status).toBe(200);
+      const tokens = await exchange.json();
+      const connections = await human.rpc('list_integration_connections');
+      expect(connections.error).toBeNull();
+      const connection = connections.data.items.find((c: { clientId: string }) => c.clientId === flow.clientId);
+      expect(connection.status).toBe('active');
+      expect(connection.grants).toEqual([{ workspaceId: workspace, workspaceName: 'Design do produto', capability: 'read' }]);
+      const agents = await human.rpc('read_operation', { p_workspace_id: workspace, p_operation: 'list_agents' });
+      expect(agents.data.items.filter((a: { clientId: string }) => a.clientId === flow.clientId)).toHaveLength(0);
+      const denied = await fetch(`${base}/rest/v1/rpc/execute_operation`, {
+        method: 'POST',
+        headers: { apikey: key, authorization: `Bearer ${tokens.access_token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          p_workspace_id: workspace,
+          p_operation: 'create_task',
+          p_command: { projectId: 'unused', title: 'Denied write' },
+          p_idempotency_key: crypto.randomUUID(),
+        }),
+      });
+      expect(denied.status).toBe(403);
+      await denied.body?.cancel();
+    } finally {
+      releaseApproval();
+      await second.close();
+    }
+  });
+  test('lost activation response cannot cancel committed access and explicit revoke still works', async ({ page }) => {
+    const flow = await request('Resposta de ativação perdida');
+    await page.goto(flow.consentUrl);
+    await login(page);
+    await expect(page.getByRole('heading', { name: 'Conectar Resposta de ativação perdida' })).toBeVisible();
+    await page.getByRole('checkbox', { name: /Design do produto/ }).check();
+    await page.route('**/rest/v1/rpc/activate_integration_consent', async route => {
+      const committed = await route.fetch();
+      expect(committed.status()).toBe(200);
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'PT503', message: 'temporarily_unavailable' }) });
+    });
+    await page.getByRole('button', { name: 'Permitir acesso' }).click();
+    await expect(page.getByRole('alert')).toContainText('Não foi possível confirmar');
+    await expect(page.getByRole('alert')).toContainText('Confira o acesso em Conexões');
+    await expect(page.getByRole('link', { name: 'Ver conexões', exact: true })).toHaveAttribute('href', '/integrations');
+    const connections = await human.rpc('list_integration_connections');
+    expect(connections.error).toBeNull();
+    expect(connections.data.items.find((c: { clientId: string }) => c.clientId === flow.clientId).status).toBe('active');
+    await page.goto('/integrations');
+    const connection = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Resposta de ativação perdida', exact: true }) });
+    await expect(connection.getByText('Conectado', { exact: true })).toBeVisible();
+    await connection.getByRole('button', { name: 'Revogar acesso' }).click();
+    await expect(connection.getByText('Revogado', { exact: true })).toBeVisible();
   });
 });

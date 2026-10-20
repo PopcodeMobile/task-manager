@@ -1,4 +1,6 @@
 import { defineConfig } from '@playwright/test';
+// Playwright sets FORCE_COLOR for child processes; do not inherit a conflicting NO_COLOR.
+delete process.env.NO_COLOR;
 export default defineConfig({
   testDir: './tests/browser',
   testMatch: 'oauth-consent.spec.ts',

@@ -29,25 +29,31 @@ export async function authorizationDetails(authorizationId: string): Promise<OAu
   if (error || !data) throw new Error('authorization_invalid');
   return data;
 }
-/** Grants stay inactive until Auth approves. Failures/denials revoke this attempt; no client ID is accepted. */
+/** Grants stay inactive until Auth approves. Only this prepared pending attempt is cancelled on failure.
+ * Committed access requires explicit revoke; another tab's preparation is never cancelled. */
 export async function decideConsent(authorizationId: string, grants: GrantChoice[], approve: boolean): Promise<string> {
   const client = configured();
   let activated = false;
+  let attemptId: string | null = null;
   try {
-    if (approve) await rpc('prepare_integration_consent', { p_authorization_id: authorizationId, p_grants: grants });
-    else await rpc('cancel_integration_consent', { p_authorization_id: authorizationId });
+    if (approve) {
+      const prepared = await rpc<{ attemptId: unknown }>('prepare_integration_consent', { p_authorization_id: authorizationId, p_grants: grants });
+      if (typeof prepared.attemptId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(prepared.attemptId))
+        throw new Error('consent_failed');
+      attemptId = prepared.attemptId;
+    }
     const { data, error } = approve
       ? await client.auth.oauth.approveAuthorization(authorizationId, { skipBrowserRedirect: true })
       : await client.auth.oauth.denyAuthorization(authorizationId, { skipBrowserRedirect: true });
     if (error || !data) throw new Error('consent_failed');
     safeOAuthRedirect(data.redirect_url);
     if (approve) {
-      await rpc('activate_integration_consent', { p_authorization_id: authorizationId });
+      await rpc('activate_integration_consent', { p_authorization_id: authorizationId, p_attempt_id: attemptId });
       activated = true;
     }
     return data.redirect_url;
   } catch {
-    if (!activated) await rpc('cancel_integration_consent', { p_authorization_id: authorizationId }).catch(() => {});
+    if (!activated && attemptId) await rpc('cancel_integration_consent', { p_authorization_id: authorizationId, p_attempt_id: attemptId }).catch(() => {});
     throw new Error('consent_failed');
   }
 }

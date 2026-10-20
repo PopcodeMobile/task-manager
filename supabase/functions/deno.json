@@ -15,7 +15,7 @@
     "semiColons": true
   },
   "tasks": {
-    "test": "deno test --allow-env --allow-net tests/",
+    "test": "deno test --unstable-no-legacy-abort --allow-env --allow-net tests/",
     "check": "deno check api/index.ts mcp/index.ts tests/*.test.ts"
   },
   "imports": {

@@ -4,7 +4,7 @@ create table public.integration_connections (
  id uuid primary key default gen_random_uuid(), user_id uuid not null references auth.users(id) on delete cascade,
  client_id uuid not null, client_name text not null,
  status text not null default 'pending' check(status in ('pending','active','revoked')),
- authorization_id text not null, created_at timestamptz not null default now(), authorized_at timestamptz, revoked_at timestamptz,
+ authorization_id text not null, consent_attempt_id uuid not null default gen_random_uuid(), created_at timestamptz not null default now(), authorized_at timestamptz, revoked_at timestamptz,
  unique(user_id,client_id)
 );
 create table public.integration_grants (
@@ -33,33 +33,52 @@ revoke all on function public.integration_human() from public,anon,authenticated
 -- This deliberately depends on the OAuth Server beta schema; absent/unexpected Auth state fails closed.
 create function public.prepare_integration_consent(p_authorization_id text,p_grants jsonb) returns jsonb
 language plpgsql security definer set search_path='' as $$
-declare uid uuid:=public.integration_human(); a record; g jsonb; w uuid; r text; c uuid;
+declare uid uuid:=public.integration_human(); a record; g jsonb; w uuid; r text; c public.integration_connections;
+ normalized jsonb:='[]'; existing jsonb; seen uuid[]:='{}'; inserted boolean;
 begin
  select o.client_id,cl.client_name into a from auth.oauth_authorizations o join auth.oauth_clients cl on cl.id=o.client_id
  where o.authorization_id=p_authorization_id and o.user_id=uid and o.status::text='pending' and o.expires_at>now() and cl.deleted_at is null for share of o,cl;
  if not found then raise exception 'forbidden' using errcode='PT403'; end if;
  if jsonb_typeof(p_grants) is distinct from 'array' or jsonb_array_length(p_grants) not between 1 and 100 then raise exception 'validation_error' using errcode='PT422';end if;
- insert into public.integration_connections(user_id,client_id,client_name,authorization_id)
- values(uid,a.client_id,coalesce(nullif(a.client_name,''),'OAuth client'),p_authorization_id)
- on conflict(user_id,client_id) do update set status='pending',authorization_id=excluded.authorization_id,client_name=excluded.client_name,authorized_at=null,revoked_at=null returning id into c;
- delete from public.integration_grants where connection_id=c;
+ -- Validate and canonicalize the complete selection before changing connection state.
  for g in select value from jsonb_array_elements(p_grants) loop
   if jsonb_typeof(g) is distinct from 'object' or g->>'capability' not in ('read','write') or g->>'capability' is null or (g-'workspaceId'-'capability')<>'{}'::jsonb then raise exception 'validation_error' using errcode='PT422';end if;
   begin w:=(g->>'workspaceId')::uuid; exception when invalid_text_representation then raise exception 'validation_error' using errcode='PT422';end;
+  if w is null or w=any(seen) then raise exception 'validation_error' using errcode='PT422';end if;
+  seen:=array_append(seen,w);
   select m.role into r from public.workspace_memberships m join public.workspaces ws on ws.id=m.workspace_id and ws.storage_version=2 where m.workspace_id=w and m.user_id=uid for share of m,ws;
   if not found or (r='guest' and g->>'capability'='write') then raise exception 'forbidden' using errcode='PT403';end if;
-  insert into public.integration_grants(connection_id,workspace_id,capability) values(c,w,g->>'capability');
+  normalized:=normalized||jsonb_build_array(jsonb_build_object('workspaceId',w,'capability',g->>'capability'));
  end loop;
- return jsonb_build_object('connectionId',c,'status','pending');
+ select jsonb_agg(value order by value->>'workspaceId') into normalized from jsonb_array_elements(normalized);
+ insert into public.integration_connections(user_id,client_id,client_name,authorization_id)
+ values(uid,a.client_id,coalesce(nullif(a.client_name,''),'OAuth client'),p_authorization_id)
+ on conflict(user_id,client_id) do nothing returning * into c;
+ inserted:=found;
+ if not inserted then
+  select * into c from public.integration_connections where user_id=uid and client_id=a.client_id for update;
+  if c.authorization_id=p_authorization_id then
+   select coalesce(jsonb_agg(jsonb_build_object('workspaceId',workspace_id,'capability',capability) order by workspace_id::text),'[]') into existing from public.integration_grants where connection_id=c.id;
+   -- One Auth request has one immutable selection. Identical pending retries share its nonce.
+   if c.status='pending' and existing=normalized then return jsonb_build_object('connectionId',c.id,'attemptId',c.consent_attempt_id,'status','pending');end if;
+   raise exception 'idempotency_conflict' using errcode='PT409';
+  end if;
+  update public.integration_connections set status='pending',authorization_id=p_authorization_id,consent_attempt_id=gen_random_uuid(),client_name=coalesce(nullif(a.client_name,''),'OAuth client'),authorized_at=null,revoked_at=null where id=c.id returning * into c;
+  delete from public.integration_grants where connection_id=c.id;
+ end if;
+ for g in select value from jsonb_array_elements(normalized) loop
+  insert into public.integration_grants(connection_id,workspace_id,capability) values(c.id,(g->>'workspaceId')::uuid,g->>'capability');
+ end loop;
+ return jsonb_build_object('connectionId',c.id,'attemptId',c.consent_attempt_id,'status','pending');
 exception when undefined_table or undefined_column then
  raise exception 'temporarily_unavailable' using errcode='PT503';
 end $$;
 
-create function public.activate_integration_consent(p_authorization_id text) returns jsonb
+create function public.activate_integration_consent(p_authorization_id text,p_attempt_id uuid) returns jsonb
 language plpgsql security definer set search_path='' as $$
 declare uid uuid:=public.integration_human(); c public.integration_connections; g record; aid text; r text;
 begin
- select * into c from public.integration_connections where user_id=uid and authorization_id=p_authorization_id and status='pending' for update;
+ select * into c from public.integration_connections where user_id=uid and authorization_id=p_authorization_id and consent_attempt_id=p_attempt_id and status in ('pending','active') for update;
  if not found then raise exception 'forbidden' using errcode='PT403';end if;
  perform 1 from auth.oauth_authorizations o join auth.oauth_clients cl on cl.id=o.client_id join auth.oauth_consents oc on oc.client_id=o.client_id and oc.user_id=uid
  where o.authorization_id=p_authorization_id and o.user_id=uid and o.client_id=c.client_id and o.status::text='approved' and cl.deleted_at is null and oc.revoked_at is null for share of o,cl,oc;
@@ -73,16 +92,16 @@ begin
    update public.integration_grants set agent_id=aid where connection_id=c.id and workspace_id=g.workspace_id;
   end if;
  end loop;
- update public.integration_connections set status='active',authorized_at=clock_timestamp(),revoked_at=null where id=c.id;
+ update public.integration_connections set status='active',authorized_at=coalesce(authorized_at,clock_timestamp()),revoked_at=null where id=c.id;
  return jsonb_build_object('connectionId',c.id,'status','active');
 exception when undefined_table or undefined_column then
  raise exception 'temporarily_unavailable' using errcode='PT503';
 end $$;
 
-create function public.cancel_integration_consent(p_authorization_id text) returns void
+create function public.cancel_integration_consent(p_authorization_id text,p_attempt_id uuid) returns void
 language plpgsql security definer set search_path='' as $$
 begin
- update public.integration_connections set status='revoked',revoked_at=clock_timestamp() where user_id=public.integration_human() and authorization_id=p_authorization_id;
+ update public.integration_connections set status='revoked',revoked_at=clock_timestamp() where user_id=public.integration_human() and authorization_id=p_authorization_id and consent_attempt_id=p_attempt_id and status='pending';
 end $$;
 create function public.revoke_integration_connection(p_connection_id uuid) returns void
 language plpgsql security definer set search_path='' as $$
@@ -138,6 +157,6 @@ exception when undefined_table or undefined_column then
  raise exception 'temporarily_unavailable' using errcode='PT503';
 end $$;
 revoke all on function public.operation_authorize(uuid,boolean) from public,anon,authenticated;
-revoke all on function public.prepare_integration_consent(text,jsonb),public.activate_integration_consent(text),public.cancel_integration_consent(text),public.revoke_integration_connection(uuid),public.list_integration_connections(),public.link_integration_executor(uuid,uuid,text) from public,anon;
-grant execute on function public.prepare_integration_consent(text,jsonb),public.activate_integration_consent(text),public.cancel_integration_consent(text),public.revoke_integration_connection(uuid),public.list_integration_connections(),public.link_integration_executor(uuid,uuid,text) to authenticated;
+revoke all on function public.prepare_integration_consent(text,jsonb),public.activate_integration_consent(text,uuid),public.cancel_integration_consent(text,uuid),public.revoke_integration_connection(uuid),public.list_integration_connections(),public.link_integration_executor(uuid,uuid,text) from public,anon;
+grant execute on function public.prepare_integration_consent(text,jsonb),public.activate_integration_consent(text,uuid),public.cancel_integration_consent(text,uuid),public.revoke_integration_connection(uuid),public.list_integration_connections(),public.link_integration_executor(uuid,uuid,text) to authenticated;
 commit;
