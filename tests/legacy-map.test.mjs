@@ -75,3 +75,10 @@ test('legacy inspection validates team mappings, nested relations, project state
   assert.ok(result.orphans.includes('memberTeams.m1:missing'));
   assert.ok(result.unmappedFields.includes('tasks[0].subtasks[0].custom'));
 });
+test('legacy inspection requires the same root arrays as the SQL migrator', async () => {
+  const inspect = await inspector();
+  for (const payload of [{}, { projects: [] }, { tasks: [] }]) {
+    assert.equal(inspect(payload).valid, false);
+  }
+  assert.equal(inspect({ projects: [], tasks: [] }).valid, true);
+});

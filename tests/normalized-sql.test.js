@@ -182,3 +182,97 @@ test('personal legacy values migrate only with admin recorded snapshot provenanc
     await db.close();
   }
 });
+test('ungranted OAuth cannot read legacy recovery surfaces or invoke any workspace RPC', async () => {
+  const db = await database();
+  try {
+    const normalized = await workspace(db);
+    await db.query('select public.migrate_workspace($1,0)', [normalized]);
+    const legacy = await workspace(db);
+    await db.exec('set role authenticated');
+    for (const claim of ['claims', 'claim.client_id']) {
+      await db.query('select set_config($1,$2,false)', [`request.jwt.${claim}`, claim === 'claims' ? '{"client_id":"ungranted-client"}' : 'ungranted-client']);
+      for (const table of ['workspaces', 'workspace_memberships', 'workspace_snapshots', 'tasks', 'user_preferences', 'workspace_migrations']) {
+        assert.equal((await db.query(`select count(*)::int n from public.${table}`)).rows[0].n, 0, `${claim}:${table}`);
+      }
+      for (const id of [normalized, legacy]) {
+        await assert.rejects(db.query('select * from public.list_workspace_members($1)', [id]), error => error.code === '42501');
+        await assert.rejects(
+          db.query('select public.save_workspace_snapshot($1,0,$2::jsonb)', [id, JSON.stringify(fixture())]),
+          error => error.code === '42501',
+        );
+        await assert.rejects(db.query('select public.migrate_workspace($1,0)', [id]), error => error.code === '42501');
+      }
+      await assert.rejects(db.query("select public.create_workspace('OAuth','oauth','{\"projects\":[],\"tasks\":[]}')"), error => error.code === '42501');
+      await assert.rejects(db.query("select public.create_workspace_v1('OAuth','oauth','{\"projects\":[],\"tasks\":[]}')"), error => error.code === '42501');
+      await db.query("select set_config($1,'',false)", [`request.jwt.${claim}`]);
+    }
+  } finally {
+    await db.close();
+  }
+});
+test('revoking the attested owner clears live identity links without deleting agents, tasks or history', async () => {
+  const db = await database();
+  try {
+    const payload = fixture();
+    payload.projects[0].lead = owner;
+    payload.projects[0].members = [owner];
+    payload.tasks[0].assignee = owner;
+    payload.tasks[0].attachments[0].by = owner;
+    payload.comments[0].by = owner;
+    payload.comments[0].re = { '👍': [owner] };
+    payload.files[0].by = owner;
+    payload.activity[0].by = owner;
+    payload.notifs[0].by = owner;
+    payload.teams[0].members = [owner];
+    const id = await workspace(db, payload);
+    await db.query("insert into public.workspace_memberships values ($1,$2,'admin')", [id, other]);
+    await db.query('insert into public.snapshot_personal_provenance values ($1,0,$2)', [id, owner]);
+    await db.query('select public.migrate_workspace($1,0)', [id]);
+    await db.query("insert into public.agents(workspace_id,id,name,auth_user_id) values ($1,'agent1','Agent',$2)", [id, owner]);
+    await db.query("update public.tasks set executor_agent_id='agent1' where workspace_id=$1 and id='t1'", [id]);
+    await db.query('delete from public.workspace_memberships where workspace_id=$1 and user_id=$2', [id, owner]);
+    for (const [table, count] of [
+      ['projects', 1],
+      ['tasks', 2],
+      ['agents', 1],
+      ['comments', 1],
+      ['files', 2],
+      ['comment_reactions', 1],
+      ['activity_entries', 1],
+      ['notifications', 1],
+    ]) {
+      assert.equal((await db.query(`select count(*)::int n from public.${table} where workspace_id=$1`, [id])).rows[0].n, count, table);
+    }
+    for (const [table, column] of [
+      ['projects', 'lead_user_id'],
+      ['tasks', 'assignee_user_id'],
+      ['agents', 'auth_user_id'],
+      ['comments', 'author_user_id'],
+      ['files', 'author_user_id'],
+      ['comment_reactions', 'user_id'],
+      ['activity_entries', 'actor_user_id'],
+      ['notifications', 'author_user_id'],
+    ]) {
+      assert.equal(
+        (await db.query(`select count(*)::int n from public.${table} where workspace_id=$1 and ${column} is not null`, [id])).rows[0].n,
+        0,
+        `${table}.${column}`,
+      );
+    }
+    for (const table of ['snapshot_personal_provenance', 'user_preferences', 'project_members', 'team_members']) {
+      assert.equal((await db.query(`select count(*)::int n from public.${table} where workspace_id=$1`, [id])).rows[0].n, 0, table);
+    }
+    const history = (await db.query('select migrated_by,diagnostics from public.workspace_migrations where workspace_id=$1', [id])).rows[0];
+    assert.equal(history.migrated_by, owner);
+    assert.equal(history.diagnostics.personalStateOwner, owner);
+    assert.equal((await db.query("select executor_agent_id from public.tasks where workspace_id=$1 and id='t1'", [id])).rows[0].executor_agent_id, 'agent1');
+    await db.exec('set role authenticated');
+    assert.equal((await db.query('select count(*)::int n from public.tasks')).rows[0].n, 0);
+    assert.equal((await db.query('select count(*)::int n from public.workspace_snapshots')).rows[0].n, 0);
+    await assert.rejects(db.query('select * from public.list_workspace_members($1)', [id]), error => error.code === '42501');
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [other]);
+    assert.equal((await db.query('select count(*)::int n from public.tasks')).rows[0].n, 2);
+  } finally {
+    await db.close();
+  }
+});

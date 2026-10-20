@@ -18,15 +18,37 @@ $$;
 
 alter table public.workspaces add column legacy_metadata jsonb not null default '{}' check(public.valid_legacy_metadata(legacy_metadata));
 
--- OAuth fails closed until integration grants replace this helper in the OAuth migration.
+-- OAuth fails closed on ALL existing policies/RPCs, including recovery snapshots.
+-- The OAuth migration must implement grant checks here before enabling client access.
+create or replace function public.workspace_role(p_workspace_id uuid) returns text
+language sql stable security definer set search_path = '' as $$
+ select role from public.workspace_memberships
+ where workspace_id=p_workspace_id and user_id=(select auth.uid())
+   and nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'client_id' is null
+   and nullif(current_setting('request.jwt.claim.client_id',true),'') is null
+$$;
 create function public.normalized_workspace_role(p_workspace_id uuid) returns text
 language sql stable security definer set search_path = '' as $$
-  select public.workspace_role(p_workspace_id)
-  where nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'client_id' is null
-    and nullif(current_setting('request.jwt.claim.client_id',true),'') is null
+ select public.workspace_role(p_workspace_id)
 $$;
 revoke all on function public.normalized_workspace_role(uuid) from public, anon;
 grant execute on function public.normalized_workspace_role(uuid) to authenticated;
+
+-- Workspace creation has no existing workspace_role check; protect it explicitly too.
+-- Keep the previous implementation private so no RPC can bypass this gate.
+alter function public.create_workspace(text,text,jsonb) rename to create_workspace_v1;
+revoke all on function public.create_workspace_v1(text,text,jsonb) from public, anon, authenticated;
+create function public.create_workspace(p_name text,p_slug text,p_payload jsonb) returns uuid
+language plpgsql security definer set search_path = '' as $$
+begin
+ if auth.uid() is null
+   or nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'client_id' is not null
+   or nullif(current_setting('request.jwt.claim.client_id',true),'') is not null then
+  raise exception 'forbidden' using errcode='42501'; end if;
+ return public.create_workspace_v1(p_name,p_slug,p_payload);
+end $$;
+revoke all on function public.create_workspace(text,text,jsonb) from public, anon;
+grant execute on function public.create_workspace(text,text,jsonb) to authenticated;
 
 -- These rows can only be supplied by a trusted DBA after verifying export ownership.
 -- Snapshot JSON (including me, by, owner) is never proof of personal ownership.
@@ -34,7 +56,7 @@ create table public.snapshot_personal_provenance (
  workspace_id uuid primary key references public.workspaces(id) on delete cascade,
  snapshot_revision integer not null check(snapshot_revision>=0),
  user_id uuid not null,
- foreign key(workspace_id,user_id) references public.workspace_memberships(workspace_id,user_id)
+ foreign key(workspace_id,user_id) references public.workspace_memberships(workspace_id,user_id) on delete cascade
 );
 alter table public.snapshot_personal_provenance enable row level security;
 revoke all on public.snapshot_personal_provenance from public, anon, authenticated;
@@ -73,7 +95,7 @@ create table public.agents (
  id text not null default gen_random_uuid()::text check(length(id) between 1 and 128),
  name text not null, auth_user_id uuid, client_id text,
  version bigint not null default 1 check(version>0), created_at timestamptz not null default now(),
- foreign key(workspace_id,auth_user_id) references public.workspace_memberships(workspace_id,user_id) on delete cascade,
+ foreign key(workspace_id,auth_user_id) references public.workspace_memberships(workspace_id,user_id) on delete set null (auth_user_id),
  legacy_metadata jsonb not null default '{}' check(public.valid_legacy_metadata(legacy_metadata)),
  primary key(workspace_id,id)
 );

@@ -91,6 +91,7 @@ export function inspectLegacyWorkspace(payload: unknown): LegacyInspection {
     result.errors.push('payload');
     return result;
   }
+  for (const required of ['projects', 'tasks']) if (!Array.isArray(payload[required])) result.errors.push(required);
   const data: Record<string, Record<string, unknown>[]> = {};
   const users = new Set<string>();
   function walk(value: unknown, path: string, depth = 0) {

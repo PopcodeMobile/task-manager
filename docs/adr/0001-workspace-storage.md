@@ -31,6 +31,9 @@ cutover. The old RPC and migrator lock the workspace in the same order to serial
 cutover against an already-open browser. Normalized tables grant authenticated users
 membership-filtered reads only; subsequent operation RPCs own mutations, versions
 and audit. OAuth client tokens fail closed until explicit integration grants exist.
+That gate also covers the original workspaces, memberships, snapshot recovery reads,
+member-list RPC and workspace creation. The private v1 creation/save functions have
+no ordinary-user execution grants, so they cannot bypass the protected wrappers.
 
 Auth users and workspace memberships remain the sole human identity authority.
 Legacy references without an exact real membership match are retained as metadata,
@@ -44,7 +47,12 @@ author. The migrator therefore imports no personal preferences by default. A DBA
 record verified export ownership in `snapshot_personal_provenance` for the exact
 snapshot revision; only that proven user receives the old personal state. JSON fields
 such as `me` and `by` never establish ownership. Original shared state remains in the
-read-only recovery snapshot. Notifications themselves remain shared legacy content;
+read-only recovery snapshot. Removing that member cascades preparatory provenance and
+personal preferences, while recorded migration diagnostics retain the historical
+attestation. Membership revocation clears nullable identity links on work and history,
+including agents; it preserves agent records and task executor references. Project/team
+membership relation rows cascade. No new membership FK blocks revocation or deletes
+shared work. Notifications themselves remain shared legacy content;
 their normalized metadata omits read state.
 
 Restoring the old snapshot after new normalized writes is not a supported rollback:

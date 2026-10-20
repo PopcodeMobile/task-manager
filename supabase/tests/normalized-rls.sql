@@ -27,6 +27,13 @@ end $$;
 select set_config('request.jwt.claims','{"client_id":"ungranted-client"}',false);
 do $$ begin
  if exists(select 1 from public.tasks) then raise exception 'OAuth exposed rows before grants'; end if;
+ if exists(select 1 from public.workspaces) then raise exception 'OAuth exposed workspace metadata'; end if;
+ if exists(select 1 from public.workspace_snapshots) then raise exception 'OAuth exposed recovery snapshot'; end if;
+ if exists(select 1 from public.workspace_memberships) then raise exception 'OAuth exposed memberships'; end if;
+ begin perform 1 from public.list_workspace_members(current_setting('test.normalized_id')::uuid); raise exception 'OAuth exposed member RPC'; exception when insufficient_privilege then null; end;
+ begin perform public.create_workspace('OAuth','oauth','{"projects":[],"tasks":[]}'); raise exception 'OAuth created workspace'; exception when insufficient_privilege then null; end;
+ begin perform public.create_workspace_v1('OAuth','oauth','{"projects":[],"tasks":[]}'); raise exception 'OAuth bypassed create wrapper'; exception when insufficient_privilege then null; end;
+ begin perform public.save_workspace_snapshot(current_setting('test.normalized_id')::uuid,0,'{"projects":[],"tasks":[]}'); raise exception 'OAuth saved snapshot'; exception when insufficient_privilege then null; end;
  begin perform public.migrate_workspace(current_setting('test.normalized_id')::uuid,0); raise exception 'OAuth migration accepted'; exception when insufficient_privilege then null; end;
 end $$;
 select set_config('request.jwt.claims','{}',false);
@@ -80,6 +87,24 @@ do $$ begin
  begin perform public.migrate_workspace(current_setting('test.broken_id')::uuid,0); raise exception 'orphan migration accepted'; exception when foreign_key_violation then null; end;
  if exists(select 1 from public.projects where workspace_id=current_setting('test.broken_id')::uuid) then raise exception 'partial cutover committed'; end if;
  if (select storage_version from public.workspaces where id=current_setting('test.broken_id')::uuid)<>1 then raise exception 'invalid workspace activated'; end if;
+end $$;
+reset role;
+-- Revoke the exact attested owner. Preparatory ownership rows disappear, history/work survives.
+insert into public.agents(workspace_id,id,name,auth_user_id) values(:'normalized_id','owner-agent','Owner agent','00000000-0000-0000-0000-000000000001');
+update public.tasks set executor_agent_id='owner-agent' where workspace_id=:'normalized_id' and id='t1';
+delete from public.workspace_memberships where workspace_id=:'normalized_id' and user_id='00000000-0000-0000-0000-000000000001';
+do $$ begin
+ if exists(select 1 from public.snapshot_personal_provenance where workspace_id=current_setting('test.normalized_id')::uuid) then raise exception 'provenance blocks revocation'; end if;
+ if exists(select 1 from public.user_preferences where workspace_id=current_setting('test.normalized_id')::uuid) then raise exception 'removed owner preferences retained'; end if;
+ if (select count(*) from public.agents where workspace_id=current_setting('test.normalized_id')::uuid and id='owner-agent' and auth_user_id is null)<>1 then raise exception 'agent deleted or identity not cleared'; end if;
+ if (select count(*) from public.tasks where workspace_id=current_setting('test.normalized_id')::uuid and id='t1' and executor_agent_id='owner-agent')<>1 then raise exception 'agent work lost on revocation'; end if;
+ if (select diagnostics->>'personalStateOwner' from public.workspace_migrations where workspace_id=current_setting('test.normalized_id')::uuid)<>'00000000-0000-0000-0000-000000000001' then raise exception 'historical provenance lost'; end if;
+end $$;
+set role authenticated;
+do $$ begin
+ if exists(select 1 from public.tasks where workspace_id=current_setting('test.normalized_id')::uuid) then raise exception 'removed owner reads tasks'; end if;
+ if exists(select 1 from public.workspace_snapshots where workspace_id=current_setting('test.normalized_id')::uuid) then raise exception 'removed owner reads snapshot'; end if;
+ begin perform 1 from public.list_workspace_members(current_setting('test.normalized_id')::uuid); raise exception 'removed owner reads members'; exception when insufficient_privilege then null; end;
 end $$;
 reset role;
 set role anon;
