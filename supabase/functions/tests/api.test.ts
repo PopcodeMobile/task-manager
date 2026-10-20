@@ -108,3 +108,36 @@ Deno.test('preflight grants CORS only to explicitly configured origins', async (
     else Deno.env.set('API_ALLOWED_ORIGINS', previous);
   }
 });
+
+Deno.test('005 panel command schemas accept clearable details and bounded atomic batches', async () => {
+  const { validateCommand } = await import('../_shared/validation.ts');
+  const envelope = { workspaceId: crypto.randomUUID(), idempotencyKey: 'panel', expectedVersion: 1 };
+  for (const [operation, input] of [
+    ['update_task', { id: 't', description: '' }],
+    ['update_project', { id: 'p', description: '' }],
+    ['update_subtask', { id: 's', taskId: 't', attributes: { assignee: 'legacy-user', due: '', note: '' } }],
+    ['delete_comment', { id: 'c' }],
+    ['update_workspace', { name: 'Workspace', slug: 'workspace', color: '#abcdef' }],
+    ['batch', { commands: [{ operation: 'update_task', input: { id: 't', description: '' }, expectedVersion: 1 }] }],
+  ] as const)
+    assertEquals(validateCommand(operation, { ...envelope, input }).input, input);
+  for (const [operation, input] of [
+    ['update_task', { id: 't', title: '' }],
+    ['update_workspace', { name: ' ', slug: 'Bad Slug', color: 'red' }],
+    ['update_subtask', { id: 's', taskId: 't', attributes: { authorUserId: crypto.randomUUID() } }],
+    ['update_subtask', { id: 's', taskId: 't', attributes: { due: '2026-02-31' } }],
+    ['batch', { commands: [] }],
+    ['batch', { commands: Array(101).fill({ operation: 'create_label', input: { name: 'x' } }) }],
+    ['batch', { commands: [{ operation: 'claim_task', input: { id: 't' }, expectedVersion: 1 }] }],
+    ['batch', { commands: [{ operation: 'update_task', input: { id: 't' } }] }],
+    ['batch', { commands: [{ operation: 'create_label', input: { name: 'x' }, workspaceId: crypto.randomUUID() }] }],
+  ] as const) {
+    let code = '';
+    try {
+      validateCommand(operation, { ...envelope, input });
+    } catch (error) {
+      code = (error as { code: string }).code;
+    }
+    assertEquals(code, 'validation_error');
+  }
+});

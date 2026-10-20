@@ -83,6 +83,7 @@ try {
     sql(await readFile(`supabase/migrations/${file}.sql`, 'utf8'), 'postgres');
   const webhookMigration = await readFile('supabase/migrations/202610200004_webhook_delivery.sql', 'utf8');
   sql(webhookMigration, 'postgres');
+  sql(await readFile('supabase/migrations/202610200005_ui_contracts.sql', 'utf8'), 'postgres');
   assert.equal(sql(vendorAclQuery).trim(), vendorAcl, 'application migration must preserve all vendor Vault function owners and ACLs');
   console.log(sql(await readFile('supabase/tests/webhook-acl.sql', 'utf8')));
   const { auditWebhookApiSurface, verifyWebhookApiBoundary } = await import('./webhook-api-boundary.mjs');
@@ -119,6 +120,7 @@ try {
       "select extname||':'||extversion from pg_extension where extname in ('pgmq','supabase_vault','pg_cron','pg_net','pg_graphql') order by extname;select p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='pgmq' and p.proname in ('read','send','archive','set_vt');",
     ),
   );
+  console.log(sql(await readFile('supabase/tests/ui-contracts.sql', 'utf8')));
   console.log(sql(await readFile('supabase/tests/webhook-delivery.sql', 'utf8')));
   // Independent SQL sessions: only one reservation is available while a live lease owns the message.
   const concurrent = await Promise.all(
@@ -225,7 +227,7 @@ try {
     let restReady = false;
     for (let i = 0; i < 100; i++) {
       try {
-        const response = await globalThis.fetch(base);
+        const response = await globalThis.fetch(base, { signal: globalThis.AbortSignal.timeout(1000) });
         await response.body?.cancel();
         if (response.ok) {
           restReady = true;

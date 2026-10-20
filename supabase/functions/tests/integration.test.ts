@@ -84,6 +84,79 @@ Deno.test({
       payload.sub = crypto.randomUUID();
       parts[1] = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
       assertEquals((await call('GET', '', undefined, parts.join('.'))).status, 401);
+      assertEquals(created.body.data.version, 1);
+      const workspaceInput = {
+        idempotencyKey: crypto.randomUUID(),
+        expectedVersion: 1,
+        input: { name: 'Panel settings', slug: `panel-${workspace}`, color: '#abcdef' },
+      };
+      assertEquals((await call('PATCH', `/${workspace}`, workspaceInput)).body.data.version, 2);
+      const batchInput = {
+        idempotencyKey: crypto.randomUUID(),
+        input: {
+          commands: [
+            { operation: 'update_task', input: { id: task.body.data.id, description: '' }, expectedVersion: 1 },
+            {
+              operation: 'create_subtask',
+              input: { id: 'panel-sub', taskId: task.body.data.id, title: 'Details', attributes: { assignee: 'historical-local', due: '', note: '' } },
+              expectedVersion: 2,
+            },
+          ],
+        },
+      };
+      const batch = await call('POST', `/${workspace}/commands/batch`, batchInput);
+      assertEquals(batch.status, 200);
+      assertEquals(batch.body.data.results.length, 2);
+      assertEquals((await call('POST', `/${workspace}/commands/batch`, batchInput)).body.eventId, batch.body.eventId);
+      const rollback = await call('POST', `/${workspace}/commands/batch`, {
+        idempotencyKey: crypto.randomUUID(),
+        input: {
+          commands: [
+            { operation: 'create_task', input: { id: 'must-rollback', projectId: project.body.data.id, title: 'Rollback' } },
+            { operation: 'update_task', input: { id: task.body.data.id, title: 'Stale' }, expectedVersion: 1 },
+          ],
+        },
+      });
+      assertEquals(rollback.status, 409);
+      assertEquals((await call('GET', `/${workspace}/tasks/must-rollback`)).status, 404);
+      const sub = await call('GET', `/${workspace}/subtasks?taskId=${task.body.data.id}`);
+      assertEquals(sub.body.items[0].legacyMetadata.assignee, 'historical-local');
+      const comment = await call('POST', `/${workspace}/tasks/${task.body.data.id}/comments`, {
+        idempotencyKey: crypto.randomUUID(),
+        input: { body: 'Own comment' },
+      });
+      assertEquals(comment.body.data.authorUserId, session.user.id);
+      assertEquals(comment.body.data.version, 1);
+      const deletion = { idempotencyKey: crypto.randomUUID(), expectedVersion: 1, input: {} };
+      const deleted = await call('DELETE', `/${workspace}/comments/${comment.body.data.id}`, deletion);
+      assertEquals(deleted.status, 200);
+      assertEquals((await call('DELETE', `/${workspace}/comments/${comment.body.data.id}`, deletion)).body.eventId, deleted.body.eventId);
+      assertEquals((await call('GET', `/${workspace}/tasks/${task.body.data.id}`)).body.data.reservation, null);
+      const recurring = await call('POST', `/${workspace}/tasks`, {
+        idempotencyKey: crypto.randomUUID(),
+        input: { projectId: project.body.data.id, title: 'Monthly fixture', recurrence: 'Monthly', dueDate: '2026-01-31' },
+      });
+      assertEquals(
+        (
+          await call('POST', `/${workspace}/commands/complete_task`, {
+            idempotencyKey: crypto.randomUUID(),
+            expectedVersion: 1,
+            input: { id: recurring.body.data.id },
+          })
+        ).status,
+        200,
+      );
+      const recurringPage = await call('GET', `/${workspace}/tasks`);
+      assert(recurringPage.body.items.some((row: { dueDate: string; startDate: string }) => row.dueDate === '2026-03-02' && row.startDate === '2026-03-02'));
+      const adminBatch = {
+        idempotencyKey: crypto.randomUUID(),
+        input: { commands: [{ operation: 'update_workspace', expectedVersion: 2, input: { name: 'Admin batch' } }] },
+      };
+      assertEquals((await call('POST', `/${workspace}/commands/batch`, adminBatch)).status, 200);
+      assertEquals(await admin(`/rest/v1/workspace_memberships?workspace_id=eq.${workspace}&user_id=eq.${session.user.id}`, 'PATCH', { role: 'member' }), 204);
+      assertEquals((await call('POST', `/${workspace}/commands/batch`, adminBatch)).status, 403);
+      assertEquals((await call('PATCH', `/${workspace}`, workspaceInput)).status, 403);
+      assertEquals(await admin(`/rest/v1/workspace_memberships?workspace_id=eq.${workspace}&user_id=eq.${session.user.id}`, 'PATCH', { role: 'owner' }), 204);
       const page = await call('GET', `/${workspace}/tasks?limit=1`);
       assertEquals(page.status, 200);
       assertEquals(page.body.items.length, 1);
@@ -98,6 +171,7 @@ Deno.test({
       assertEquals(item.legacy_metadata, undefined);
       assertEquals(await admin(`/rest/v1/workspace_memberships?workspace_id=eq.${workspace}&user_id=eq.${session.user.id}`), 204);
       assertEquals((await call('POST', `/${workspace}/tasks`, taskInput)).status, 403);
+      assertEquals((await call('POST', `/${workspace}/commands/batch`, batchInput)).status, 403);
     } finally {
       if (workspace) assertEquals(await admin(`/rest/v1/workspaces?id=eq.${workspace}`), 204);
       assertEquals(await admin(`/auth/v1/admin/users/${session.user.id}`), 200);

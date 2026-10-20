@@ -4857,6 +4857,64 @@
             "$ref": "#/components/responses/PublicError"
           }
         }
+      },
+      "patch": {
+        "operationId": "patch_workspace",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/update_workspace"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        },
+        "description": "Direct human owner/admin only, checked again before every replay. expectedVersion is the workspace edit version, independent of storageVersion."
       }
     },
     "/v1/workspaces/{workspaceId}/preferences": {
@@ -4974,6 +5032,273 @@
           }
         }
       }
+    },
+    "/v1/workspaces/{workspaceId}/commands/batch": {
+      "post": {
+        "operationId": "batch",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/batch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/delete_comment": {
+      "post": {
+        "operationId": "delete_comment",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/delete_comment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        },
+        "description": "Only the persisted author or workspace owner/admin may delete. Uses comment expectedVersion, cascades reactions and emits immutable audit. Retrying after deletion is supported; a demoted administrator must still satisfy the author policy."
+      }
+    },
+    "/v1/workspaces/{workspaceId}/commands/update_workspace": {
+      "post": {
+        "operationId": "update_workspace",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/update_workspace"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        },
+        "description": "Direct human owner/admin only, checked again before every replay. expectedVersion is the workspace edit version, independent of storageVersion."
+      }
+    },
+    "/v1/workspaces/{workspaceId}/comments/{commentId}": {
+      "delete": {
+        "operationId": "delete_comment_alias",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "commentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["idempotencyKey", "input", "expectedVersion"],
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "input": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [],
+                    "properties": {}
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed data and durable event identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        },
+        "description": "Only the persisted author or workspace owner/admin may delete. Uses comment expectedVersion, cascades reactions and emits immutable audit. Retrying after deletion is supported; a demoted administrator must still satisfy the author policy."
+      }
     }
   },
   "components": {
@@ -5073,8 +5398,12 @@
           },
           "legacyMetadata": {
             "type": "object"
+          },
+          "reservation": {
+            "$ref": "#/components/schemas/TaskReservation"
           }
-        }
+        },
+        "description": "get_task/list_tasks include a live safe reservation or null. executorAgentId is an independent assignment; reservation.active uses server time. claimToken is never readable here."
       },
       "CommandResult": {
         "type": "object",
@@ -5171,7 +5500,9 @@
                 "type": ["string", "null"]
               },
               "description": {
-                "type": ["string", "null"]
+                "type": "string",
+                "maxLength": 100000,
+                "description": "Empty string clears the description."
               },
               "status": {
                 "type": ["string", "null"]
@@ -5227,7 +5558,9 @@
                 "type": ["string", "null"]
               },
               "description": {
-                "type": ["string", "null"]
+                "type": "string",
+                "maxLength": 100000,
+                "description": "Empty string clears the description."
               },
               "status": {
                 "type": ["string", "null"]
@@ -5623,7 +5956,9 @@
                 "type": ["string", "null"]
               },
               "description": {
-                "type": ["string", "null"]
+                "type": "string",
+                "maxLength": 100000,
+                "description": "Empty string clears the description."
               },
               "status": {
                 "type": ["string", "null"]
@@ -5679,7 +6014,9 @@
                 "type": ["string", "null"]
               },
               "description": {
-                "type": ["string", "null"]
+                "type": "string",
+                "maxLength": 100000,
+                "description": "Empty string clears the description."
               },
               "status": {
                 "type": ["string", "null"]
@@ -5823,10 +6160,31 @@
               },
               "claimToken": {
                 "type": ["string", "null"]
+              },
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "assignee": {
+                    "type": ["string", "null"],
+                    "maxLength": 128,
+                    "description": "Historical/local identity metadata; never an Auth membership."
+                  },
+                  "due": {
+                    "type": ["string", "null"],
+                    "pattern": "^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                    "description": "ISO date, empty string or null."
+                  },
+                  "note": {
+                    "type": ["string", "null"],
+                    "maxLength": 20000
+                  }
+                }
               }
             }
           }
-        }
+        },
+        "description": "expectedVersion is the parent task version; each successful subtask mutation increments the parent. Details return in legacyMetadata."
       },
       "update_subtask": {
         "type": "object",
@@ -5864,10 +6222,31 @@
               },
               "claimToken": {
                 "type": ["string", "null"]
+              },
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "assignee": {
+                    "type": ["string", "null"],
+                    "maxLength": 128,
+                    "description": "Historical/local identity metadata; never an Auth membership."
+                  },
+                  "due": {
+                    "type": ["string", "null"],
+                    "pattern": "^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                    "description": "ISO date, empty string or null."
+                  },
+                  "note": {
+                    "type": ["string", "null"],
+                    "maxLength": 20000
+                  }
+                }
               }
             }
           }
-        }
+        },
+        "description": "expectedVersion is the parent task version; each successful subtask mutation increments the parent. Details return in legacyMetadata."
       },
       "delete_subtask": {
         "type": "object",
@@ -6180,7 +6559,9 @@
                 "type": ["string", "null"]
               },
               "description": {
-                "type": ["string", "null"]
+                "type": "string",
+                "maxLength": 100000,
+                "description": "Empty string clears the description."
               },
               "attributes": {
                 "type": "object"
@@ -6215,7 +6596,9 @@
                 "type": ["string", "null"]
               },
               "description": {
-                "type": ["string", "null"]
+                "type": "string",
+                "maxLength": 100000,
+                "description": "Empty string clears the description."
               },
               "attributes": {
                 "type": "object"
@@ -6826,6 +7209,1064 @@
                 "type": ["string", "null"]
               }
             }
+          }
+        }
+      },
+      "update_workspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "slug": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "color": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            },
+            "minProperties": 1
+          }
+        }
+      },
+      "delete_comment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            }
+          }
+        }
+      },
+      "batch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["commands"],
+            "properties": {
+              "commands": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 100,
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input"],
+                      "properties": {
+                        "operation": {
+                          "const": "create_task"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/create_task/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "update_task"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/update_task/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "move_task"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/move_task/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "duplicate_task"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/duplicate_task/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "delete_task"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/delete_task/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "archive_task"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/archive_task/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "restore_task"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/restore_task/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "complete_task"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/complete_task/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "intervene_task"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/intervene_task/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input"],
+                      "properties": {
+                        "operation": {
+                          "const": "add_task_comment"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/add_task_comment/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input"],
+                      "properties": {
+                        "operation": {
+                          "const": "create_project"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/create_project/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "update_project"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/update_project/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "delete_project"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/delete_project/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "archive_project"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/archive_project/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "restore_project"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/restore_project/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "create_subtask"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/create_subtask/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "update_subtask"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/update_subtask/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "delete_subtask"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/delete_subtask/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "set_task_dependency"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/set_task_dependency/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "remove_task_dependency"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/remove_task_dependency/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "set_task_label"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/set_task_label/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "remove_task_label"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/remove_task_label/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "set_task_attachment"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/set_task_attachment/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "remove_task_attachment"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/remove_task_attachment/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input"],
+                      "properties": {
+                        "operation": {
+                          "const": "add_reaction"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/add_reaction/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input"],
+                      "properties": {
+                        "operation": {
+                          "const": "remove_reaction"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/remove_reaction/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input"],
+                      "properties": {
+                        "operation": {
+                          "const": "create_team"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/create_team/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "update_team"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/update_team/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "delete_team"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/delete_team/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "set_team_member"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/set_team_member/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "remove_team_member"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/remove_team_member/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "set_project_member"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/set_project_member/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "remove_project_member"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/remove_project_member/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input"],
+                      "properties": {
+                        "operation": {
+                          "const": "create_label"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/create_label/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "update_label"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/update_label/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "delete_label"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/delete_label/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input"],
+                      "properties": {
+                        "operation": {
+                          "const": "create_view"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/create_view/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "update_view"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/update_view/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "delete_view"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/delete_view/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input"],
+                      "properties": {
+                        "operation": {
+                          "const": "create_calendar_event"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/create_calendar_event/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "update_calendar_event"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/update_calendar_event/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "delete_calendar_event"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/delete_calendar_event/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input"],
+                      "properties": {
+                        "operation": {
+                          "const": "create_file"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/create_file/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "update_file"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/update_file/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "delete_file"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/delete_file/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input"],
+                      "properties": {
+                        "operation": {
+                          "const": "set_preferences"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/set_preferences/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "update_workspace"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/update_workspace/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "delete_comment"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/delete_comment/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Atomic ordered commands in this workspace only. Any conflict rolls back all effects, events, logged queue messages and idempotency. Replay returns the same child results. Nested batches, workspace creation and claim/renew/release are forbidden. Preallocate text IDs for templates/promotion; supply successive parent versions. N children consume N+1 rate units; no claim credentials are returned."
+      },
+      "BatchResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["data", "eventId", "requestId"],
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["results"],
+            "properties": {
+              "results": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 100,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["data", "eventId"],
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "eventId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "eventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "TaskReservation": {
+        "type": ["object", "null"],
+        "additionalProperties": false,
+        "required": ["agentId", "claimedAt", "expiresAt", "active"],
+        "properties": {
+          "agentId": {
+            "type": "string"
+          },
+          "claimedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Workspace": {
+        "type": "object",
+        "required": ["id", "name", "slug", "color", "version", "storageVersion"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "storageVersion": {
+            "type": "integer"
+          },
+          "role": {
+            "enum": ["owner", "admin", "member", "guest"]
           }
         }
       }

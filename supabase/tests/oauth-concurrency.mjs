@@ -75,6 +75,7 @@ test('reconsent and an already-authorized OAuth write use compatible row-lock or
 create table auth.oauth_authorizations(authorization_id text primary key,user_id uuid,client_id uuid,status text,expires_at timestamptz);
 create table auth.oauth_consents(user_id uuid,client_id uuid,revoked_at timestamptz);`);
     sql(await readFile('supabase/migrations/202610200003_integration_grants.sql', 'utf8'));
+    sql(await readFile('supabase/migrations/202610200005_ui_contracts.sql', 'utf8'));
     sql(`select set_config('request.jwt.claim.sub','${owner}',false);
 create table public.oauth_race_fixture as select (public.create_workspace_v2('OAuth race','oauth-race','race-workspace')->'data'->>'id')::uuid workspace_id;
 grant select on public.oauth_race_fixture to authenticated;

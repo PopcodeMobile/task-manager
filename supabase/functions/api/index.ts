@@ -118,7 +118,12 @@ export async function handleRequest(request: Request): Promise<Response> {
     let operation: string;
     const input = { ...body.input };
     if (path.length === 2 && request.method === 'POST') operation = 'create_workspace';
-    else if (path[3] === 'commands' && path.length === 5 && request.method === 'POST') operation = path[4];
+    else if (path.length === 3 && request.method === 'PATCH') operation = 'update_workspace';
+    else if (path[3] === 'comments' && path.length === 5 && request.method === 'DELETE') {
+      operation = 'delete_comment';
+      if (input.id !== undefined && input.id !== path[4]) throw new PublicError('validation_error');
+      input.id = path[4];
+    } else if (path[3] === 'commands' && path.length === 5 && request.method === 'POST') operation = path[4];
     else if (path[3] === 'preferences' && path.length === 4 && request.method === 'PATCH') {
       operation = 'set_preferences';
     } else if (['tasks', 'projects'].includes(path[3]) && path.length >= 4) {

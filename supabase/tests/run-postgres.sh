@@ -37,6 +37,7 @@ fi
 
 if [ "$suite" = agents ] || [ "$suite" = all ]; then
   docker exec -i "$container_name" psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 < "$repo_root/supabase/migrations/202610200002_agent_operations.sql"
+  docker exec -i "$container_name" psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 < "$repo_root/supabase/migrations/202610200005_ui_contracts.sql"
   docker exec -i "$container_name" psql -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 < "$repo_root/supabase/tests/agent-operations.sql"
   # Two real sessions contend for one lease. The second waits for the first commit.
   docker exec -i "$container_name" psql -qAt -h 127.0.0.1 -U postgres -v ON_ERROR_STOP=1 > /tmp/task-manager-claim-first.log 2>&1 <<'SQL' &

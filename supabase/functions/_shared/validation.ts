@@ -7,6 +7,9 @@ const rule = (fields: string, required = '', version = false): Rule => ({
   version,
 });
 export const commandRules: Record<string, Rule> = {
+  batch: rule('commands', 'commands'),
+  update_workspace: rule('name slug color', '', true),
+  delete_comment: rule('id', 'id', true),
   create_task: rule('id projectId title description status priority assigneeUserId recurrence dueDate startDate sortOrder attributes', 'projectId title'),
   update_task: rule('id title description status priority assigneeUserId recurrence dueDate startDate sortOrder claimToken attributes', 'id', true),
   move_task: rule('id projectId sortOrder claimToken', 'id projectId', true),
@@ -25,8 +28,8 @@ export const commandRules: Record<string, Rule> = {
   delete_project: rule('id', 'id', true),
   archive_project: rule('id', 'id', true),
   restore_project: rule('id', 'id', true),
-  create_subtask: rule('id taskId title done sortOrder claimToken', 'taskId title', true),
-  update_subtask: rule('id taskId title done sortOrder claimToken', 'id taskId', true),
+  create_subtask: rule('id taskId title done sortOrder claimToken attributes', 'taskId title', true),
+  update_subtask: rule('id taskId title done sortOrder claimToken attributes', 'id taskId', true),
   delete_subtask: rule('id taskId claimToken', 'id taskId', true),
   set_task_dependency: rule('id dependsOnTaskId claimToken', 'id dependsOnTaskId', true),
   remove_task_dependency: rule('id dependsOnTaskId claimToken', 'id dependsOnTaskId', true),
@@ -58,6 +61,9 @@ export const commandRules: Record<string, Rule> = {
   set_preferences: rule('preferences', 'preferences'),
   create_workspace: rule('name slug', 'name slug'),
 };
+export const batchOperations = Object.keys(commandRules).filter(
+  name => !['batch', 'create_workspace', 'claim_task', 'renew_task_claim', 'release_task_claim'].includes(name),
+);
 const queryNames = new Set([
   'list_workspaces',
   'get_workspace',
@@ -135,6 +141,25 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
     schema.required.some(key => input[key] === undefined || input[key] === null)
   )
     invalid();
+  if (operation === 'batch') {
+    if (!Array.isArray(input.commands) || input.commands.length < 1 || input.commands.length > 100) invalid();
+    for (const child of input.commands) {
+      if (
+        !object(child) ||
+        Object.keys(child).some(key => !['operation', 'input', 'expectedVersion'].includes(key)) ||
+        typeof child.operation !== 'string' ||
+        !batchOperations.includes(child.operation)
+      )
+        invalid();
+      validateCommand(child.operation, {
+        workspaceId: value.workspaceId,
+        idempotencyKey: value.idempotencyKey,
+        input: child.input,
+        ...(child.expectedVersion === undefined ? {} : { expectedVersion: child.expectedVersion }),
+      });
+    }
+    return value as Command<Record<string, unknown>>;
+  }
   for (const [key, item] of Object.entries(input)) {
     if (item === null) {
       if (!nullable.has(key)) invalid();
@@ -148,7 +173,7 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
       if (typeof item !== 'number' || !Number.isFinite(item)) invalid();
     } else if (
       typeof item !== 'string' ||
-      !item.trim() ||
+      (key !== 'description' && !item.trim()) ||
       item.length > (key === 'description' ? 100000 : key === 'body' ? 20000 : ['title', 'name'].includes(key) ? 500 : 128)
     )
       invalid();
@@ -156,16 +181,30 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
   }
   if (input.attributes !== undefined) {
     const attrs = input.attributes as Record<string, unknown>;
-    const fields = operation.endsWith('task')
-      ? ['estimate']
-      : operation.endsWith('project')
-        ? ['icon', 'color', 'milestones']
-        : operation.endsWith('team')
-          ? ['icon', 'color']
-          : [];
+    const fields = ['create_subtask', 'update_subtask'].includes(operation)
+      ? ['assignee', 'due', 'note']
+      : operation.endsWith('task')
+        ? ['estimate']
+        : operation.endsWith('project')
+          ? ['icon', 'color', 'milestones']
+          : operation.endsWith('team')
+            ? ['icon', 'color']
+            : [];
     for (const [key, item] of Object.entries(attrs)) {
       if (!fields.includes(key)) invalid();
-      if (key === 'milestones') {
+      if (['create_subtask', 'update_subtask'].includes(operation)) {
+        if (item !== null && (typeof item !== 'string' || item.length > (key === 'note' ? 20000 : 128))) invalid();
+        if (
+          key === 'due' &&
+          item !== null &&
+          item !== '' &&
+          (typeof item !== 'string' ||
+            !/^\d{4}-\d{2}-\d{2}$/.test(item) ||
+            Number.isNaN(Date.parse(item)) ||
+            new Date(item).toISOString().slice(0, 10) !== item)
+        )
+          invalid();
+      } else if (key === 'milestones') {
         if (
           !Array.isArray(item) ||
           item.length > 100 ||
@@ -181,6 +220,15 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
           invalid();
       } else if (item !== null && (typeof item !== 'string' || item.length > 128)) invalid();
     }
+  }
+  if (operation === 'update_workspace') {
+    if (
+      Object.keys(input).length === 0 ||
+      (typeof input.name === 'string' && input.name.length > 120) ||
+      (input.slug !== undefined && (typeof input.slug !== 'string' || input.slug.length > 120 || !/^[a-z0-9][a-z0-9-]*$/.test(input.slug))) ||
+      (input.color !== undefined && (typeof input.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(input.color)))
+    )
+      invalid();
   }
   const allowedStatus = operation.endsWith('task') ? ['backlog', 'todo', 'progress', 'review'] : ['planning', 'active', 'risk', 'hold', 'complete'];
   if (input.status !== undefined && !allowedStatus.includes(input.status as string)) invalid();

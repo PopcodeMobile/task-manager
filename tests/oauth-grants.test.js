@@ -19,6 +19,7 @@ async function setup() {
   const migration = await readFile('supabase/migrations/202610200003_integration_grants.sql', 'utf8').catch(() => null);
   assert.ok(migration, 'OAuth grants migration must exist');
   await db.exec(migration);
+  await db.exec(await readFile('supabase/migrations/202610200005_ui_contracts.sql', 'utf8'));
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [uid]);
   const w = (
     await db.query(

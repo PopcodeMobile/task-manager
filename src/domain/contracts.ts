@@ -12,7 +12,15 @@ export type TaskStatus = 'backlog' | 'todo' | 'progress' | 'review' | 'done';
 export type TaskPriority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
 export type Recurrence = 'Daily' | 'Weekly' | 'Every 2 weeks' | 'Monthly';
 export type VersionedEntity = EntityRef & { version: number; legacyMetadata: LegacyMetadata };
+export type TaskReservation = { agentId: string; claimedAt: string; expiresAt: string; active: boolean };
+export type Workspace = { id: string; name: string; slug: string; color: string; version: number; storageVersion: number; role: WorkspaceRole };
+export type SubtaskAttributes = { assignee?: string | null; due?: string | null; note?: string | null };
+export type BatchCommand = { operation: string; input: Record<string, Json>; expectedVersion?: number };
+export type BatchInput = { commands: BatchCommand[] };
+export type BatchResult = { results: { data: Json; eventId: string }[] };
 export type Task = VersionedEntity & {
+  /** Present on reads. Assignment executorAgentId is independent from this live reservation. */
+  reservation?: TaskReservation | null;
   projectId: string;
   key: string | null;
   title: string;
@@ -43,10 +51,10 @@ export type Project = VersionedEntity & {
   sortOrder: number;
   archived: boolean;
 };
-export type Subtask = EntityRef & { taskId: string; title: string; done: boolean; sortOrder: number; legacyMetadata: LegacyMetadata };
+export type Subtask = VersionedEntity & { taskId: string; title: string; done: boolean; sortOrder: number; legacyMetadata: LegacyMetadata };
 export type TaskDependency = { workspaceId: string; taskId: string; dependsOnTaskId: string };
 export type Label = EntityRef & { name: string; legacyMetadata: LegacyMetadata };
-export type Comment = EntityRef & { taskId: string; authorUserId: string | null; body: string; createdAt: string; legacyMetadata: LegacyMetadata };
+export type Comment = VersionedEntity & { taskId: string; authorUserId: string | null; body: string; createdAt: string; legacyMetadata: LegacyMetadata };
 export type CommentReaction = { workspaceId: string; commentId: string; reaction: string; legacyUserId: string; userId: string | null };
 export type Team = EntityRef & { name: string; legacyMetadata: LegacyMetadata };
 export type FileMetadata = EntityRef & {

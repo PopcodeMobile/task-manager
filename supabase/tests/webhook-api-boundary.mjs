@@ -38,6 +38,19 @@ export function auditWebhookApiSurface({ sql, exposedSchemas, extraSearchPath })
       checkedSource = source.replace("pgmq.send('webhook_delivery',jsonb_build_object('delivery_id',d.id))", 'reviewed_fixed_delivery_replay()');
     }
     assert.doesNotMatch(checkedSource, /\b(?:net|vault|pgmq|cron)\s*\./, `sensitive API bridge: ${object.name}`);
+    if (object.name === 'operation_task') {
+      assert.equal(object.definer, false, 'reservation projection must retain the private invoker seam');
+      assert.equal(object.anon || object.authenticated, false, 'reservation helper is never an RPC');
+      assert.doesNotMatch(source, /claim_token|to_jsonb\(c/);
+      assert.match(
+        source,
+        /jsonb_build_object\('agentid',c.agent_id,'claimedat',c.claimed_at,'expiresat',c.expires_at,'active',c.expires_at>clock_timestamp\(\)\)/,
+      );
+      assert.match(source, /c.workspace_id=\(p_row->>'workspace_id'\)::uuid and c.task_id=p_row->>'id'/);
+    }
+    if (['operation_capability', 'operation_batch_allowed'].includes(object.name)) {
+      assert.equal(object.definer || object.anon || object.authenticated, false, 'batch capability helpers must remain private invokers');
+    }
     if (/\bexecute\s+/.test(source)) {
       // These reviewed domain dispatchers interpolate only fixed allowlisted entity tables/columns.
       assert.ok(['operation_graph', 'read_operation'].includes(object.name), `unreviewed dynamic SQL: ${object.name}`);
