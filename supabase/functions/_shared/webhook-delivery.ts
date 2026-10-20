@@ -2,6 +2,7 @@
 import { buildConnector, Client } from 'npm:undici@7.30.1';
 import { signHermesWebhook } from './webhook-signing.ts';
 import {
+  DnsResolutionUnavailable,
   resolvePublicDns,
   type Resolver,
   TargetRejected,
@@ -23,6 +24,7 @@ export type Category =
   | 'redirect'
   | 'timeout'
   | 'network'
+  | 'dns_unavailable'
   | 'target_rejected'
   | 'configuration';
 export interface DeliveryResult {
@@ -155,6 +157,8 @@ export async function dispatchWebhookBatch(
     } catch (error) {
       const category: Category = signal.aborted
         ? 'timeout'
+        : error instanceof DnsResolutionUnavailable
+        ? 'dns_unavailable'
         : error instanceof TargetRejected
         ? 'target_rejected'
         : error instanceof Error && error.message === 'configuration'

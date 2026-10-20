@@ -64,6 +64,20 @@ try {
       return { status: response.status, retryAfter: response.headers.get('Retry-After') };
     },
   };
+  assertEquals(
+    await dispatchWebhookBatch(store, {
+      ...options,
+      resolve: () => Promise.reject(new Deno.errors.TimedOut('fixture DNS timeout')),
+    }),
+    { claimed: 1, completed: 1 },
+  );
+  assertEquals(deliveries.length, 0, 'DNS failure must never send');
+  assertEquals(await rpc('test_dns_delivery_result'), {
+    state: 'pending',
+    category: 'dns_unavailable',
+    retryPersisted: true,
+  });
+  await rpc('test_advance_webhook');
   assertEquals(await dispatchWebhookBatch(store, options), { claimed: 1, completed: 1 });
   await rpc('test_advance_webhook');
   now += 60000;

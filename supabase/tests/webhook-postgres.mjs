@@ -101,10 +101,26 @@ try {
     1,
     'concurrent workers reserved more than one delivery',
   );
-  sql(
-    `create function public.test_advance_webhook() returns void language sql security definer set search_path='' as $$ update public.webhook_deliveries set next_attempt_at=clock_timestamp()-interval '1 second',lease_until=clock_timestamp()-interval '1 second' where state in ('pending','processing');update pgmq.q_webhook_delivery set vt=clock_timestamp()-interval '1 second';$$;revoke all on function public.test_advance_webhook() from public,anon,authenticated;grant execute on function public.test_advance_webhook() to service_role;`,
-  );
-  sql(`
+  console.log(sql(await readFile('supabase/tests/webhook-isolation.sql', 'utf8')));
+  if (process.env.WEBHOOK_REVIEW_CASE) {
+    const { verifyWebhookRecovery } = await import('./webhook-recovery.mjs');
+    await verifyWebhookRecovery({ container, sql, scenario: process.env.WEBHOOK_REVIEW_CASE });
+    console.log(`PASS production regression ${process.env.WEBHOOK_REVIEW_CASE}`);
+  } else {
+    const { verifyWebhookRecovery } = await import('./webhook-recovery.mjs');
+    for (const scenario of ['secret-lock', 'completion-lock', 'crash-backoff']) {
+      await verifyWebhookRecovery({ container, sql, scenario });
+      console.log(`PASS production regression ${scenario}`);
+    }
+    sql(
+      "select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);select public.retry_webhook_delivery(w,(select id from public.webhook_deliveries where state='failed' and last_category='lease_expired' order by created_at desc limit 1)) from public.webhook_fixture;",
+    );
+    sql(
+      `create function public.test_advance_webhook() returns void language sql security definer set search_path='' as $$ update public.webhook_deliveries set next_attempt_at=clock_timestamp()-interval '1 second',lease_until=clock_timestamp()-interval '1 day' where state in ('pending','processing');update pgmq.q_webhook_delivery set vt=clock_timestamp()-interval '1 second';$$;revoke all on function public.test_advance_webhook() from public,anon,authenticated;grant execute on function public.test_advance_webhook() to service_role;`,
+    );
+    sql(`
+ create function public.test_dns_delivery_result() returns jsonb language sql security definer set search_path='' as $$select jsonb_build_object('state',state,'category',last_category,'retryPersisted',next_attempt_at>clock_timestamp()+interval '25 seconds') from public.webhook_deliveries where subscription_id=(select s from public.webhook_fixture) order by created_at desc limit 1;$$;
+ revoke all on function public.test_dns_delivery_result() from public,anon,authenticated;grant execute on function public.test_dns_delivery_result() to service_role;
  create table public.test_consumer_effects(event_id uuid primary key,applied_at timestamptz not null default clock_timestamp());
  create function public.test_consumer_accept(p_event_id uuid) returns boolean language plpgsql security definer set search_path='' as $$begin insert into public.test_consumer_effects(event_id) values(p_event_id) on conflict do nothing;return found;end$$;
  revoke all on public.test_consumer_effects from public,anon,authenticated;revoke all on function public.test_consumer_accept(uuid) from public,anon,authenticated;grant execute on function public.test_consumer_accept(uuid) to service_role;
@@ -124,61 +140,62 @@ try {
  revoke all on function public.test_prepare_scheduler(text),public.test_scheduler_result(),public.test_stop_scheduler() from public,anon,authenticated;
  grant execute on function public.test_prepare_scheduler(text),public.test_scheduler_result(),public.test_stop_scheduler() to service_role;
  `);
-  const jwtSecret = 'webhook-test-only-signing-key-32-characters-minimum';
-  docker([
-    'run',
-    '--detach',
-    '--rm',
-    '--name',
-    rest,
-    '--network',
-    network,
-    '--publish',
-    '127.0.0.1::3000',
-    '-e',
-    `PGRST_DB_URI=postgresql://supabase_admin@${container}:5432/postgres`,
-    '-e',
-    'PGRST_DB_ANON_ROLE=anon',
-    '-e',
-    `PGRST_JWT_SECRET=${jwtSecret}`,
-    'public.ecr.aws/supabase/postgrest:v14.18',
-  ]);
-  const port = docker(['port', rest, '3000/tcp']).trim().split(':').at(-1);
-  const base = `http://127.0.0.1:${port}`;
-  for (let i = 0; i < 100; i++) {
-    try {
-      await globalThis.fetch(base);
-      break;
-    } catch {
-      await delay(100);
-    }
-  }
-  const encoded = value => Buffer.from(JSON.stringify(value)).toString('base64url');
-  const unsigned = encoded({ alg: 'HS256', typ: 'JWT' }) + '.' + encoded({ role: 'service_role', exp: Math.floor(Date.now() / 1000) + 600 });
-  const token = unsigned + '.' + createHmac('sha256', jwtSecret).update(unsigned).digest('base64url');
-  // Production store includes /rest/v1; this standalone PostgREST has no Kong prefix.
-  const live = spawnSync(
-    'deno',
-    [
+    const jwtSecret = 'webhook-test-only-signing-key-32-characters-minimum';
+    docker([
       'run',
-      ...(process.env.TEST_WEBHOOK_COVERAGE_DIR ? [`--coverage=${process.env.TEST_WEBHOOK_COVERAGE_DIR}`] : []),
-      '--config',
-      'supabase/functions/deno.json',
-      '--allow-env',
-      '--allow-net',
-      'supabase/tests/webhook-dispatch-live.ts',
-    ],
-    {
-      encoding: 'utf8',
-      timeout: 30000,
-      env: { ...process.env, TEST_WEBHOOK_RPC_URL: base, TEST_WEBHOOK_SERVICE_TOKEN: token },
-    },
-  );
-  assert.equal(live.status, 0, live.stdout + '\n' + live.stderr);
-  console.log(live.stdout.trim());
-  console.log(
-    'PASS real extensions, transactional fanout/rollback, OAuth/admin/secret isolation, eight attempts, lease fencing, crash/replay, concurrent reservation, scheduler SQL',
-  );
+      '--detach',
+      '--rm',
+      '--name',
+      rest,
+      '--network',
+      network,
+      '--publish',
+      '127.0.0.1::3000',
+      '-e',
+      `PGRST_DB_URI=postgresql://supabase_admin@${container}:5432/postgres`,
+      '-e',
+      'PGRST_DB_ANON_ROLE=anon',
+      '-e',
+      `PGRST_JWT_SECRET=${jwtSecret}`,
+      'public.ecr.aws/supabase/postgrest:v14.18',
+    ]);
+    const port = docker(['port', rest, '3000/tcp']).trim().split(':').at(-1);
+    const base = `http://127.0.0.1:${port}`;
+    for (let i = 0; i < 100; i++) {
+      try {
+        await globalThis.fetch(base);
+        break;
+      } catch {
+        await delay(100);
+      }
+    }
+    const encoded = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const unsigned = encoded({ alg: 'HS256', typ: 'JWT' }) + '.' + encoded({ role: 'service_role', exp: Math.floor(Date.now() / 1000) + 600 });
+    const token = unsigned + '.' + createHmac('sha256', jwtSecret).update(unsigned).digest('base64url');
+    // Production store includes /rest/v1; this standalone PostgREST has no Kong prefix.
+    const live = spawnSync(
+      'deno',
+      [
+        'run',
+        ...(process.env.TEST_WEBHOOK_COVERAGE_DIR ? [`--coverage=${process.env.TEST_WEBHOOK_COVERAGE_DIR}`] : []),
+        '--config',
+        'supabase/functions/deno.json',
+        '--allow-env',
+        '--allow-net',
+        'supabase/tests/webhook-dispatch-live.ts',
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 30000,
+        env: { ...process.env, TEST_WEBHOOK_RPC_URL: base, TEST_WEBHOOK_SERVICE_TOKEN: token },
+      },
+    );
+    assert.equal(live.status, 0, live.stdout + '\n' + live.stderr);
+    console.log(live.stdout.trim());
+    console.log(
+      'PASS real extensions, transactional fanout/rollback, OAuth/admin/secret isolation, eight attempts, lease fencing, crash/replay, concurrent reservation, scheduler SQL',
+    );
+  }
 } finally {
   spawnSync('docker', ['rm', '--force', rest, container], { stdio: 'ignore' });
   spawnSync('docker', ['network', 'rm', network], { stdio: 'ignore' });

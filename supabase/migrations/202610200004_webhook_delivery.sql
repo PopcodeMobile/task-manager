@@ -140,7 +140,7 @@ end $$;
 create trigger domain_events_webhooks after insert on public.domain_events for each row execute function public.enqueue_domain_webhooks();
 
 create function public.claim_webhook_batch(p_limit integer default 5) returns jsonb language plpgsql security definer set search_path='' as $$
-declare msg record; d public.webhook_deliveries; result jsonb:='[]'; token uuid;
+declare msg record; d public.webhook_deliveries; result jsonb:='[]'; token uuid; reserve_until timestamptz; recover_at timestamptz;
 begin
  for msg in select * from pgmq.read('webhook_delivery',60,least(5,greatest(1,coalesce(p_limit,5)))) loop
   select * into d from public.webhook_deliveries where id=(msg.message->>'delivery_id')::uuid and queue_msg_id=msg.msg_id for update skip locked;
@@ -151,15 +151,21 @@ begin
    update public.webhook_delivery_attempts set category='access_revoked',completed_at=clock_timestamp() where delivery_id=d.id and completed_at is null;
    perform pgmq.archive('webhook_delivery',msg.msg_id);continue;
   end if;
-  if d.state='processing' and d.lease_until>clock_timestamp() then perform pgmq.set_vt('webhook_delivery',msg.msg_id,60);continue;end if;
-  if d.next_attempt_at>clock_timestamp() then perform pgmq.set_vt('webhook_delivery',msg.msg_id,greatest(1,ceil(extract(epoch from d.next_attempt_at-clock_timestamp()))::int));continue;end if;
-  update public.webhook_delivery_attempts set category='lease_expired',completed_at=clock_timestamp() where delivery_id=d.id and completed_at is null;
-  if d.attempt>=8 then
-   update public.webhook_deliveries set state='failed',lease_token=null,lease_until=null,last_category='lease_expired',completed_at=clock_timestamp() where id=d.id;
-   perform pgmq.archive('webhook_delivery',msg.msg_id);continue;
+  if d.state='processing' then
+   if d.lease_until>clock_timestamp() then perform pgmq.set_vt('webhook_delivery',msg.msg_id,greatest(1,ceil(extract(epoch from d.lease_until-clock_timestamp()))::int));continue;end if;
+   update public.webhook_delivery_attempts set category='lease_expired',completed_at=clock_timestamp() where delivery_id=d.id and completed_at is null;
+   if d.attempt>=8 then
+    update public.webhook_deliveries set state='failed',lease_token=null,lease_until=null,last_category='lease_expired',last_status=null,completed_at=clock_timestamp() where id=d.id;
+    perform pgmq.archive('webhook_delivery',msg.msg_id);continue;
+   end if;
+   -- A lost acknowledgement follows the same retry floor; polling never restarts its wait.
+   recover_at:=greatest(d.next_attempt_at,coalesce(d.lease_until,clock_timestamp())+make_interval(secs=>(array[30,120,600,1800,7200,21600,86400])[d.attempt]));
+   update public.webhook_deliveries set state='pending',lease_token=null,lease_until=null,next_attempt_at=recover_at,last_category='lease_expired',last_status=null where id=d.id returning * into d;
   end if;
-  token:=gen_random_uuid();
-  update public.webhook_deliveries set state='processing',attempt=attempt+1,total_attempts=total_attempts+1,lease_token=token,lease_until=clock_timestamp()+interval '60 seconds' where id=d.id returning * into d;
+  if d.next_attempt_at>clock_timestamp() then perform pgmq.set_vt('webhook_delivery',msg.msg_id,greatest(1,ceil(extract(epoch from d.next_attempt_at-clock_timestamp()))::int));continue;end if;
+  token:=gen_random_uuid();reserve_until:=clock_timestamp()+interval '60 seconds';
+  -- Persist fallback due before I/O, so a crash cannot bypass the interval after its lease.
+  update public.webhook_deliveries set state='processing',attempt=attempt+1,total_attempts=total_attempts+1,lease_token=token,lease_until=reserve_until,next_attempt_at=reserve_until+make_interval(secs=>coalesce((array[30,120,600,1800,7200,21600,86400])[attempt+1],0)) where id=d.id returning * into d;
   insert into public.webhook_delivery_attempts(delivery_id,sequence,replay,attempt,lease_token) values(d.id,d.total_attempts,d.replay_count,d.attempt,token);
   result:=result||jsonb_build_array(jsonb_build_object('id',d.id,'leaseToken',token,'eventId',d.event_id,'attempt',d.attempt,'rawBody',d.raw_body,'targetUrl',(select target_url from public.webhook_subscriptions where id=d.subscription_id)));
  end loop;
@@ -168,8 +174,10 @@ end $$;
 create function public.webhook_delivery_secret(p_delivery_id uuid,p_lease_token uuid) returns text language plpgsql security definer set search_path='' as $$
 declare d public.webhook_deliveries; result text;
 begin
- select * into d from public.webhook_deliveries where id=p_delivery_id and state='processing' and lease_token=p_lease_token and lease_until>clock_timestamp() for update;
- if not found or not public.webhook_connection_allowed(d.subscription_id) then return null;end if;
+ select * into d from public.webhook_deliveries where id=p_delivery_id and state='processing' and lease_token=p_lease_token for update;
+ -- The row may have waited on an unchanged lock past its expiry. Check a fresh clock now.
+ if not found or d.lease_until is null or d.lease_until<=clock_timestamp() then return null;end if;
+ if not public.webhook_connection_allowed(d.subscription_id) then return null;end if;
  select decrypted_secret into result from vault.decrypted_secrets where id=(select secret_id from public.webhook_subscriptions where id=d.subscription_id);
  return result;
 end $$;
@@ -177,12 +185,12 @@ create function public.complete_webhook_delivery(p_delivery_id uuid,p_lease_toke
 language plpgsql security definer set search_path='' as $$
 declare d public.webhook_deliveries; retry integer; v_category text:=p_category; terminal text;
 begin
- if v_category is null or v_category not in ('accepted','http_retry','http_rejected','redirect','timeout','network','target_rejected','configuration') or (p_status is not null and p_status not between 100 and 599) then raise exception 'validation_error' using errcode='PT422';end if;
- select * into d from public.webhook_deliveries where id=p_delivery_id and state='processing' and lease_token=p_lease_token and lease_until>clock_timestamp() for update;
- if not found then return false;end if;
+ if v_category is null or v_category not in ('accepted','http_retry','http_rejected','redirect','timeout','network','dns_unavailable','target_rejected','configuration') or (p_status is not null and p_status not between 100 and 599) then raise exception 'validation_error' using errcode='PT422';end if;
+ select * into d from public.webhook_deliveries where id=p_delivery_id and state='processing' and lease_token=p_lease_token for update;
+ if not found or d.lease_until is null or d.lease_until<=clock_timestamp() then return false;end if;
  if not public.webhook_connection_allowed(d.subscription_id) then terminal:='cancelled';v_category:='access_revoked';
  elsif v_category='accepted' and p_status between 200 and 299 then terminal:='succeeded';
- elsif d.attempt<8 and v_category in ('http_retry','timeout','network','configuration') then
+ elsif d.attempt<8 and v_category in ('http_retry','timeout','network','dns_unavailable','configuration') then
   retry:=greatest((array[30,120,600,1800,7200,21600,86400])[d.attempt],least(86400,greatest(0,coalesce(p_retry_seconds,0))));terminal:='pending';
  else terminal:='failed';end if;
  update public.webhook_delivery_attempts set completed_at=clock_timestamp(),category=v_category,response_status=p_status where delivery_id=d.id and sequence=d.total_attempts;

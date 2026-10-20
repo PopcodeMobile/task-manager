@@ -25,7 +25,7 @@ set role authenticated;
 select public.test_assert((public.list_webhook_subscriptions(w)->0->>'agentId')=a,'owner safe subscription read') from public.webhook_fixture;
 reset role;
 select public.test_assert(not(public.list_webhook_subscriptions(w)::text like '%secret%'),'no secret or Vault ID in browser response') from public.webhook_fixture;
--- Guest, cross-workspace and delegated OAuth cannot configure or inspect.
+-- Guest and delegated OAuth cannot configure or inspect; second-workspace isolation runs separately.
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
 do $$begin begin perform public.list_webhook_subscriptions((select w from public.webhook_fixture));raise exception 'guest unexpectedly allowed';exception when sqlstate 'PT403' then null;end;end$$;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
@@ -53,6 +53,11 @@ select public.test_assert(public.webhook_delivery_secret(d,old_lease)=repeat('fi
 select public.test_assert(jsonb_array_length(public.claim_webhook_batch())=0,'visibility protects live lease');
 update public.webhook_deliveries set lease_until=now()-interval '1 second';
 update pgmq.q_webhook_delivery set vt=now()-interval '1 second';
+select public.test_assert(public.claim_webhook_batch()='[]'::jsonb,'expired lease must wait for its persisted crash backoff');
+select public.test_assert((select state='pending' and next_attempt_at>clock_timestamp()+interval '25 seconds' from public.webhook_deliveries),'crash wait persisted before replacement');
+-- Advance time only after proving the interrupted attempt cannot reserve early.
+update public.webhook_deliveries set next_attempt_at=clock_timestamp()-interval '1 second';
+update pgmq.q_webhook_delivery set vt=clock_timestamp()-interval '1 second';
 update public.webhook_fixture set new_lease=(public.claim_webhook_batch()->0->>'leaseToken')::uuid;
 select public.test_assert(old_lease<>new_lease,'recovery replaces lease token') from public.webhook_fixture;
 select public.test_assert(not public.complete_webhook_delivery(d,old_lease,'accepted',200),'stale worker cannot archive replacement') from public.webhook_fixture;

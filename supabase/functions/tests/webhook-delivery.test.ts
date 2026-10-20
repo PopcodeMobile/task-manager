@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertRejects } from '@std/assert';
 import { signHermesWebhook } from '../_shared/webhook-signing.ts';
-import { isPublicAddress, validateWebhookTarget } from '../_shared/webhook-targets.ts';
+import { isPublicAddress, resolvePublicDns, validateWebhookTarget } from '../_shared/webhook-targets.ts';
 import {
   type Delivery,
   type DeliveryResult,
@@ -231,4 +231,84 @@ Deno.test('worker rejects public keys, user JWTs, missing/wrong secrets before s
     assertEquals(response.status, 401);
   }
   assertEquals(accessed, 0);
+});
+
+Deno.test('DNS timeout or empty answers persist retry classification while prohibited answers remain terminal', async () => {
+  const results: DeliveryResult[] = [];
+  let sends = 0;
+  const store: DeliveryStore = {
+    claim: () => Promise.resolve([{ ...delivery }]),
+    secret: () => Promise.resolve('fixture'),
+    complete: (_delivery, result) => {
+      results.push(result);
+      return Promise.resolve(true);
+    },
+  };
+  const send = () => {
+    sends++;
+    return Promise.resolve({ status: 200, retryAfter: null });
+  };
+  await dispatchWebhookBatch(store, {
+    resolve: () => Promise.reject(new Deno.errors.TimedOut('private resolver detail')),
+    send,
+  });
+  await dispatchWebhookBatch(store, { resolve: () => Promise.resolve([]), send });
+  for (const answers of [['10.0.0.1'], ['8.8.8.8', '10.0.0.1']]) {
+    await dispatchWebhookBatch(store, { resolve: () => Promise.resolve(answers), send });
+  }
+  assertEquals(sends, 0);
+  assertEquals<unknown>(results.map((result) => [result.category, result.retrySeconds]), [
+    ['dns_unavailable', 30],
+    ['dns_unavailable', 30],
+    ['target_rejected', null],
+    ['target_rejected', null],
+  ]);
+  assert(!JSON.stringify(results).includes('private resolver detail'));
+});
+
+Deno.test('default A/AAAA resolver preserves transient failures and prioritizes proven prohibited addresses', async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(Deno, 'resolveDns')!;
+  const results: DeliveryResult[] = [];
+  let sent = 0;
+  const store: DeliveryStore = {
+    claim: () => Promise.resolve([{ ...delivery }]),
+    secret: () => Promise.resolve('fixture'),
+    complete: (_delivery, result) => {
+      results.push(result);
+      return Promise.resolve(true);
+    },
+  };
+  const responses: [string[] | Error, string[] | Error][] = [
+    [['8.8.8.8'], new Deno.errors.TimedOut('AAAA timeout')],
+    [['10.0.0.1'], new Deno.errors.TimedOut('AAAA timeout')],
+    [new Deno.errors.NotFound('no A'), new Deno.errors.NotFound('no AAAA')],
+    [['8.8.8.8'], new Deno.errors.NotFound('no AAAA')],
+  ];
+  try {
+    for (const answers of responses) {
+      Object.defineProperty(Deno, 'resolveDns', {
+        ...descriptor,
+        value: (_hostname: string, type: string) => {
+          const answer = answers[type === 'A' ? 0 : 1];
+          return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
+        },
+      });
+      await dispatchWebhookBatch(store, {
+        resolve: resolvePublicDns,
+        send: () => {
+          sent++;
+          return Promise.resolve({ status: 200, retryAfter: null });
+        },
+      });
+    }
+  } finally {
+    Object.defineProperty(Deno, 'resolveDns', descriptor);
+  }
+  assertEquals(sent, 1);
+  assertEquals<unknown>(results.map((result) => [result.category, result.retrySeconds]), [
+    ['dns_unavailable', 30],
+    ['target_rejected', null],
+    ['dns_unavailable', 30],
+    ['accepted', null],
+  ]);
 });
