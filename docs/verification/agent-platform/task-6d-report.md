@@ -173,3 +173,7 @@ Commands and observed results:
 The 212-test aggregate and browser/Deno/PostgreSQL results remain historical evidence for unchanged runtime sources; no broad rerun or new aggregate claim accompanies this tooling fix. I1/M1 stay addressed as recorded by the independent review. N1 implementation is ready for scoped rereview after the fix commit; this report does not approve itself. No listeners, browser, freeze, push, merge or activation were involved.
 
 Final fix-round checks: owned `prettier --check` exited 0 (`task6d-fix2-owned-format-check.log`). `node /tmp/task6d-secret-scan.mjs` plus `rg` over authored `src` and the changed auditor found zero known private/credential-shaped issues and zero debug matches; `git diff --cached --check` exited 0. Current bounded scan counts are preserved in `task6d-fix2-scans.json`; no exhaustive secret guarantee is claimed.
+
+## Independent Task6d gate approved
+
+Root received and read the [second scoped rereview](task-6d-rereview-2.md) at source `fb881aa3aae804e8d05ad349cdddf3b2f28aa113`: N1 addressed, no new breakage; original I1/M1 remain addressed. Spec compliance and task quality are Approved for Task6d. No suites or browsers were repeated by the reviewer. This records the independent verdict rather than author self-approval. Whole-branch review, publication and real Hermes/two-Claude activation remain separate pending gates.

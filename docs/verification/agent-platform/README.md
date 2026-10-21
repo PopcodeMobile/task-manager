@@ -2,7 +2,7 @@
 
 These source-owned reports and independent review rulings were preserved from the staged implementation workspace before cleanup. They record their own BASE/HEAD and chronology. Earlier failures/pending statements are historical; later appends and final cutover evidence take precedence. Paths under `/tmp` or private config directories identify original local logs and are not published credentials or a promise those logs remain available forever.
 
-The final [Task6d report](task-6d-report.md) and [verification matrix](../../verification.md) identify current evidence. Stage reports are retained rather than rewriting their historical claims. No scratch directory has been deleted. Final Task6d independent review, whole-branch review and actual activation remain root responsibilities.
+The final [Task6d report](task-6d-report.md) and [verification matrix](../../verification.md) identify current evidence. Stage reports are retained rather than rewriting their historical claims. No scratch directory has been deleted. The [Task6d independent gate](task-6d-rereview-2.md) is approved at `fb881aa`. Whole-branch review and actual activation remain root responsibilities.
 
 The exact [rulings](final-rulings-source.md) preserve withdrawn alternatives as well as superseding decisions, including the disproved private-http proposal. The [hosted proof](hosted-preactivation-proof.md) includes008 API/MCP and current synthetic/real-client boundaries. [Isolated Hermes proof](task-7-hermes-isolated-runtime.md) is pinned synthetic-runtime evidence, not deployed service acceptance.
 
@@ -58,3 +58,5 @@ The exact [rulings](final-rulings-source.md) preserve withdrawn alternatives as 
 - [task-6d-rereview-1.md](task-6d-rereview-1.md) (I1/M1 addressed; lexical-shadowing N1 led to fix round 2)
 - [task-7-hermes-isolated-runtime.md](task-7-hermes-isolated-runtime.md)
 - [ui-api-parity-notes.md](ui-api-parity-notes.md)
+
+- [task-6d-rereview-2.md](task-6d-rereview-2.md)

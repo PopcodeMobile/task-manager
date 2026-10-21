@@ -553,7 +553,8 @@ Preservar callbacks/consentimento e demonstração local no entrypoint final.
 - [x] Passar check/typecheck/browser, Deno e PostgreSQL reais apropriados; builds com
       e sem configuração cloud, bundle sem segredos/logs e auditoria visual.
       Resultados ignorados/fixtures e uniões de execuções ficam identificados.
-- [ ] Aprovar revisão independente de Task6d e revisão ampla final pelo root.
+- [x] Aprovar revisão independente de Task6d (revisão scoped final em `fb881aa`).
+- [ ] Aprovar revisão ampla final da branch pelo root.
 - [x] Publicar matriz e provas permanentes; substituir ponteiros temporários do plano.
       Atualizar documentação da stack e limites, sem afirmar ativação real pendente.
 - [x] Commit: `refactor(ui): finish react migration and retire legacy rendering`.

@@ -1,0 +1,24 @@
+**N1 — Static resolution falls through local shadowing declarations — ADDRESSED.** `scripts/token-react.mjs:97` now obtains lexical identity from the installed TypeScript binder rather than an incomplete name/scope table. `:100` resolves the actual referenced symbol, including shorthand value symbols; `:103` accepts only a single, simple initialized const declaration as a resolvable source. A nearest destructuring, parameter, import, catch or mutable/uninitialized binding remains unknown and cannot fall through to an outer constant. `:117` uses this same lookup for static template/key evaluation.
+
+## Checks and Evidence
+
+- **Scoped source check:** reviewed supplied package `review-de11cc2..fb881aa.diff`, BASE `de11cc23b628c0b196954baee5719b87b6038590` → HEAD `fb881aa3aae804e8d05ad349cdddf3b2f28aa113`, against N1 and the fix-round-2 append. Changes are confined to auditor/tests/documentation/evidence. No application, backend, browser, dependency, quota or serving configuration change is present.
+- **Exact regressions:** `tests/tokens.test.mjs:242` includes both reported examples and renamed nested destructuring, array binding and catch binding controls; `:255` asserts that these unknown dynamic values yield no false violations. `:260` separately proves that a destructuring property name does not incorrectly shadow the outer variable and that valid outer const/shorthand references still trigger the existing policy. Assertions check exact absence or expected count/content, not implementation internals.
+- **Meaningful RED/GREEN:** `docs/verification/agent-platform/task-6d-evidence/task6d-fix2-red.log:19` records the two exact failures plus three additional shadowing failures, with 19 passed/5 failed. `task6d-fix2-unit.log:19` records the same shadowing cases passing; `:25` records 24 tests, 24 passed, zero failures/skips. Its first 18 cases retain the original static template/computed-key fixes, static nested templates, mixed known/unknown utilities, runtime geometry/colors, imports/generated/mutable/cyclic values and parameter controls. The final code agrees with those outcomes.
+- **Safe binder boundary:** `scripts/token-react.mjs:81` enables `noLib`, `noResolve`, `noEmit` and empty `types`; `:82` supplies an entirely virtual host that returns only the supplied source, denies directory/library/import file reads and throws on writes. No audited expression is executed. The existing bounded literal/template/unary traversal and cycle detection remain in place. Shorthand resolution uses the compiler's value-symbol API instead of accidentally reading the object-property symbol (`:100`).
+- **Research and observed cost:** `task6d-fix2-binding-research.log:1` preserves the binding-element/name/symbol observations against TypeScript 5.9.3 with zero parse diagnostics. `task6d-fix2-audit.log:5` records 234 public tokens/99 sources passing; `:6` records 0.42 seconds wall time for the full-source audit including npm startup. This supports the observed cost on this tree, not an unmeasured general performance claim.
+- **Other focused validation:** `task6d-fix2-lint.log:1` and `task6d-fix2-owned-format-check.log:1` retain lint and successful owned-file formatting output. `task6d-fix2-scans.json:1` records a bounded two-candidate/346-file private scan with zero issues, no debug matches and a clean staged whitespace check. Existing passing checks were inspected, not rerun.
+- **Evidence provenance:** compared the newly archived `docs/verification/agent-platform/task-6d-rereview-1.md` to the scratch original; content is equal after whitespace normalization. `docs/verification.md:7` and `task-6d-report.md:173` distinguish the prior 212-test aggregate/runtime/browser results from the fresh 24-case tooling validation. No newly rerun aggregate or browser proof is claimed. The earlier M1 warning acknowledgment remains intact.
+- **Review execution:** no new concrete doubt required a behavioral probe. Only read-only diff/evidence/provenance checks were performed; no test suite, browser, service, subagent, Git mutation or product edit. Only this report was written.
+
+## New Breakage in the Fix Diff
+
+None found. No Critical, Important or Minor finding in this fix diff.
+
+## Out-of-Scope Observations
+
+None. The previous whole-branch review and Task7 production/hosted-frontend/Hermes/actual-Claude-user proof boundaries remain unchanged.
+
+## Verdict
+
+**Fix round: All findings addressed, no new Critical/Important breakage.** N1 is closed; I1 and M1 remain addressed from the preceding round. **Task6d spec compliance: Approved. Task quality: Approved.** This closes the scoped 6d review gate only; it is not the later whole-branch review or production activation approval. Stop condition reached: complete scoped rereview delivered, with no push, merge or activation.
