@@ -262,3 +262,58 @@ test('deleting a task that only links another task file does not transfer owners
   const file = (await repo.list('list_files')).find(f => f.id === embedded.id);
   assert.equal(file.taskId, owner.id);
 });
+
+for (const ownerMode of ['parent', 'null']) {
+  test(`linking embedded metadata to an earlier task preserves canonical ${ownerMode} ownership and receipts`, async () => {
+    const { repo, persistence, storage } = await setup();
+    const loaded = await persistence.load(repo.workspaceId);
+    const owner = loaded.data.tasks.at(-1),
+      consumer = loaded.data.tasks[0];
+    const fileId = 'earlier-link-file';
+    owner.attachments.push({
+      id: fileId,
+      name: 'Full metadata',
+      type: 'doc',
+      size: '7KB',
+      unknown: { retain: ['exact'] },
+      ...(ownerMode === 'null' ? { task: null, project: null } : {}),
+    });
+    for (const task of loaded.data.tasks) task.deps = [];
+    await persistence.save(repo.workspaceId, loaded.data, loaded.revision);
+    const before = (await repo.list('list_files')).find(file => file.id === fileId);
+    let task = (await repo.query('get_task', { id: consumer.id })).data;
+    const linked = await command(repo, 'set_task_attachment', { id: consumer.id, fileId }, task.version, 'earlier-link-retry');
+    const reloaded = createLocalWorkspaceRepository({ persistence, storage, identity: 'local', workspaceId: repo.workspaceId });
+    assert.deepEqual(await command(reloaded, 'set_task_attachment', { id: consumer.id, fileId }, task.version, 'earlier-link-retry'), linked);
+    const raw = storage.getItem('gr8r.workspaces.v1');
+    const files = await reloaded.list('list_files');
+    const after = files.find(file => file.id === fileId);
+    assert.equal(files.filter(file => file.id === fileId).length, 1);
+    assert.equal(after.version, before.version);
+    assert.equal((await reloaded.query('get_task', { id: consumer.id })).data.version, task.version + 1);
+    assert.equal(after.taskId, before.taskId);
+    assert.equal(after.projectId, before.projectId);
+    assert.deepEqual(after.legacyMetadata.unknown, before.legacyMetadata.unknown);
+    assert.equal(storage.getItem('gr8r.workspaces.v1'), raw);
+    if (ownerMode === 'parent') {
+      const parent = (await reloaded.query('get_task', { id: owner.id })).data;
+      await assert.rejects(command(reloaded, 'delete_task', { id: owner.id }, parent.version), { code: 'validation_error' });
+    }
+    task = (await reloaded.query('get_task', { id: consumer.id })).data;
+    await command(reloaded, 'remove_task_attachment', { id: consumer.id, fileId }, task.version);
+    task = (await reloaded.query('get_task', { id: consumer.id })).data;
+    await command(reloaded, 'set_task_attachment', { id: consumer.id, fileId }, task.version);
+    task = (await reloaded.query('get_task', { id: consumer.id })).data;
+    await command(reloaded, 'delete_task', { id: consumer.id }, task.version);
+    assert.equal((await reloaded.list('list_files')).find(file => file.id === fileId).taskId, before.taskId);
+    const parent = (await reloaded.query('get_task', { id: owner.id })).data;
+    await command(reloaded, 'remove_task_attachment', { id: owner.id, fileId }, parent.version);
+    const detached = (await reloaded.list('list_files')).find(file => file.id === fileId);
+    assert.equal(detached.version, before.version);
+    assert.deepEqual(detached.legacyMetadata.unknown, before.legacyMetadata.unknown);
+    assert.equal(detached.taskId, before.taskId);
+    await command(reloaded, 'delete_task', { id: owner.id }, parent.version + 1);
+    const remaining = (await reloaded.list('list_files')).filter(file => file.id === fileId);
+    assert.equal(remaining.length, ownerMode === 'null' ? 1 : 0);
+  });
+}

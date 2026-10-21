@@ -857,3 +857,43 @@ test('late personal menu failure cannot publish an error in a different workspac
   await page.evaluate(() => window.dispatchEvent(new Event('reject-clipboard')));
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
+
+test('remote subtask deletion retains the dirty editor until explicit discard', async ({ page, context }) => {
+  test.setTimeout(45000);
+  await prepare(page);
+  await page.goto('/app-local');
+  const parent = data.tasks.find(task => task.subtasks.length > 0)!;
+  const child = parent.subtasks[0];
+  await page.getByRole('button', { name: parent.title }).click();
+  await page.getByRole('button', { name: 'Subtask details: ' + child.title, exact: true }).click();
+  await page.getByLabel('Subtask title', { exact: true }).fill('Retained remote draft');
+  await page.getByLabel('Subtask notes', { exact: true }).fill('Notes kept after another tab deletes the child');
+  await page.getByLabel('Subtask due date', { exact: true }).fill('2026-11-12');
+  const other = await context.newPage();
+  await other.goto(page.url());
+  await other.getByRole('button', { name: 'Subtask details: ' + child.title, exact: true }).click();
+  await other.getByRole('button', { name: 'Delete subtask', exact: true }).click();
+  await expect(other.getByRole('button', { name: 'Subtask details: ' + child.title, exact: true })).toHaveCount(0);
+  await page.bringToFront();
+  await expect(page.getByRole('button', { name: 'Subtask details: ' + child.title, exact: true })).toHaveCount(0, { timeout: 18000 });
+  await expect(page.getByLabel('Subtask notes', { exact: true })).toHaveValue('Notes kept after another tab deletes the child');
+  await expect(page.getByLabel('Subtask title', { exact: true })).toHaveValue('Retained remote draft');
+  await expect(page.getByLabel('Subtask due date', { exact: true })).toHaveValue('2026-11-12');
+  await expect(page.getByRole('alert')).toContainText('This subtask was deleted elsewhere');
+  await expect(page.getByRole('button', { name: 'Save subtask', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Convert to task', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await expect(page.getByLabel('Subtask notes', { exact: true })).toHaveValue('Notes kept after another tab deletes the child');
+  await page.locator('.subtask-editor').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/task6b2-fix1-deleted-subtask-draft.png', fullPage: false });
+  await page.getByRole('button', { name: 'Discard subtask draft', exact: true }).click();
+  await expect(page.getByLabel('Subtask notes', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const stored = await page.evaluate(
+    id => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.tasks.find((task: { id: string }) => task.id === id).subtasks,
+    parent.id,
+  );
+  expect(stored.some((row: { id: string }) => row.id === child.id)).toBe(false);
+  await other.close();
+});

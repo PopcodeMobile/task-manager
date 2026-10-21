@@ -32,13 +32,16 @@ export function TaskSubtasksSection({
 }) {
   const [title, setTitle] = useState(''),
     [id, setId] = useState(() => crypto.randomUUID()),
-    [selected, select] = useState<string | null>(null),
+    [selected, select] = useState<Subtask | null>(null),
     [editing, setEditing] = useState(false);
   useEffect(() => {
     registerDirty(editing);
     return () => registerDirty(false);
   }, [editing, registerDirty]);
-  const current = subtasks.find(s => s.id === selected);
+  // The live collection can remove a row while its editor still owns an unsaved draft.
+  const live = subtasks.find(s => s.id === selected?.id);
+  const current = live ?? selected;
+  const removed = !!selected && !live;
   return (
     <section className="drawer-section">
       <h3>{t('Subtarefas', 'Subtasks')}</h3>
@@ -56,7 +59,7 @@ export function TaskSubtasksSection({
             aria-label={t('Detalhes da subtarefa: ', 'Subtask details: ') + s.title}
             disabled={editing}
             onClick={() => {
-              if (canOpen()) select(s.id);
+              if (canOpen()) select(s);
             }}
           >
             {s.title}
@@ -91,6 +94,7 @@ export function TaskSubtasksSection({
           key={current.id}
           task={task}
           subtask={current}
+          removed={removed}
           members={members}
           action={action}
           execute={execute}
@@ -99,10 +103,10 @@ export function TaskSubtasksSection({
           open={open}
           close={() => select(null)}
           registerDirty={setEditing}
-          previous={subtasks.findIndex(s => s.id === current.id) > 0 ? () => select(subtasks[subtasks.findIndex(s => s.id === current.id) - 1].id) : undefined}
+          previous={subtasks.findIndex(s => s.id === current.id) > 0 ? () => select(subtasks[subtasks.findIndex(s => s.id === current.id) - 1]) : undefined}
           next={
             subtasks.findIndex(s => s.id === current.id) < subtasks.length - 1
-              ? () => select(subtasks[subtasks.findIndex(s => s.id === current.id) + 1].id)
+              ? () => select(subtasks[subtasks.findIndex(s => s.id === current.id) + 1])
               : undefined
           }
         />
@@ -113,6 +117,7 @@ export function TaskSubtasksSection({
 function SubtaskEditor({
   task,
   subtask,
+  removed,
   members,
   action,
   execute,
@@ -126,6 +131,7 @@ function SubtaskEditor({
 }: {
   task: Task;
   subtask: Subtask;
+  removed: boolean;
   members: Member[];
   action: DetailAction;
   execute: Execute;
@@ -148,9 +154,9 @@ function SubtaskEditor({
   const saved = useRef(fingerprint);
   const dirty = fingerprint !== saved.current;
   useEffect(() => {
-    registerDirty(dirty);
+    registerDirty(dirty || removed);
     return () => registerDirty(false);
-  }, [dirty, registerDirty]);
+  }, [dirty, removed, registerDirty]);
   function reload() {
     setTitle(subtask.title);
     setDue(String(subtask.legacyMetadata.due ?? ''));
@@ -166,14 +172,23 @@ function SubtaskEditor({
     setRowVersion(subtask.version);
   }
   useEffect(() => {
-    if (!dirty && !disabled && subtask.version >= rowVersion) reload();
-  }, [task.version, subtask.version, disabled, dirty]);
+    if (!dirty && !removed && !disabled && subtask.version >= rowVersion) reload();
+  }, [task.version, subtask.version, disabled, dirty, removed]);
   return (
     <div className="subtask-editor">
       <h4>{t('Detalhes da subtarefa', 'Subtask details')}</h4>
+      {removed && (
+        <p role="alert">
+          {t(
+            'Esta subtarefa foi excluída em outro lugar. Seu rascunho foi mantido. Copie o que precisar e descarte o rascunho para continuar.',
+            'This subtask was deleted elsewhere. Your draft was kept. Copy anything you need, then discard the draft to continue.',
+          )}
+        </p>
+      )}
       <form
         onSubmit={e => {
           e.preventDefault();
+          if (removed) return;
           void action(async () => {
             const result = await execute<Subtask>(
               'update_subtask',
@@ -216,26 +231,26 @@ function SubtaskEditor({
             disabled={disabled}
           />
         </label>
-        <Button type="submit" disabled={disabled}>
+        <Button type="submit" disabled={disabled || removed}>
           {t('Salvar subtarefa', 'Save subtask')}
         </Button>
       </form>
-      {dirty && <p>{t('Salve os detalhes antes de converter ou excluir.', 'Save details before converting or deleting.')}</p>}
-      {dirty && (
-        <Button variant="outline" disabled={disabled} onClick={reload}>
+      {dirty && !removed && <p>{t('Salve os detalhes antes de converter ou excluir.', 'Save details before converting or deleting.')}</p>}
+      {(dirty || removed) && (
+        <Button variant="outline" disabled={disabled} onClick={removed ? close : reload}>
           {t('Descartar rascunho da subtarefa', 'Discard subtask draft')}
         </Button>
       )}
       <div className="button-row">
-        <Button variant="ghost" disabled={!previous || dirty || disabled} onClick={previous}>
+        <Button variant="ghost" disabled={!previous || dirty || removed || disabled} onClick={previous}>
           {t('Subtarefa anterior', 'Previous subtask')}
         </Button>
-        <Button variant="ghost" disabled={!next || dirty || disabled} onClick={next}>
+        <Button variant="ghost" disabled={!next || dirty || removed || disabled} onClick={next}>
           {t('Próxima subtarefa', 'Next subtask')}
         </Button>
         <Button
           variant="outline"
-          disabled={disabled || dirty}
+          disabled={disabled || dirty || removed}
           onClick={() =>
             void action(async () => {
               await execute('batch', {
@@ -254,7 +269,7 @@ function SubtaskEditor({
         </Button>
         <Button
           variant="destructive"
-          disabled={disabled || dirty}
+          disabled={disabled || dirty || removed}
           onClick={() =>
             void action(async () => {
               await execute('delete_subtask', { id: subtask.id, taskId: task.id }, task.version);
@@ -264,7 +279,7 @@ function SubtaskEditor({
         >
           {t('Excluir subtarefa', 'Delete subtask')}
         </Button>
-        <Button variant="ghost" disabled={dirty || disabled} onClick={close}>
+        <Button variant="ghost" disabled={dirty || removed || disabled} onClick={close}>
           {t('Voltar à tarefa', 'Back to task')}
         </Button>
       </div>

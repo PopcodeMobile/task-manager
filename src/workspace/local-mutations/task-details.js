@@ -14,13 +14,9 @@ export function mutateTaskDetails({ data, find, cas, bump, dto, initialize }, op
     const links = task[field] ?? [];
     if (label && !(data.labels ?? []).some(item => item.id === row.id)) (data.labels ??= []).push(structuredClone(row));
     const matches = link => (label ? link : link.id) === row.id;
+    // Freeze the full canonical record before a new embedded link can precede its source.
+    if (!label && !(data.files ?? []).some(file => file.id === row.id)) (data.files ??= []).push(structuredClone(row));
     if (operation.startsWith('remove')) {
-      if (!label && !(data.files ?? []).some(file => file.id === row.id))
-        (data.files ??= []).push({
-          ...structuredClone(row),
-          project: Object.hasOwn(row, 'project') ? row.project : task.project,
-          task: Object.hasOwn(row, 'task') ? row.task : task.id,
-        });
       task[field] = links.filter(link => !matches(link));
     } else if (links.some(matches)) {
       if (!label) task[field] = links.map(link => (matches(link) ? { ...link, order: input.sortOrder ?? 0 } : link));
