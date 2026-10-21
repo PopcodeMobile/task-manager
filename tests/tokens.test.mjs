@@ -183,3 +183,58 @@ test('signed numeric styles and computed literal keys cannot bypass controlled s
   assert.ok(faults.some(fault => fault.includes('fixed padding')));
   assert.ok(faults.some(fault => fault.includes('fixed margin-top')));
 });
+
+for (const [name, source, expected] of [
+  ['style template', 'const pad = 12; export const Probe = () => <div style={{ padding: `${pad}px` }} />;', 'fixed padding'],
+  ['class template', 'const pad = 4; export const Probe = () => <div className={`p-${pad}`} />;', 'p-4'],
+  ['computed const key', 'const key = "padding"; export const Probe = () => <div style={{ [key]: 12 }} />;', 'fixed padding'],
+]) {
+  test(`static local ${name} cannot bypass the token policy`, () => {
+    const faults = auditTokenSources([sources.find(file => file.path.endsWith('/tokens.css')), { path: 'src/probe.tsx', source }]);
+    assert.ok(
+      faults.some(fault => fault.includes(expected)),
+      `Missed ${name}: ${faults.join('\n')}`,
+    );
+  });
+}
+
+test('nested static templates and computed class keys retain modifier and arbitrary-value checks', () => {
+  const source = [
+    'const size = 12; const px = `${size}px`; const key = `pad${"ding"}`;',
+    'const utility = `hover:gap-[${px}]`; const styles = { [key]: px };',
+    'export const Probe = () => <div style={styles} className={cn({ [utility]: enabled })} />;',
+  ].join('\n');
+  const faults = auditTokenSources([sources.find(file => file.path.endsWith('/tokens.css')), { path: 'src/probe.tsx', source }]);
+  assert.ok(faults.some(fault => fault.includes('fixed padding')));
+  assert.ok(faults.some(fault => fault.includes('hover:gap-[12px]')));
+});
+
+test('static token templates and dynamic imported generated values retain geometry and domain-color tolerance', () => {
+  const source = [
+    'import { importedPad, importedKey } from "./runtime";',
+    'const token = "var(--s-2)"; const tokenClass = `p-[${token}]`; const key = "padding";',
+    'const generated = readSize(); const domainColor = validateColor(userColor);',
+    'const cycleA = cycleB; const cycleB = cycleA;',
+    'export const Probe = ({ pad, property, progress }) => <>',
+    '<div style={{ [key]: `${token}`, width: `${12}px`, left: `${progress}%`, color: `${domainColor}` }} className={tokenClass} />',
+    '<div style={{ padding: `${pad}px`, [property]: 12, margin: `${importedPad}px`, [importedKey]: 8, gap: `${generated}px`, borderRadius: `${cycleA}px` }} className={`p-${pad}`} />',
+    '</>;',
+  ].join('\n');
+  assert.deepEqual(auditTokenSources([sources.find(file => file.path.endsWith('/tokens.css')), { path: 'src/probe.tsx', source }]), []);
+});
+
+test('unknown template substitutions do not turn partial utilities or shadowed parameters into static values', () => {
+  const source = [
+    'import { importedPad } from "./runtime";',
+    'const pad = 12; const key = "padding"; let mutable = 4; mutable = readSize();',
+    'export const Probe = (pad, key, color) => <div',
+    '  style={{ padding: `${pad}px`, [key]: 12, margin: `${mutable}px`, color: `${color}` }}',
+    '  className={`p-[${pad}px] bg-[${color}] hover:p-${importedPad} gap-${mutable}`} />;',
+  ].join('\n');
+  const base = sources.find(file => file.path.endsWith('/tokens.css'));
+  assert.deepEqual(auditTokenSources([base, { path: 'src/probe.tsx', source }]), []);
+  const mixed = 'const spacing = 6; export const Probe = ({ pad, extra }) => <div className={`p-[${pad}px] hover:gap-4 p-4 md:gap-${spacing} ${extra}`} />; ';
+  const faults = auditTokenSources([base, { path: 'src/mixed.tsx', source: mixed }]);
+  assert.equal(faults.length, 3);
+  for (const value of ['hover:gap-4', 'p-4', 'md:gap-6']) assert.ok(faults.some(fault => fault.includes(value)));
+});

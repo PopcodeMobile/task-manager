@@ -8,10 +8,6 @@ const unbox = node => {
     node = node.expression;
   return node;
 };
-const propertyName = node => {
-  if (node && ts.isComputedPropertyName(node) && ts.isStringLiteralLike(node.expression)) return node.expression.text;
-  return node && (ts.isIdentifier(node) || ts.isStringLiteral(node)) ? node.text : '';
-};
 const cssName = key => (key.startsWith('--') ? key : key.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`));
 
 export function semanticAliases(sources) {
@@ -89,20 +85,53 @@ export function auditReactSource(path, source, aliases) {
   const collect = node => {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const entries = declarations.get(node.name.text) ?? [];
-      entries.push({ scope: scope(node), value: node.initializer });
+      entries.push({ scope: scope(node), value: node.initializer, constant: !!(node.parent.flags & ts.NodeFlags.Const) });
       declarations.set(node.name.text, entries);
     }
     ts.forEachChild(node, collect);
   };
   collect(root);
-  function binding(node) {
+  function binding(node, constantsOnly = false) {
     if (!ts.isIdentifier(node)) return null;
     const entries = declarations.get(node.text) ?? [];
+    const declares = name =>
+      ts.isIdentifier(name) ? name.text === node.text : name.elements.some(element => ts.isBindingElement(element) && declares(element.name));
     for (let parent = node; parent; parent = parent.parent) {
       const entry = entries.find(candidate => candidate.scope === parent);
-      if (entry) return entry.value;
+      if (entry) return !constantsOnly || entry.constant ? entry.value : null;
+      if (ts.isFunctionLike(parent) && parent.parameters.some(parameter => declares(parameter.name))) return null;
     }
     return null;
+  }
+  function staticValue(node, seen = new Set()) {
+    node = unbox(node);
+    if (!node || seen.has(node)) return undefined;
+    seen = new Set(seen).add(node);
+    if (ts.isStringLiteralLike(node)) return node.text;
+    if (ts.isNumericLiteral(node)) return Number(node.text);
+    if (ts.isIdentifier(node)) return staticValue(binding(node, true), seen);
+    if (ts.isPrefixUnaryExpression(node) && [ts.SyntaxKind.MinusToken, ts.SyntaxKind.PlusToken].includes(node.operator)) {
+      const value = staticValue(node.operand, seen);
+      if (typeof value === 'number') return node.operator === ts.SyntaxKind.MinusToken ? -value : value;
+    }
+    if (ts.isTemplateExpression(node)) {
+      let value = node.head.text;
+      for (const span of node.templateSpans) {
+        const part = staticValue(span.expression, seen);
+        if (part === undefined) return undefined;
+        value += String(part) + span.literal.text;
+      }
+      return value;
+    }
+    // Imports, calls and runtime expressions are unknown, never evaluated.
+    return undefined;
+  }
+  function propertyName(node) {
+    if (node && ts.isComputedPropertyName(node)) {
+      const value = staticValue(node.expression);
+      return value === undefined ? '' : String(value);
+    }
+    return node && (ts.isIdentifier(node) || ts.isStringLiteral(node)) ? node.text : '';
   }
   function report(node, message) {
     const { line, character } = root.getLineAndCharacterOfPosition(node.getStart(root));
@@ -156,11 +185,13 @@ export function auditReactSource(path, source, aliases) {
         if (violation) report(node, `${violation}: ${property}: ${node.text}`);
       }
     } else if (ts.isTemplateExpression(node)) {
-      // Audit authored static chunks; interpolated data is not a literal design value.
-      const chunks = [node.head.text, ...node.templateSpans.map(span => span.literal.text)];
-      if (mode === 'class') chunks.forEach(chunk => inspectClasses(node, chunk));
-      else
-        for (const chunk of chunks) {
+      // Resolve local constants before policy checks; unresolved data stays unknown.
+      // A marker preserves token boundaries: p-${runtime} is unknown, but adjacent p-4 is still authored.
+      const value = node.head.text + node.templateSpans.map(span => (staticValue(span.expression) ?? '\0') + span.literal.text).join('');
+      if (mode === 'class') {
+        for (const token of value.split(/\s+/)) if (!token.includes('\0')) inspectClasses(node, token);
+      } else
+        for (const chunk of value.split('\0')) {
           const violation = styleViolation(property, chunk);
           if (violation) report(node, `${violation}: ${property}: ${chunk}`);
         }

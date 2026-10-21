@@ -54,5 +54,6 @@ The exact [rulings](final-rulings-source.md) preserve withdrawn alternatives as 
 - [task-6c-rereview-1.md](task-6c-rereview-1.md)
 - [task-6c-rereview-2.md](task-6c-rereview-2.md)
 - [task-6c-review.md](task-6c-review.md)
+- [task-6d-review.md](task-6d-review.md) (initial Needs fixes; fix-round evidence is appended to the Task6d report)
 - [task-7-hermes-isolated-runtime.md](task-7-hermes-isolated-runtime.md)
 - [ui-api-parity-notes.md](ui-api-parity-notes.md)

@@ -185,3 +185,16 @@ writeFileSync('/tmp/task6d-build-paths.json', JSON.stringify(paths, null, 2));
 writeFileSync('/tmp/task6d-build-scan.json', JSON.stringify(scan, null, 2));
 console.log(JSON.stringify(scan));
 ```
+
+## Aggregate output directory (review M1)
+
+The retained initial/final aggregate build logs warn that the external output directory will not be emptied. This is a Vite output-directory warning, distinct from the removed bundle-size warning. Those aggregate logs prove build completion, not an exact clean directory inventory. The separate local/cloud build wrapper above creates fresh owned directories and passes `--emptyOutDir`; its scans are the clean-artifact proof.
+
+For a future aggregate, first allocate a fresh empty owned directory, then pass it to the existing environment-supported output setting:
+
+```sh
+task6d_build_dir="$(mktemp -d /tmp/task6d-check-XXXXXX)"
+VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= VITE_SUPABASE_PUBLISHABLE_KEY= GR8R_BUILD_DIR="$task6d_build_dir" SUPABASE_TEST_CONFIG=/tmp/task3-local-status.json npm run check
+```
+
+Vite can still print its external-directory warning, but this fresh directory contains no stale output. For a separate clean build of an explicitly owned directory, the existing build wrapper passes `npm run build -- --outDir "$task6d_build_dir" --emptyOutDir`. Do not set global `emptyOutDir: true` for arbitrary environment paths. No aggregate/build was rerun merely to erase the historical warning.

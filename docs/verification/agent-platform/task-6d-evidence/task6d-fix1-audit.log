@@ -1,0 +1,5 @@
+
+> gr8r-studio@1.0.0 check:tokens
+> node scripts/check-tokens.mjs
+
+Token audit passed: 234 public tokens, 99 source files checked.
