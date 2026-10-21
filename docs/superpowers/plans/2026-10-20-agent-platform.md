@@ -597,7 +597,7 @@ Gates6a–6c aprovados, incluindo6b0–6b4 e correções6c: [arquivo de relatór
 
 Task6d: [relatório de implementação e comandos](../../verification/agent-platform/task-6d-report.md); gate scoped aprovado emfb881aa. A revisão ampla subsequente pediu as correções registradas no [relatório final](../../verification/agent-platform/final-fix-report.md); rerevisões scoped/residuais e auditor estão aprovados na [prova009](../../verification/agent-platform/runtime-009-proof.md). Ativação pública/real ainda pertence ao root; aprovação de código não equivale a publicação.
 
-Task7: backend hospedado009/API/MCP possui [prova atual](../../verification/agent-platform/runtime-009-proof.md);008/wake-up vazio mantêm [prova histórica](../../verification/agent-platform/hosted-preactivation-proof.md); Cron desabilitado, frontend/Auth/CORS de produção, Hermes real e dois usuários Claude reais continuam pendentes. [Hermes isolado5/5](../../verification/agent-platform/task-7-hermes-isolated-runtime.md) não substitui esses gates.
+Task7: backend hospedado009/API/MCP possui [prova atual](../../verification/agent-platform/runtime-009-proof.md);008/wake-up vazio mantêm [prova histórica](../../verification/agent-platform/hosted-preactivation-proof.md). Frontend/Auth/CORS de produção possuem [prova de publicação](../../verification/agent-platform/task-7-vercel-publication-2026-10-21.md). Cron permanece desabilitado; Hermes real e dois usuários Claude reais continuam pendentes. [Hermes isolado5/5](../../verification/agent-platform/task-7-hermes-isolated-runtime.md) não substitui esses gates.
 
 ## Onda única após revisão ampla
 
@@ -621,11 +621,11 @@ Ativação real permanece separada; resultados anteriores não substituem o novo
 
 - [x] Fechar todos os achados originais/residuais e o auditor de ativação com revisão independente.
 - [x] Provar Auth/API/MCP reais local/hosted, catalog51objetos,001–009, cleanup e builds finais; preservar limites de usuários sintéticos.
-- [ ] Publicar frontend e configurar Auth/redirects/CORS para sua URLHTTPS real (acesso Vercel pendente).
+- [x] Publicar frontend e configurar Auth/redirects/CORS para sua URLHTTPS real; [Vercel Delta Academy e verificação pública](../../verification/agent-platform/task-7-vercel-publication-2026-10-21.md).
 - [x] Confirmar DNS/HTTPS do Hermes e `/health` público200; [preflight de2026-10-21](../../verification/agent-platform/task-7-hermes-public-preflight-2026-10-21.md).
 - [ ] Concluir rota Task Manager/OAuth/MCP/receiver/retention e duas contas Claude reais; só depois habilitar entregas e integrar branch conformeTask7.
 
-O usuário confirmou que o painel ainda não está publicado e disponibilizará acesso à Vercel. O listener Hermes atual contém a rota diagnóstica `infra-ping`; a configuração principal ainda não tem `task_manager` em `mcp_servers`. Não confundir saúde pública/teste assinado com aceite da integração real.
+O painel está publicado em https://task-manager-chi-eight-19.vercel.app, com consentimento em `/oauth/consent`. O listener Hermes atual contém a rota diagnóstica `infra-ping`; a configuração principal ainda não tem `task_manager` em `mcp_servers`. Não confundir publicação do painel ou saúde pública/teste assinado com aceite da integração real.
 
 A [prova009](../../verification/agent-platform/runtime-009-proof.md) é o estado atual. Relatórios anteriores mantêm sua cronologia. Nenhuma conta/segredo real é compartilhado.
 

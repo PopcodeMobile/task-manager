@@ -44,7 +44,9 @@ The first new local transport probe incorrectly expected201for add_task_comment.
 
 The first catalog audit stopped on its old inline005lease-projection assumption.009 correctly delegates to a renamed private projector. The narrowly updated auditor preserves recursion, sensitive-schema/dynamic SQL rejection, private invoker/ACL checks and the reservation-preserving delegation;45focused positive/negative cases and independent review precede the actual51object rechecks. Source-pattern auditing is bounded evidence, not a semantic proof for arbitrary disguised SQL.
 
-## Remaining human/production gates and stop condition
+## Remaining human/production gates and stop condition (historical)
+
+The access/publication and Hermes DNS statements in this section describe the earlier009 rollout. Later [Hermes public preflight](task-7-hermes-public-preflight-2026-10-21.md) and [Vercel publication proof](task-7-vercel-publication-2026-10-21.md) supersede those specific pending items; real-client/retention gates remain open.
 
 Publication access is still missing. The browser rejected an invalid/blank Vercel tab URL; no alternate-surface bypass was attempted. The pending access question offers a valid user-opened Vercel tab or user CLI login. No Vercel project, GitHub grant or public frontend deployment was created. The artifact is concrete and ready for that access step; production Auth Site URL/redirect allowlist/consent origin/CORS must then use its actual HTTPS origin.
 
