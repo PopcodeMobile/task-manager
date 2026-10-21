@@ -897,3 +897,268 @@ test('remote subtask deletion retains the dirty editor until explicit discard', 
   expect(stored.some((row: { id: string }) => row.id === child.id)).toBe(false);
   await other.close();
 });
+
+test('shared calendar and timeline create on date, preserve duration on native drag and reload', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local');
+  await page.getByRole('link', { name: 'Calendar', exact: true }).click();
+  const day = await page.locator('[data-calendar-day]').nth(15).getAttribute('data-calendar-day');
+  await page
+    .locator(`[data-calendar-day="${day}"]`)
+    .getByRole('button', { name: /Add task on/ })
+    .click();
+  await page.getByLabel('Title', { exact: true }).fill('Schedule <literal>');
+  await expect(page.getByLabel('Due date', { exact: true })).toHaveValue(day!);
+  await page.getByLabel('Start date', { exact: true }).fill(day!);
+  await page.getByRole('button', { name: 'Create task', exact: true }).click();
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  const next = await page.locator('[data-calendar-day]').nth(17).getAttribute('data-calendar-day');
+  await page.getByRole('button', { name: 'Schedule <literal>', exact: true }).dragTo(page.locator(`[data-calendar-day="${next}"]`));
+  await expect(page.locator(`[data-calendar-day="${next}"]`).getByRole('button', { name: 'Schedule <literal>', exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Schedule <literal>', exact: true }).click();
+  await expect(page.getByLabel('Due date', { exact: true })).toHaveValue(next!);
+  await expect(page.getByLabel('Start date', { exact: true })).toHaveValue(next!);
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await expect(page).toHaveURL(/\/calendar/);
+  await page.getByRole('button', { name: 'Week', exact: true }).click();
+  await expect(page.locator('[data-calendar-day]')).toHaveCount(7);
+  await page.getByRole('link', { name: 'Timeline', exact: true }).click();
+  await page.getByRole('button', { name: 'Today', exact: true }).click();
+  const bar = page.locator('[data-schedule-bar]').filter({ hasText: 'Schedule <literal>' });
+  await bar.scrollIntoViewIfNeeded();
+  const bounds = (await bar.boundingBox())!;
+  await page.mouse.move(bounds.x + 8, bounds.y + bounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + 72, bounds.y + bounds.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect(bar).toHaveAttribute(
+    'data-due-date',
+    new Date(new Date(next! + 'T12:00:00').setDate(new Date(next! + 'T12:00:00').getDate() + 2)).toLocaleDateString('sv-SE'),
+  );
+  await page.getByRole('button', { name: 'Months', exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Months', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const unchangedDue = await bar.getAttribute('data-due-date');
+  for (const group of ['status', 'assignee', 'none', 'project']) {
+    await page.getByLabel('Group', { exact: true }).selectOption(group);
+    await expect(bar).toHaveAttribute('data-due-date', unchangedDue!);
+  }
+  await expect(page.locator('.timeline-dependencies path').first()).toBeAttached();
+  await expect(page.locator('.timeline-milestone').first()).toBeAttached();
+  await page.screenshot({ path: '/tmp/task6b3-timeline-dark.png' });
+  await bar.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Open task', exact: true }).click();
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Schedule <literal>');
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await expect(page).toHaveURL(/\/timeline/);
+});
+
+test('shared files filter preview rename duplicate unlink delete preserve metadata and scope', async ({ page }) => {
+  const fixture = structuredClone(data);
+  Object.assign(fixture.files[0], { preservedFileMetadata: { literal: '<unknown>', nested: [3, 'kept'] } });
+  await page.addInitScript(value => {
+    if (!localStorage.getItem('gr8r.v2')) localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en', theme: 'dark' } }));
+  }, fixture);
+  await page.goto('/app-local');
+  await page.getByRole('link', { name: 'Files', exact: true }).click();
+  const source = data.files[0];
+  await page.getByLabel('Search files', { exact: true }).fill(source.name);
+  await page.locator(`[data-file-id="${source.id}"]`).getByRole('button', { name: source.name, exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('Metadata only');
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('status')).toHaveText('Link copied');
+  expect(new URL(await page.evaluate(() => navigator.clipboard.readText())).searchParams.get('file')).toBe(source.id);
+  await page.getByLabel('File name', { exact: true }).fill('<literal> renamed.pdf');
+  await page.getByRole('button', { name: 'Rename file', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toContainText('<literal> renamed.pdf');
+  await page.getByRole('button', { name: 'Duplicate', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toContainText('<literal> renamed copy.pdf');
+  const clonedMetadata = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.files.find((f: { name: string }) => f.name === '<literal> renamed copy.pdf'),
+  );
+  expect(clonedMetadata.preservedFileMetadata).toEqual({ literal: '<unknown>', nested: [3, 'kept'] });
+  expect(clonedMetadata.by).toBe(data.me);
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await page.getByLabel('Search files', { exact: true }).fill('<literal>');
+  await page.getByLabel('Filter by type', { exact: true }).selectOption('pdf');
+  await page.getByLabel('Sort files', { exact: true }).selectOption('name');
+  await page.getByRole('button', { name: 'List view', exact: true }).click();
+  await expect(page.getByRole('button', { name: '<literal> renamed copy.pdf', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('Search files', { exact: true })).toHaveValue('<literal>');
+  await page.getByRole('button', { name: '<literal> renamed copy.pdf', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete file', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm deletion', exact: true }).click();
+  await expect(page.getByRole('button', { name: '<literal> renamed copy.pdf', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '<literal> renamed.pdf', exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: '<literal> renamed.pdf', exact: true }).click();
+  await expect(page.getByRole('dialog').locator('img')).toHaveCount(0);
+  await page.screenshot({ path: '/tmp/task6b3-files-mobile.png' });
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: '<literal> renamed.pdf', exact: true })).toBeFocused();
+});
+
+test('calendar overflow event details preferences and files beyond cursor stay literal on mobile', async ({ page }) => {
+  const fixture = structuredClone(data),
+    today = new Date().toLocaleDateString('sv-SE');
+  fixture.tasks = fixture.tasks.slice(0, 4).map((task, index) => ({ ...task, title: `Overflow task ${index}`, due: today }));
+  fixture.events = Array.from({ length: 103 }, (_, i) => ({
+    id: `ev-${i}`,
+    project: 'p1',
+    title: i === 102 ? '<unsafe> last event' : `Event ${i}`,
+    date: today,
+    time: '09:30',
+  }));
+  fixture.files = Array.from({ length: 103 }, (_, i) => ({
+    id: `file-${i}`,
+    project: 'p1',
+    name: `File ${String(i).padStart(3, '0')}.pdf`,
+    type: 'pdf',
+    size: '1 KB',
+    by: 'm1',
+    at: Date.now() + i,
+  }));
+  await page.addInitScript(value => {
+    if (!localStorage.getItem('gr8r.v2'))
+      localStorage.setItem(
+        'gr8r.v2',
+        JSON.stringify({
+          data: value,
+          prefs: { lang: 'en', theme: 'light', weekStart: 0, dateFmt: 'yyyy-MM-dd' },
+          views: { cal: { q: 'Overflow task', custom: 'keep' } },
+        }),
+      );
+  }, fixture);
+  await page.goto('/app-local');
+  await page.getByRole('link', { name: 'Calendar', exact: true }).click();
+  await expect(page.locator('.schedule-weekday').first()).toHaveText('Sun');
+  await expect(page.getByLabel('Search tasks', { exact: true })).toHaveValue('Overflow task');
+  await page.locator(`[data-calendar-day="${today}"]`).getByRole('button', { name: /more/ }).click();
+  await page.getByRole('button', { name: '09:30 <unsafe> last event', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('<unsafe> last event');
+  await expect(page.getByRole('dialog')).toContainText(today);
+  await expect(page.getByRole('dialog').locator('unsafe')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  const nextMonth = await page.locator('.schedule-controls h2').textContent();
+  await page.reload();
+  await expect(page.locator('.schedule-controls h2')).toHaveText(nextMonth!);
+  await page.getByRole('button', { name: 'Today', exact: true }).click();
+  await page.getByRole('link', { name: 'Files', exact: true }).click();
+  await expect(page.locator('[data-file-id]')).toHaveCount(105); // 103 global + two canonical embedded-only records
+  await page.getByLabel('Search files', { exact: true }).fill('File 102');
+  await page.getByRole('button', { name: 'File 102.pdf', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('link', { name: 'Calendar', exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel('Language', { exact: true }).selectOption('pt-BR');
+  await page.getByRole('button', { name: 'Semana', exact: true }).click();
+  await expect(page.locator('[data-calendar-day]')).toHaveCount(7);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/task6b3-calendar-mobile-pt.png' });
+});
+
+test('native schedule drag cannot cross workspace lifetime even with the same task ID', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local');
+  const initial = data.tasks.find(task => task.due && task.status !== 'done')!;
+  await page.evaluate(
+    ({ task, project }) => {
+      const state = JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!);
+      state.records.w2.data.projects = [project];
+      state.records.w2.data.tasks = [{ ...task, title: 'Other schedule', subtasks: [], deps: [], attachments: [] }];
+      localStorage.setItem('gr8r.workspaces.v1', JSON.stringify(state));
+    },
+    { task: initial, project: data.projects.find(p => p.id === initial.project)! },
+  );
+  await page.getByRole('link', { name: 'Calendar', exact: true }).click();
+  await page.getByRole('button', { name: 'Week', exact: true }).click();
+  // The fixture task can lie outside this week; date navigation is through the rendered controls.
+  await page.getByRole('button', { name: 'Month', exact: true }).click();
+  await page.getByLabel('Search tasks', { exact: true }).fill(initial.title);
+  const events: { type: string; scope: string }[] = [];
+  page.on('console', message => {
+    if (message.text().startsWith('schedule-scope:')) events.push(JSON.parse(message.text().slice('schedule-scope:'.length)));
+  });
+  await page.evaluate(() => {
+    for (const type of ['dragstart', 'drop'])
+      document.addEventListener(
+        type,
+        event => {
+          const value = (event as DragEvent).dataTransfer?.getData('application/x-gr8r-schedule');
+          if (value) console.debug('schedule-scope:' + JSON.stringify({ type, scope: JSON.parse(value).scope }));
+        },
+        type === 'drop',
+      );
+  });
+  const handle = page.getByRole('button', { name: initial.title, exact: true });
+  await handle.scrollIntoViewIfNeeded();
+  const box = (await handle.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 18, box.y + box.height / 2 + 10, { steps: 5 });
+  await expect.poll(() => events.filter(event => event.type === 'dragstart').length).toBe(1);
+  await page.getByRole('combobox', { name: 'Workspace', exact: true }).selectOption('w2');
+  await page.getByRole('button', { name: initial.key + ' Other schedule', exact: true }).hover();
+  await page.mouse.up();
+  await page.getByRole('link', { name: 'Calendar', exact: true }).click();
+  await expect(page.locator(`[data-calendar-day="${initial.due}"]`).getByRole('button', { name: 'Other schedule', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w2.revision)).toBe(0);
+  if (!events.some(event => event.type === 'drop'))
+    test
+      .info()
+      .annotations.push({ type: 'native-drag-cancel', description: 'Chromium cancelled on source unmount; pure helper separately rejects stale scope.' });
+  await test.info().attach('schedule-native-scope', { body: JSON.stringify(events), contentType: 'application/json' });
+});
+
+test('local file selection simulates metadata atomically and shared surfaces respect project scope', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tasks');
+  const base = new URL(page.url()).pathname.replace(/\/tasks$/, '');
+  const project = data.projects[0];
+  const other = data.tasks.find(task => task.project !== project.id && task.due)!;
+  await page.goto(`${base}/calendar?project=${project.id}`);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(project.name);
+  await expect(page.getByRole('button', { name: other.title, exact: true })).toHaveCount(0);
+  await page.goto(`${base}/timeline?project=${project.id}`);
+  await expect(page.locator('[data-schedule-bar]').first()).toBeVisible();
+  await expect(page.locator(`[data-schedule-bar="${other.id}"]`)).toHaveCount(0);
+  await page.goto(`${base}/files?project=${project.id}`);
+  const input = page.getByLabel('Select files for metadata simulation', { exact: true });
+  await expect(input).toHaveCount(1);
+  const before = await page.evaluate(() => localStorage.getItem('gr8r.workspaces.v1'));
+  await input.setInputFiles(Array.from({ length: 101 }, (_, i) => ({ name: `Too many ${i}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('x') })));
+  await expect(page.getByRole('alert')).toContainText('100');
+  expect(await page.evaluate(() => localStorage.getItem('gr8r.workspaces.v1'))).toBe(before);
+  await input.setInputFiles([{ name: 'Selected <literal>.pdf', mimeType: 'application/pdf', buffer: Buffer.from('metadata-only') }]);
+  await page.getByRole('button', { name: 'Add selected metadata', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Selected <literal>.pdf', exact: true })).toBeVisible();
+  await page.reload();
+  const stored = await page.evaluate(id => {
+    const record = JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records[id].data;
+    return { file: record.files.find((file: { name: string }) => file.name === 'Selected <literal>.pdf'), actor: record.me };
+  }, data.workspaces[0].id);
+  expect(stored.file.project).toBe(project.id);
+  expect(stored.file.by).toBe(stored.actor);
+  expect(stored.file.size).toBe('13 B');
+  await page.getByRole('button', { name: 'Selected <literal>.pdf', exact: true }).click();
+  await page.getByLabel('File name', { exact: true }).fill('Scoped renamed.pdf');
+  await page.getByRole('button', { name: 'Rename file', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Scoped renamed.pdf');
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  const transfer = await page.evaluateHandle(() => {
+    const data = new DataTransfer();
+    data.items.add(new File(['drop'], 'Dropped literal.txt', { type: 'text/plain' }));
+    return data;
+  });
+  await page.locator('[data-metadata-drop]').dispatchEvent('drop', { dataTransfer: transfer });
+  await page.getByRole('button', { name: 'Add selected metadata', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Dropped literal.txt', exact: true })).toBeVisible();
+  await page.goto(`${base}/files?project=${other.project}`);
+  await expect(page.getByRole('button', { name: 'Scoped renamed.pdf', exact: true })).toHaveCount(0);
+});

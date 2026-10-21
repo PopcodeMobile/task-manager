@@ -1,12 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Task, Project, UserPreferences, Label, TaskLabel, TaskDependency, Subtask } from '../../domain/contracts';
+import type {
+  Task,
+  Project,
+  UserPreferences,
+  Label,
+  TaskLabel,
+  TaskDependency,
+  Subtask,
+  FileMetadata,
+  TaskAttachment,
+  CalendarEvent,
+} from '../../domain/contracts';
 import { eventCursor, type Agent, type DomainEvent, type Member } from '../../workspace/normalized';
 import type { WorkspaceRepository } from '../../workspace/repository';
 import type { Translate } from '../auth/ConsentPage';
 import type { Execute } from '../projects/ProjectsPage';
 import { errorMessage } from './messages';
-export type TaskGraph = { labels: Label[]; taskLabels: TaskLabel[]; dependencies: TaskDependency[]; subtasks: Subtask[]; events: DomainEvent[] };
+export type TaskGraph = {
+  labels: Label[];
+  taskLabels: TaskLabel[];
+  dependencies: TaskDependency[];
+  subtasks: Subtask[];
+  events: DomainEvent[];
+  files?: FileMetadata[];
+  attachments?: TaskAttachment[];
+};
 type Snapshot = {
+  files: FileMetadata[];
+  attachments: TaskAttachment[];
+  calendarEvents: CalendarEvent[];
   labels: Label[];
   taskLabels: TaskLabel[];
   dependencies: TaskDependency[];
@@ -19,6 +41,9 @@ type Snapshot = {
   preferences: UserPreferences['preferences'];
 };
 export const emptySnapshot: Snapshot = {
+  files: [],
+  attachments: [],
+  calendarEvents: [],
   labels: [],
   taskLabels: [],
   dependencies: [],
@@ -47,28 +72,41 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
       try {
         // Capture the event boundary BEFORE reading mutable rows. Later commits remain visible to polling.
         const events = initial ? await repo.list<DomainEvent>('list_domain_events', {}, true) : null;
-        const [tasks, projects, agents, members, preferences, labels, taskLabels, dependencies, subtasks] = await Promise.all([
-          repo.list<Task>('list_tasks', {}, true),
-          repo.list<Project>('list_projects', {}, true),
-          repo.list<Agent>('list_agents', {}, true),
-          initial ? repo.rpc<Member[]>('list_workspace_members', { p_workspace_id: repo.workspaceId }) : Promise.resolve(null),
-          initial ? repo.preferences() : Promise.resolve(null),
-          initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
-            ? repo.list<Label>('list_labels', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
-            ? repo.list<TaskLabel>('list_task_labels', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /dependency$|delete_project|delete_task/.test(op))
-            ? repo.list<TaskDependency>('list_dependencies', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /subtask$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
-            ? repo.list<Subtask>('list_subtasks', {}, true)
-            : Promise.resolve(null),
-        ]);
+        const [tasks, projects, agents, members, preferences, labels, taskLabels, dependencies, subtasks, files, attachments, calendarEvents] =
+          await Promise.all([
+            repo.list<Task>('list_tasks', {}, true),
+            repo.list<Project>('list_projects', {}, true),
+            repo.list<Agent>('list_agents', {}, true),
+            initial ? repo.rpc<Member[]>('list_workspace_members', { p_workspace_id: repo.workspaceId }) : Promise.resolve(null),
+            initial ? repo.preferences() : Promise.resolve(null),
+            initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
+              ? repo.list<Label>('list_labels', {}, true)
+              : Promise.resolve(null),
+            initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
+              ? repo.list<TaskLabel>('list_task_labels', {}, true)
+              : Promise.resolve(null),
+            initial || operations.some(op => /dependency$|delete_project|delete_task/.test(op))
+              ? repo.list<TaskDependency>('list_dependencies', {}, true)
+              : Promise.resolve(null),
+            initial || operations.some(op => /subtask$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
+              ? repo.list<Subtask>('list_subtasks', {}, true)
+              : Promise.resolve(null),
+            initial || operations.some(op => /file$|attachment$|delete_project|delete_task|duplicate_task|complete_task|move_task/.test(op))
+              ? repo.list<FileMetadata>('list_files', {}, true)
+              : Promise.resolve(null),
+            initial || operations.some(op => /attachment$|delete_project|delete_task|duplicate_task|complete_task/.test(op))
+              ? repo.list<TaskAttachment>('list_attachments', {}, true)
+              : Promise.resolve(null),
+            initial || operations.some(op => /calendar_event$|delete_project/.test(op))
+              ? repo.list<CalendarEvent>('list_calendar_events', {}, true)
+              : Promise.resolve(null),
+          ]);
         if (repo.controller.signal.aborted || serial !== refreshSerial.current) return;
         setSnapshot(old => ({
           tasks,
+          files: files ?? old.files,
+          attachments: attachments ?? old.attachments,
+          calendarEvents: calendarEvents ?? old.calendarEvents,
           labels: labels ?? old.labels,
           taskLabels: taskLabels ?? old.taskLabels,
           dependencies: dependencies ?? old.dependencies,
@@ -216,8 +254,8 @@ export function useTaskDetails(repo: WorkspaceRepository, taskId: string | undef
     setLoading(true);
     void Promise.all([
       repo.list<import('../../domain/contracts').Comment>('list_comments', { taskId }, true),
-      repo.list<import('../../domain/contracts').FileMetadata>('list_files', {}, true),
-      repo.list<import('../../domain/contracts').TaskAttachment>('list_attachments', {}, true),
+      graph.files ? Promise.resolve(graph.files) : repo.list<import('../../domain/contracts').FileMetadata>('list_files', {}, true),
+      graph.attachments ? Promise.resolve(graph.attachments) : repo.list<import('../../domain/contracts').TaskAttachment>('list_attachments', {}, true),
       repo.list<import('../../domain/contracts').CommentReaction>('list_reactions', {}, true),
       repo.list<import('../../domain/contracts').ActivityEntry>('list_activity', { taskId }, true),
       repo.mode === 'local' ? repo.rpc<{ currentMemberId: string }>('get_local_actor').then(r => r.currentMemberId) : Promise.resolve(repo.userId),

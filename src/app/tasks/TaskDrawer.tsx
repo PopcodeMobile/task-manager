@@ -40,6 +40,7 @@ export function TaskDrawer({
   created,
   readOnly,
   projectId,
+  initialDueDate,
   revision,
   admin,
   refresh,
@@ -61,6 +62,7 @@ export function TaskDrawer({
   created: (id: string) => void;
   readOnly: boolean;
   projectId?: string;
+  initialDueDate?: string;
   revision: number;
   admin: boolean;
   refresh: () => Promise<void>;
@@ -77,7 +79,7 @@ export function TaskDrawer({
     [project, setProject] = useState(initial?.projectId ?? (projectId || projects[0]?.id || '')),
     [status, setStatus] = useState<TaskStatus>(initial?.status ?? 'todo'),
     [priority, setPriority] = useState<TaskPriority>(initial?.priority ?? 'none'),
-    [due, setDue] = useState(initial?.dueDate ?? ''),
+    [due, setDue] = useState(initial?.dueDate ?? initialDueDate ?? ''),
     [start, setStart] = useState(initial?.startDate ?? ''),
     [recurrence, setRecurrence] = useState<Recurrence | ''>(initial?.recurrence ?? ''),
     [estimate, setEstimate] = useState(String(initial?.legacyMetadata.estimate ?? '')),

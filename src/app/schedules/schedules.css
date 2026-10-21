@@ -1,0 +1,313 @@
+.schedule-view {
+  --schedule-color: var(--accent);
+}
+.schedule-view,
+.files-view {
+  min-width: 0;
+}
+.schedule-controls {
+  display: flex;
+  gap: var(--s-2);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: var(--s-3) 0;
+}
+.schedule-controls h2 {
+  flex: 1;
+  min-width: 160px;
+  text-transform: capitalize;
+}
+.schedule-controls > input {
+  max-width: 280px;
+}
+.schedule-controls select {
+  padding: var(--s-2);
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--text);
+}
+.schedule-calendar-scroll,
+.schedule-timeline {
+  overflow: auto;
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.schedule-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  min-width: 700px;
+}
+.schedule-weekday {
+  padding: var(--s-2);
+  text-align: center;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+  border-bottom: var(--stroke) solid var(--border);
+}
+.schedule-day {
+  padding: var(--s-1);
+  border-right: var(--stroke) solid var(--border);
+  border-bottom: var(--stroke) solid var(--border);
+  min-height: 140px;
+}
+.schedule-day.outside {
+  background: var(--surface-2);
+}
+.schedule-day header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 32px;
+}
+.schedule-day time {
+  padding: var(--s-1) var(--s-2);
+  font-size: var(--fs-xs);
+}
+.schedule-day time[aria-current] {
+  border-radius: var(--r-circle);
+  color: var(--on-accent);
+  background: var(--accent);
+}
+.schedule-day .ui-button {
+  min-height: 26px;
+  padding: var(--s-1);
+  font-size: var(--fs-xs);
+}
+.schedule-calendar.week .schedule-day {
+  min-height: 420px;
+}
+.schedule-task,
+.schedule-event {
+  width: 100%;
+  padding: var(--s-1-5) var(--s-2);
+  border: 0;
+  border-left: 3px solid var(--schedule-color, var(--accent));
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  margin-bottom: var(--s-1);
+  font-size: var(--fs-xs);
+  color: var(--text);
+}
+.schedule-task:hover,
+.schedule-event:hover {
+  background: color-mix(in srgb, var(--schedule-color, var(--accent)) 14%, var(--surface));
+}
+.schedule-event {
+  border-left-style: dotted;
+}
+.schedule-event small {
+  color: var(--text-3);
+}
+.is-done {
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+.schedule-overflow {
+  display: grid;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+}
+.schedule-timeline {
+  max-height: 600px;
+}
+.timeline-canvas {
+  position: relative;
+}
+.timeline-heading {
+  display: flex;
+  position: sticky;
+  top: 0;
+  height: 48px;
+  z-index: 4;
+  background: var(--surface);
+  border-bottom: var(--stroke) solid var(--border);
+}
+.timeline-heading > strong {
+  position: sticky;
+  left: 0;
+  flex: 0 0 220px;
+  background: var(--surface);
+  padding: var(--s-3);
+  z-index: 5;
+}
+.timeline-heading > div {
+  display: flex;
+  align-items: end;
+}
+.timeline-heading span {
+  flex-shrink: 0;
+  font-size: var(--fs-2xs);
+  text-align: center;
+  padding-bottom: var(--s-2);
+  overflow: hidden;
+}
+.timeline-body {
+  position: relative;
+}
+.timeline-row {
+  position: absolute;
+  height: 40px;
+  width: 100%;
+  border-bottom: var(--stroke) solid var(--border);
+}
+.timeline-row-name {
+  position: sticky;
+  left: 0;
+  width: 220px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border-right: var(--stroke) solid var(--border);
+  z-index: 3;
+}
+.timeline-row-name > strong {
+  padding: var(--s-2);
+  font-size: var(--fs-xs);
+}
+.timeline-row-name .ui-button {
+  min-width: 0;
+  max-width: 100%;
+  justify-content: start;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.timeline-bar {
+  position: absolute;
+  top: 7px;
+  height: 26px;
+  min-width: 11px;
+  padding: 0 var(--s-1);
+  border: var(--stroke) solid var(--schedule-color, var(--accent));
+  border-radius: var(--r-sm);
+  color: var(--text);
+  background: color-mix(in srgb, var(--schedule-color, var(--accent)) 14%, var(--surface));
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  text-align: left;
+  overflow: hidden;
+  touch-action: none;
+  z-index: 2;
+}
+.timeline-bar:hover,
+.timeline-bar:focus-visible {
+  overflow: visible;
+}
+.timeline-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--stroke);
+  background: var(--danger);
+  pointer-events: none;
+}
+.timeline-dependencies {
+  position: absolute;
+  left: 220px;
+  top: 0;
+  pointer-events: none;
+}
+.timeline-milestone {
+  position: absolute;
+  top: 9px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  color: var(--accent);
+  font-size: var(--fs-xs);
+}
+.file-collection {
+  display: grid;
+  gap: var(--s-4);
+}
+.file-collection.grid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.file-card {
+  display: flex;
+  gap: var(--s-3);
+  align-items: start;
+  padding: var(--s-4);
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.file-card > svg {
+  flex-shrink: 0;
+  color: var(--accent);
+  margin-top: var(--s-2);
+}
+.file-card > div {
+  min-width: 0;
+  flex: 1;
+}
+.file-name.ui-button {
+  display: block;
+  padding: var(--s-1) 0;
+  max-width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.file-card small {
+  display: block;
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+.file-metadata {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-2) var(--s-4);
+  margin: var(--s-5) 0;
+  font-size: var(--fs-sm);
+}
+.file-metadata dt {
+  color: var(--text-3);
+}
+.file-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+[data-density='compact'] .schedule-day {
+  min-height: 112px;
+}
+@media (max-width: 640px) {
+  .schedule-calendar {
+    min-width: 630px;
+  }
+  .schedule-controls {
+    gap: var(--s-1);
+  }
+  .file-collection.grid {
+    grid-template-columns: 1fr;
+  }
+  .file-card {
+    padding: var(--s-3);
+  }
+  .schedule-controls > input {
+    max-width: 100%;
+  }
+}
+
+.file-metadata-import {
+  border: var(--stroke) dashed var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-3);
+  margin-bottom: var(--s-3);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+.file-metadata-import input {
+  max-width: 100%;
+}
+.file-metadata-import .form-field {
+  min-width: 0;
+  max-width: 100%;
+}

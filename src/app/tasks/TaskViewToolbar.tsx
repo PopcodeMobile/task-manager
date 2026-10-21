@@ -51,6 +51,7 @@ export function TaskViewToolbar({
   tasks,
   t,
   table,
+  grouping = true,
 }: {
   view: TaskView;
   setView: (v: TaskView) => void;
@@ -59,6 +60,7 @@ export function TaskViewToolbar({
   tasks: Task[];
   t: Translate;
   table: boolean;
+  grouping?: boolean;
 }) {
   const options = (f: string) =>
     f === 'status'
@@ -154,16 +156,18 @@ export function TaskViewToolbar({
       <Button variant="ghost" aria-label={t('Inverter ordem', 'Reverse sort')} onClick={() => patch({ sort: { ...view.sort, dir: -view.sort.dir } })}>
         {view.sort.dir === 1 ? '↑' : '↓'}
       </Button>
-      <label>
-        {t('Agrupar', 'Group')}
-        <select aria-label={t('Agrupar', 'Group')} value={view.group} onChange={e => patch({ group: e.target.value })}>
-          {['status', 'priority', 'assignee', 'project', 'due', 'none'].map(f => (
-            <option key={f} value={f}>
-              {fieldLabel(f, t)}
-            </option>
-          ))}
-        </select>
-      </label>
+      {grouping && (
+        <label>
+          {t('Agrupar', 'Group')}
+          <select aria-label={t('Agrupar', 'Group')} value={view.group} onChange={e => patch({ group: e.target.value })}>
+            {['status', 'priority', 'assignee', 'project', 'due', 'none'].map(f => (
+              <option key={f} value={f}>
+                {fieldLabel(f, t)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label>
         <input type="checkbox" checked={view.showDone} onChange={e => patch({ showDone: e.target.checked })} />
         {t('Mostrar concluídas', 'Show completed')}

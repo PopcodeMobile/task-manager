@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Activity, Bot, CheckCheck, ChevronRight, FolderKanban, ListTodo, Plug, Plus, RefreshCw, Star } from 'lucide-react';
+import { Activity, CalendarDays, ChartGantt, Files, Bot, CheckCheck, ChevronRight, FolderKanban, ListTodo, Plug, Plus, RefreshCw, Star } from 'lucide-react';
 import type { Workspace } from '../../domain/contracts';
 import type { RepositoryFactory } from '../../workspace/repository';
 import { useWorkspaceData, emptySnapshot } from './useWorkspaceData';
@@ -8,7 +8,10 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import { WorkspacePicker } from '../workspaces/WorkspacePicker';
+import type { ExtraTaskMenuAction } from '../tasks/TaskContextMenu';
 import { taskLink } from '../tasks/task-detail-model';
+import { ScheduleView } from '../schedules/ScheduleView';
+import { FilesView } from '../files/FilesView';
 import { TaskList } from '../tasks/TaskList';
 import { TaskDrawer, type DraftGuard } from '../tasks/TaskDrawer';
 import { ProjectsPage } from '../projects/ProjectsPage';
@@ -109,9 +112,9 @@ export function WorkspacePanel({
       if (value) q.set(key, value);
       else q.delete(key);
     }
-    return `${base}/tasks${q.size ? '?' + q.toString() : ''}`;
+    return `${base}/${['calendar', 'timeline', 'files'].includes(route) ? route : 'tasks'}${q.size ? '?' + q.toString() : ''}`;
   };
-  const openTask = (id: string) => navigate(taskHref({ task: id }));
+  const openTask = (id: string) => navigate(taskHref({ task: id, due: '', file: '' }));
   const shown = snapshotScope === workspaceId ? snapshot : emptySnapshot;
   const projectId = url.searchParams.get('project') ?? '',
     filterProject = shown.projects.find(p => p.id === projectId),
@@ -121,6 +124,9 @@ export function WorkspacePanel({
     admin = current?.role === 'owner' || current?.role === 'admin';
   const nav = [
     { id: 'tasks', label: t('Tarefas', 'Tasks'), icon: ListTodo },
+    { id: 'calendar', label: t('Calendário', 'Calendar'), icon: CalendarDays },
+    { id: 'timeline', label: t('Cronograma', 'Timeline'), icon: ChartGantt },
+    { id: 'files', label: t('Arquivos', 'Files'), icon: Files },
     { id: 'projects', label: t('Projetos', 'Projects'), icon: FolderKanban },
     { id: 'agents', label: t('Agentes', 'Agents'), icon: Bot },
     { id: 'activity', label: t('Atividade', 'Activity'), icon: Activity },
@@ -132,6 +138,28 @@ export function WorkspacePanel({
   }, [activeNav?.label]);
   const taskList = shown.tasks.filter(task => !task.archived && (!projectId || task.projectId === projectId)),
     projects = shown.projects.filter(p => !p.archived);
+  const taskMenuActions: ExtraTaskMenuAction[] = [
+    {
+      id: 'favorite',
+      personal: true,
+      label: t('Alternar favorito', 'Toggle favorite'),
+      run: task => {
+        void toggleFavorite(task.id).catch(err => {
+          if (!repo.controller.signal.aborted) setError(errorMessage(err, t));
+        });
+      },
+    },
+    {
+      id: 'copy-link',
+      personal: true,
+      label: t('Copiar link', 'Copy link'),
+      run: task => {
+        void navigator.clipboard.writeText(taskLink(task, repo.mode === 'local', location.origin)).catch(err => {
+          if (!repo.controller.signal.aborted) setError(errorMessage(err, t));
+        });
+      },
+    },
+  ];
   return (
     <div className="work-shell">
       <a className="work-skip" href="#work-content">
@@ -304,20 +332,26 @@ export function WorkspacePanel({
                     <p>
                       {route === 'tasks'
                         ? t('Todo o trabalho da equipe, com cada próximo passo no lugar.', 'Your team’s work, with every next step in place.')
-                        : route === 'agents'
-                          ? t('Acompanhe atribuições e reservas de execução.', 'Supervise assignments and execution reservations.')
-                          : route === 'activity'
-                            ? t('Alterações de pessoas e agentes, no mesmo histórico.', 'Updates from people and agents in one history.')
-                            : route === 'integrations'
-                              ? t('Acesso dos aplicativos e entrega de eventos.', 'App access and event delivery.')
-                              : t('Esta rota será concluída na próxima etapa da migração.', 'This route will be completed in the next migration stage.')}
+                        : route === 'calendar'
+                          ? t('Prazos e eventos de todos os projetos.', 'Deadlines and events across projects.')
+                          : route === 'timeline'
+                            ? t('Datas, dependências e marcos dos projetos.', 'Schedules, dependencies and project milestones.')
+                            : route === 'files'
+                              ? t('Documentos e metadados dos projetos.', 'Project documents and metadata.')
+                              : route === 'agents'
+                                ? t('Acompanhe atribuições e reservas de execução.', 'Supervise assignments and execution reservations.')
+                                : route === 'activity'
+                                  ? t('Alterações de pessoas e agentes, no mesmo histórico.', 'Updates from people and agents in one history.')
+                                  : route === 'integrations'
+                                    ? t('Acesso dos aplicativos e entrega de eventos.', 'App access and event delivery.')
+                                    : t('Esta rota será concluída na próxima etapa da migração.', 'This route will be completed in the next migration stage.')}
                     </p>
                   </div>
                   <div className="button-row">
                     <Button variant="ghost" aria-label={t('Atualizar dados', 'Refresh data')} onClick={() => void refresh(true)}>
                       <RefreshCw size={16} />
                     </Button>
-                    {route === 'tasks' && (
+                    {['tasks', 'calendar', 'timeline'].includes(route) && (
                       <Button disabled={readOnly || !projects.length} onClick={() => openTask('new')}>
                         <Plus size={16} />
                         {t('Nova tarefa', 'New task')}
@@ -352,30 +386,45 @@ export function WorkspacePanel({
                     open={openTask}
                     t={t}
                     canCreate={!readOnly}
-                    extraTaskMenuActions={[
-                      {
-                        id: 'favorite',
-                        personal: true,
-                        label: t('Alternar favorito', 'Toggle favorite'),
-                        run: task => {
-                          void toggleFavorite(task.id).catch(err => {
-                            if (!repo.controller.signal.aborted) setError(errorMessage(err, t));
-                          });
-                        },
-                      },
-                      {
-                        id: 'copy-link',
-                        personal: true,
-                        label: t('Copiar link', 'Copy link'),
-                        run: task => {
-                          void navigator.clipboard.writeText(taskLink(task, repo.mode === 'local', location.origin)).catch(err => {
-                            if (!repo.controller.signal.aborted) setError(errorMessage(err, t));
-                          });
-                        },
-                      },
-                    ]}
+                    extraTaskMenuActions={taskMenuActions}
                   />
                 </>
+              ) : route === 'calendar' || route === 'timeline' ? (
+                <ScheduleView
+                  key={`${workspaceId}:${route}:${projectId}`}
+                  mode={route}
+                  extraTaskMenuActions={taskMenuActions}
+                  projectId={projectId}
+                  repo={repo}
+                  tasks={shown.tasks}
+                  projects={projects}
+                  members={shown.members}
+                  graph={shown}
+                  events={shown.calendarEvents}
+                  execute={execute}
+                  t={t}
+                  readOnly={!!readOnly}
+                  openTask={openTask}
+                  createTask={day => navigate(taskHref({ task: 'new', due: day || '' }))}
+                  openProject={id => navigate(`${base}/tasks?project=${encodeURIComponent(id)}`)}
+                />
+              ) : route === 'files' ? (
+                <FilesView
+                  key={`${workspaceId}:files:${projectId}`}
+                  repo={repo}
+                  files={shown.files}
+                  attachments={shown.attachments}
+                  tasks={shown.tasks}
+                  projects={projects}
+                  members={shown.members}
+                  projectId={projectId}
+                  execute={execute}
+                  readOnly={!!readOnly}
+                  t={t}
+                  openTask={openTask}
+                  fileId={url.searchParams.get('file') || undefined}
+                  selectFile={id => navigate(taskHref({ file: id, task: '' }))}
+                />
               ) : route === 'agents' ? (
                 repo.mode === 'local' ? (
                   <p role="status" className="configuration-note">
@@ -395,7 +444,7 @@ export function WorkspacePanel({
                   <IntegrationsPanel repo={repo} t={t} admin={admin} />
                 )
               ) : null}
-              {taskId && !loading && route === 'tasks' && (selected || taskId === 'new') && (
+              {taskId && !loading && ['tasks', 'calendar', 'timeline', 'files'].includes(route) && (selected || taskId === 'new') && (
                 <TaskDrawer
                   key={`${workspaceId}:${taskId}`}
                   graph={shown}
@@ -407,10 +456,11 @@ export function WorkspacePanel({
                   repo={repo}
                   execute={execute}
                   t={t}
-                  close={() => navigate(taskHref({ task: '' }))}
+                  close={() => navigate(taskHref({ task: '', due: '' }))}
                   created={openTask}
                   readOnly={readOnly}
                   projectId={projectId}
+                  initialDueDate={url.searchParams.get('due') || undefined}
                   revision={revision}
                   admin={admin}
                   refresh={async () => {
@@ -422,7 +472,7 @@ export function WorkspacePanel({
                   copyLink={() => (selected ? navigator.clipboard.writeText(taskLink(selected, repo.mode === 'local', location.origin)) : Promise.resolve())}
                 />
               )}{' '}
-              {taskId && !loading && route === 'tasks' && !selected && taskId !== 'new' && (
+              {taskId && !loading && ['tasks', 'calendar', 'timeline', 'files'].includes(route) && !selected && taskId !== 'new' && (
                 <p role="status">{t('Tarefa não encontrada nesta organização.', 'Task not found in this workspace.')}</p>
               )}
             </>

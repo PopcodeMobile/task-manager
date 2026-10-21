@@ -1196,3 +1196,213 @@ test('successful relation command refreshes canonical links even when event read
   await label.click();
   await expect(label).toBeChecked();
 });
+
+test('actual cloud schedules and files preserve duration, CAS, claims, metadata and cursor reload', async ({ page }) => {
+  test.skip(!process.env.TEST_SUPABASE_URL || !process.env.TEST_SUPABASE_SERVICE_ROLE_KEY, 'Requires dedicated local Supabase');
+  test.setTimeout(90000);
+  const { createClient } = await import('@supabase/supabase-js');
+  const base = process.env.TEST_SUPABASE_URL!,
+    key = process.env.TEST_SUPABASE_ANON_KEY!,
+    options = { auth: { persistSession: false, autoRefreshToken: false } };
+  const service = createClient(base, process.env.TEST_SUPABASE_SERVICE_ROLE_KEY!, options),
+    human = createClient(base, key, options),
+    setupActor = createClient(base, key, options),
+    executor = createClient(base, key, options);
+  const suffix = crypto.randomUUID(),
+    password = `Schedule-${crypto.randomUUID()}!`,
+    addresses = [`schedule-${suffix}@example.test`, `setup-${suffix}@example.test`, `executor-${suffix}@example.test`],
+    users: string[] = [];
+  const cleanup: string[] = [],
+    counts: Record<string, number> = {};
+  let ws = '';
+  page.on('response', response => {
+    if (response.url().includes('/rest/v1/rpc/')) {
+      const key = response.url().split('/').pop() + ':' + response.status();
+      counts[key] = (counts[key] || 0) + 1;
+    }
+  });
+  try {
+    for (const email of addresses) {
+      const made = await service.auth.admin.createUser({ email, password, email_confirm: true });
+      expect(!!made.error).toBe(false);
+      users.push(made.data.user!.id);
+    }
+    for (const [index, client] of [human, setupActor, executor].entries())
+      expect(!!(await client.auth.signInWithPassword({ email: addresses[index], password })).error).toBe(false);
+    const made = await human.rpc('create_workspace_v2', { p_name: 'Schedules actual', p_slug: `schedule-${suffix}`, p_idempotency_key: suffix });
+    expect(!!made.error).toBe(false);
+    ws = made.data.data.id;
+    expect(!!(await service.from('workspace_memberships').insert(users.slice(1).map(user_id => ({ workspace_id: ws, user_id, role: 'member' })))).error).toBe(
+      false,
+    );
+    expect(!!(await service.from('agents').insert({ workspace_id: ws, id: 'schedule-agent', name: 'Schedule executor', auth_user_id: users[2] })).error).toBe(
+      false,
+    );
+    const command = async (operation: string, input: Record<string, unknown>, version?: number, client = human) => {
+      const result = await client.rpc('execute_operation', {
+        p_workspace_id: ws,
+        p_operation: operation,
+        p_command: input,
+        p_expected_version: version ?? null,
+        p_idempotency_key: crypto.randomUUID(),
+      });
+      expect(result.error?.message || '').toBe('');
+      return result.data.data;
+    };
+    const read = async (operation: string, query = {}) => {
+      const result = await human.rpc('read_operation', { p_workspace_id: ws, p_operation: operation, p_query: query });
+      expect(result.error?.message || '').toBe('');
+      return result.data;
+    };
+    const day = (offset: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() + offset);
+      return d.toLocaleDateString('sv-SE');
+    };
+    const project = await command('create_project', { name: 'Schedules project', attributes: { milestones: [{ name: 'Literal <milestone>', date: day(3) }] } });
+    const task = await command('create_task', { id: 'schedule-task', projectId: project.id, title: 'Cloud schedule', startDate: day(-2), dueDate: day(1) });
+    const other = await command('create_task', { id: 'schedule-consumer', projectId: project.id, title: 'File consumer' });
+    await command('create_calendar_event', { id: 'schedule-event', projectId: project.id, title: 'Cloud <event>', eventDate: day(0), eventTime: '14:00' });
+    // Large fixture uses a separate authenticated setup actor; observed UI and reads remain human JWT.
+    for (const [start, count] of [
+      [0, 100],
+      [100, 3],
+    ])
+      await command(
+        'batch',
+        {
+          commands: Array.from({ length: count }, (_, i) => ({
+            operation: 'create_file',
+            input: {
+              id: `schedule-file-${start + i}`,
+              projectId: project.id,
+              name: `Cloud file ${String(start + i).padStart(3, '0')}.pdf`,
+              fileType: 'pdf',
+              sizeLabel: '2 KB',
+            },
+          })),
+        },
+        undefined,
+        setupActor,
+      );
+    // Trusted fixture only: historical unknown metadata is not writable through public commands.
+    expect(
+      !!(
+        await service
+          .from('files')
+          .update({ task_id: task.id, legacy_metadata: { custom: { literal: '<unknown>', nested: [1, 'kept'] } } })
+          .eq('workspace_id', ws)
+          .eq('id', 'schedule-file-102')
+      ).error,
+    ).toBe(false);
+    await command('set_task_attachment', { id: task.id, fileId: 'schedule-file-102' }, task.version);
+    await command('set_task_attachment', { id: other.id, fileId: 'schedule-file-102' }, other.version);
+    await page.goto(`/app/w/${ws}/calendar`);
+    await page.getByLabel('E-mail').fill(addresses[0]);
+    await page.getByLabel('Senha', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Calendário', exact: true })).toBeVisible();
+    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await page.getByRole('button', { name: /14:00(?::00)? Cloud <event>/ }).click();
+    await expect(page.getByRole('dialog')).toContainText('Schedules project');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Cloud schedule', exact: true }).dragTo(page.locator(`[data-calendar-day="${day(3)}"]`));
+    await expect(page.locator(`[data-calendar-day="${day(3)}"]`).getByRole('button', { name: 'Cloud schedule', exact: true })).toBeVisible();
+    let current = (await read('get_task', { id: task.id })).data;
+    expect(current.startDate).toBe(day(0));
+    expect(current.dueDate).toBe(day(3));
+    await page.getByRole('link', { name: 'Timeline', exact: true }).click();
+    await page.getByRole('button', { name: 'Today', exact: true }).click();
+    const bar = page.locator(`[data-schedule-bar="${task.id}"]`);
+    await bar.scrollIntoViewIfNeeded();
+    await bar.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(bar).toHaveAttribute('data-due-date', day(4));
+    await page.reload();
+    await expect(bar).toHaveAttribute('data-due-date', day(4));
+    current = (await read('get_task', { id: task.id })).data;
+    expect(current.startDate).toBe(day(1));
+    await command('claim_task', { id: task.id }, current.version, executor);
+    await page.reload();
+    await bar.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('alert')).toContainText(/reservation|reserved|control/i);
+    expect((await read('get_task', { id: task.id })).data.dueDate).toBe(day(4));
+    await page.getByRole('link', { name: 'Files', exact: true }).click();
+    await expect(page.locator('[data-file-id]')).toHaveCount(103);
+    await expect(page.getByLabel('Select files for metadata simulation', { exact: true })).toHaveCount(0);
+    await page.getByLabel('Search files', { exact: true }).fill('Cloud file 102');
+    await page.getByRole('button', { name: 'Cloud file 102.pdf', exact: true }).click();
+    await page.getByLabel('File name', { exact: true }).fill('Literal <renamed>.pdf');
+    await page.getByRole('button', { name: 'Rename file', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Literal <renamed>.pdf');
+    const duplicateAttempts: Record<string, unknown>[] = [];
+    await page.route('**/rest/v1/rpc/execute_operation', async route => {
+      const body = route.request().postDataJSON();
+      if (body.p_operation !== 'duplicate_file') return route.fallback();
+      duplicateAttempts.push(body);
+      if (duplicateAttempts.length === 1) {
+        const committed = await route.fetch();
+        expect(committed.ok()).toBe(true);
+        await route.abort('failed');
+      } else await route.fallback();
+    });
+    await page.getByRole('button', { name: 'Duplicate', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toContainText(/connection/i);
+    await page.getByRole('button', { name: 'Duplicate', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Literal <renamed> copy.pdf');
+    expect(duplicateAttempts).toHaveLength(2);
+    expect(duplicateAttempts[1].p_idempotency_key).toBe(duplicateAttempts[0].p_idempotency_key);
+    expect(duplicateAttempts[1].p_command).toEqual(duplicateAttempts[0].p_command);
+    const copyId = new URL(page.url()).searchParams.get('file')!;
+    const filePage = await read('list_files', { limit: 100 });
+    const fileTail = filePage.nextCursor ? await read('list_files', { limit: 100, cursor: filePage.nextCursor }) : { items: [] };
+    const copied = [...filePage.items, ...fileTail.items].find((file: { id: string }) => file.id === copyId);
+    expect(copied.legacyMetadata.custom).toEqual({ literal: '<unknown>', nested: [1, 'kept'] });
+    expect(copied.authorUserId).toBe(users[0]);
+    expect(copied.taskId).toBe(task.id);
+    expect((await read('list_attachments')).items.filter((x: { fileId: string }) => x.fileId === copyId)).toHaveLength(0);
+    await page.reload();
+    await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Literal <renamed> copy.pdf');
+    await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+    await page.getByLabel('Search files', { exact: true }).fill('Literal');
+    await page.getByRole('button', { name: 'Literal <renamed>.pdf', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete file', exact: true }).click();
+    await page.getByRole('button', { name: 'Confirm deletion', exact: true }).click();
+    await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText(/reservation|reserved|control/i);
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+    // Explicit human intervention is the only path that clears the executor reservation.
+    await page.getByRole('link', { name: 'Timeline', exact: true }).click();
+    await page.locator('.timeline-row-name').getByRole('button', { name: 'Cloud schedule', exact: true }).click();
+    await page.getByRole('button', { name: 'Resume human control', exact: true }).click();
+    await page.getByRole('button', { name: 'Confirm resume', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Resume human control', exact: true })).toBeDisabled();
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.getByRole('link', { name: 'Files', exact: true }).click();
+    await page.getByRole('button', { name: 'Literal <renamed>.pdf', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete file', exact: true }).click();
+    await page.getByRole('button', { name: 'Confirm deletion', exact: true }).click();
+    await expect(page.locator('[data-file-id="schedule-file-102"]')).toHaveCount(0);
+    expect((await read('list_attachments')).items.filter((x: { fileId: string }) => x.fileId === 'schedule-file-102')).toHaveLength(0);
+    expect((await read('get_task', { id: other.id })).data.title).toBe('File consumer');
+    await page.getByRole('button', { name: 'Literal <renamed> copy.pdf', exact: true }).click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByRole('dialog').locator('img')).toHaveCount(0);
+    await page.screenshot({ path: '/tmp/task6b3-cloud-files-mobile.png' });
+    console.log('Task6b3 actual cloud RPC counts:', JSON.stringify(counts));
+  } finally {
+    if (ws) {
+      if ((await service.from('task_claims').delete().eq('workspace_id', ws)).error) cleanup.push('claims');
+      if ((await service.from('workspaces').delete().eq('id', ws)).error) cleanup.push('workspace');
+    }
+    for (const id of users) if ((await service.auth.admin.deleteUser(id)).error) cleanup.push('user');
+    await human.auth.signOut();
+    await setupActor.auth.signOut();
+    await executor.auth.signOut();
+  }
+  expect(cleanup).toEqual([]);
+});
