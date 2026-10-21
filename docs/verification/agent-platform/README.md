@@ -1,5 +1,7 @@
 # Agent platform evidence archive
 
+Latest candidate: [N3 local visibility correction](final-visibility-report.md), following [N1/N2 approval with minor N3](final-residual-review.md). Exact-diff N3 verification is pending;009hash and runtime008 boundary are unchanged.
+
 These source-owned reports and independent review rulings were preserved from the staged implementation workspace before cleanup. They record their own BASE/HEAD and chronology. Earlier failures/pending statements are historical; later appends and final cutover evidence take precedence. Paths under `/tmp` or private config directories identify original local logs and are not published credentials or a promise those logs remain available forever.
 
 The [final residual report](final-residual-report.md) records the bounded N1/N2 correction after the [scoped rereview](final-fix-rereview.md); its new009hash supersedes the first final-fix hash. Independent narrow N1/N2 review and matched runtime gate remain pending.

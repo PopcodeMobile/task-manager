@@ -1,0 +1,12 @@
+✔ residual contextual history pages actual sources, keeps pending context visible, and merges polled events without duplicate comment entries (49.137167ms)
+✔ local history visibility retains only allowed context: hidden project (11.595166ms)
+✔ local history visibility retains only allowed context: visible project (6.875042ms)
+✔ local history visibility retains only allowed context: unscoped member event (7.066166ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 233.146917

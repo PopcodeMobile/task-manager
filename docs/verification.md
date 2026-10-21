@@ -1,5 +1,7 @@
 # Verification
 
+Latest source adds the [N3 local visibility filter](verification/agent-platform/final-visibility-report.md) after independent N1/N2 acceptance. Four focused component tests, types/lint/owned formatting pass. No new browser/build is claimed for that filter; exact-diff verification and root runtime/activation gates remain pending.
+
 Current candidate: [bounded N1/N2 remediation](verification/agent-platform/final-residual-report.md), product d1c11ad75503ef4bee611be95778633415b64ca8. Five focused tests pass, two mock-cloud preview case outcomes pass, lint/types/tokens234/103 and one488.01kBbuild pass. Narrow independent review remains pending; shared/hosted runtime is008. The report contains the latest009hash and exact proof boundaries. Earlier final-fix evidence below is historical.
 
 The final React cutover passed its independent Task6d gate at `fb881aa` ([scoped approval](verification/agent-platform/task-6d-rereview-2.md)). The subsequent [whole-branch review](verification/agent-platform/final-review.md) required I1–I9 fixes; the [single consolidated fix wave](verification/agent-platform/final-fix-report.md) is implemented and awaiting scoped rereview. Production activation remains pending. [Its report](verification/agent-platform/task-6d-report.md) records exact source, commands, failures, final reruns, visual evidence and runtime boundaries. Earlier stage reviews and exact architectural rulings are preserved in the [evidence archive](verification/agent-platform/README.md); they are not a claim of final deployment.

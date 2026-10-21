@@ -1,0 +1,69 @@
+# Independent bounded N1/N2 residual review
+
+2026-10-21. Range: `2f325a8cad66b75376b82bcddd19a2fc0daf00ff..2c555e4852ebe4cbaf98e7a7991edbe0a383720d`, two commits. Reviewed HEAD and supplied diff size match: **137,401 bytes**. Migration009 SHA-256 independently verified: `f2212f8031061ad9d12cd76e491cf9f53ba2fb064131131c9f7fc3a644f47fb3`.
+
+**N1 and N2 original triggers: ADDRESSED.** One minor directly introduced local-demo visibility regression is documented below. **Unqualified code approval remains subject to root's disposition of that regression.** This report neither restarts the whole-branch audit nor requests an automatic fix/review loop.
+
+**Activation: NOT APPROVED.** Shared/hosted runtime remains008 according to the handoff. Actual009 API/Auth/MCP/full-SDK acceptance is root-owned and still pending, independently of this source review.
+
+## Scope and criteria
+
+Read the bounded review brief, immutable prior `final-fix-rereview.md` N1/N2 triggers, permanent `docs/verification/agent-platform/final-residual-report.md`, changed production code and focused tests. Confirmed the scratch and permanent residual reports are byte-identical. The two-axis spec/quality vocabulary from the code-review skill is applied within the explicit no-subagent, no-broad-rerun brief. No callable context-manager review tool was available; the supplied brief and global AGENTS instructions supply the review context. No tracked project AGENTS/CLAUDE/CONTRIBUTING/STANDARDS file was returned by the targeted inventory.
+
+Only disconnected project/member/palette history consumers, reservation/execution projection, and directly introduced breakage were considered. Previously addressed I1, I2, I4–I9, M1/M2 were not reopened. Root's explicit procedural exception is accepted as recorded; this review does not introduce a new permission threshold.
+
+## Per-residual disposition
+
+### N1 / remaining I3 — ADDRESSED for the original history-disconnect trigger
+
+`src/app/activity/ContextHistory.tsx:28–103` obtains bounded pages for domain events, legacy activity and comments; each paging request uses the existing hook's limit100. Unknown or failed history shows partial/retry/continuation instead of a final empty feed. Later locally filtered matches remain reachable through explicit continuation. Historical and polled domain events merge by event ID; canonical comments are suppressed when the matching add-comment event is present. Overview/member limits apply to loaded matching entries, with the partial-state qualification retained.
+
+`ProjectDetail.tsx:120`, `:283`, `:390` connects project Activity/Overview; `PeoplePages.tsx:307` connects member context. `CommandPalette.tsx:126–145` offers the explicit historical-search route and qualifies empty loaded results. `WorkspacePanel.tsx:790–795` preserves query and category; `RemainingRoutes.tsx:52`, `:506–507` remounts Search when route query/category changes and initializes both inputs. The existing paged comment search supplies later matching results.
+
+Inspected the actual component/hook test and browser test. Archived `focused-final.log` reports5/5,0skip; the contextual test covers three bounded initial reads, deduplication, later filtered match, failed-cursor retry, no false initial empty feed and a polled event. `browser4.log` reports the contextual case passing after reload, Project Overview/Activity, member continuation, posthydration event, comment-only palette query/category and a second query on the existing Search route. The browser fixture contains105activity rows/105comments and a historical domain event. This supports the exact N1 correction; it is mock Auth/RPC preview evidence, not live transport acceptance.
+
+The high-water-before-hydration code and quota enforcement are unchanged. No eager whole-workspace history exhaustion was introduced. Three reads per mounted context/revision plus explicit continuations are bounded work, not proof of an unlimited event-rate/request budget. The local visibility parity limitation discovered below is separate directly introduced breakage.
+
+### N2 — ADDRESSED
+
+`supabase/migrations/202610200009_task_context_execution.sql:20–33` leaves the original `reservation.active` projection intact and calculates a separate `execution_active`. The original005 projection uses the lease deadline; membership/OAuth/connection/grant authority can now disable execution without changing that unexpired lock. The ordinary mutation guard at009:64–67 remains unchanged and still rejects human completion/deletion/move while the lease is active.
+
+The existing `TaskDrawer.tsx:113`, `TaskExecutionSection.tsx:50–88`, project completion gating and `task-view-model.ts:143` consume the reservation consistently. The future deadline is therefore labeled as a reservation, ordinary completion stays disabled, and explicit human intervention remains available. No release, authorization or lease bypass was added.
+
+Inspected the new SQL test and archived final5/5 output: claim → membership demotion → owner read produces reservation.active=true/execution.active=false; ordinary completion raises already_claimed; explicit release clears both projections; completion then succeeds. The archived `browser2.log` N2 case passed and checks inactive prior-block text, future reservation label, disabled completion and enabled intervention. That same invocation's N1 failure was a fixture expectation later corrected; the evidence is a latest-outcome union, not a fresh2/2 aggregate. OAuth-specific revocation follows the unchanged authority predicate in source; this narrow new test executes membership demotion, not every authority variant.
+
+## Directly introduced breakage
+
+### N3 — Minor / P3: Local member history can show activity metadata for a hidden private project
+
+**Changed source:** `src/app/activity/ContextHistory.tsx:61–67`, reached by new `PeoplePages.tsx:307`.
+
+**Trigger:** In the local demo, a member has an `update_project` event for a private project that the current local actor cannot see. The member page receives a visibility-filtered snapshot, but its new ContextHistory independently queries raw `list_domain_events`. Local `appendEvent` (`src/workspace/local-panel.js:395–413`) represents an update_project input `{id: privateProjectId, ...}` with entityId equal to that project ID and no payload.projectId/taskId. ContextHistory only checks payload.projectId or a referenced task's project; neither exists in this shape, so the hidden project event passes its member filter.
+
+The existing `visiblePanelSnapshot` (`panel-model.ts:69–72`) explicitly excludes hidden project entity IDs, but its already-filtered `snapshot.events` cannot filter the independently fetched historical page. Before this change the member surface only rendered visibility-filtered legacy activity and did not independently display these domain events.
+
+**Actual visible information:** `ActivityPage.tsx:63–78` displays the actor name (or generic Member), the translated action “updated a project”, and timestamp. It does **not** render the hidden project's name, ID, body, task title or a project link for this shape. This is local-demo visibility parity, not evidence of cloud cross-tenant access, OAuth bypass or a remote data disclosure. Severity is therefore minor/P3.
+
+**Reviewer probe:** Executed exactly one isolated in-memory probe using the actual ContextHistory and actual usePagedCollection through the existing JSX/state/effect shim. The repository fixture returned the source-supported local event shape; the visible snapshot contained only a different public project. Output:
+
+```json
+{"probe":"new local member history hidden-project event","visibleProjectIds":["public-project"],"fixtureEvent":{"id":"hidden-event","operation":"update_project","entityId":"private-project","actorUserId":"member","actorAgentId":null,"createdAt":"2026-10-21T00:00:00Z","payload":{}},"renderedEvents":[{"id":"hidden-event","operation":"update_project","entityId":"private-project","actorUserId":"member","actorAgentId":null,"createdAt":"2026-10-21T00:00:00Z","payload":{}}]}
+```
+
+The probe establishes that the actual component passes the hidden event to ActivityPage. The exact text rendering and producer shape were traced in source; no new browser/local-adapter end-to-end run is claimed.
+
+**Smallest correction if root elects to fix:** Apply the existing local visibility policy to independently fetched domain pages as well, including project entity IDs when payload.projectId is absent. Supply enough entity visibility context or classify these project-scoped operations against visible project IDs. Retain legitimate workspace/member events without project associations. A focused assertion using the above hidden-project shape, plus one visible project and one unscoped event, would verify the correction without another broad suite.
+
+## Spec and quality verdicts
+
+**Spec:** The original N1/N2 triggers and requested narrow proofs are satisfied. Preservation of local visibility is incomplete for the concrete N3 shape. Root must adjudicate that minor directly introduced regression before an unqualified spec pass.
+
+**Quality:** The shared paging component avoids duplicating the three consumers' history logic; the SQL change is confined to projection and preserves mutation guards. No critical/high-priority issue was found in this bounded diff. One actionable minor correctness/privacy-presentation finding, N3, remains. Archived lint/typecheck/global-format logs pass; token log reports234/103 and the recorded single build reports1764modules, maximum488.01kB/gzip151.38kB. These are inspected implementer evidence, not fresh reviewer executions. Coverage>80%, cyclomatic complexity<10, production capacity and comprehensive security are not measured or certified here.
+
+## Limits and stop condition
+
+The fresh SQL evidence uses PGlite with synthetic principals. The existing focused SDK case uses the real SDK over InMemoryTransport with injected Auth. Browser evidence uses final React over mock Auth/RPC. No new actual PostgreSQL/pgmq, OAuth, hosted/local API/MCP transport, full SDK gate, broad tests, builds, browser session or contention loop was run by this reviewer.
+
+No product/index/HEAD, service, deployment, database or remote state was changed. No subagents were started. The only written artifact is this review; user preview5182 and unrelated services were untouched. Actual Hermes/personal Claude, Vercel publication/Auth/CORS, receiver DNS/TLS, effective retention/pruning/replay horizon and Cron remain pending independently.
+
+Stop condition reached: exact candidate/hash/package checked, N1/N2 source and focused evidence assessed, one concrete direct regression isolated and reported, and root's separate runtime/activation gates retained. No automatic remediation/review cycle is requested.
