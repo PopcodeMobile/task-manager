@@ -736,6 +736,22 @@
 .react-shell .auth-card .ui-input {
   height: var(--h-lg);
 }
+.react-shell .auth-field-hint,
+.react-shell .auth-field-error {
+  margin: 0;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+}
+.react-shell .auth-field-hint {
+  color: var(--text-2);
+}
+.react-shell .auth-field-error {
+  color: var(--danger);
+}
+.react-shell .auth-card .ui-input[aria-invalid='true'] {
+  border-color: var(--danger);
+  box-shadow: var(--error-ring);
+}
 .react-shell .auth-card .login-button {
   height: var(--h-lg);
   min-height: var(--h-lg);

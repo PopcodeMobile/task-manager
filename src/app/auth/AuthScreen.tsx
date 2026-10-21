@@ -1,10 +1,12 @@
 import { KairosLogo } from '../design/KairosMark';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { supabase } from '../integrations/client';
 import { useAuth } from './AuthProvider';
 import type { Translate } from './ConsentPage';
+type AuthField = 'name' | 'email' | 'password' | 'confirm';
+type FieldErrors = Partial<Record<AuthField, string>>;
 export function AuthScreen({ t }: { t: Translate }) {
   const { configured, recovery, completeRecovery, authError } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot' | 'verify' | 'sent'>('login'),
@@ -13,10 +15,20 @@ export function AuthScreen({ t }: { t: Translate }) {
     [confirm, setConfirm] = useState(''),
     [name, setName] = useState(''),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const newPassword = mode === 'signup' || recovery;
+  const pendingFocus = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!busy) {
+      pendingFocus.current?.focus();
+      pendingFocus.current = null;
+    }
+  }, [busy, fieldErrors]);
   const change = (next: typeof mode) => {
     setMode(next);
     setError('');
+    setFieldErrors({});
     setPassword('');
     setConfirm('');
   };
@@ -26,20 +38,56 @@ export function AuthScreen({ t }: { t: Translate }) {
     if (reset) url.searchParams.set('mode', 'recovery');
     return url.href;
   };
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!supabase) return;
+  function validate(form: HTMLFormElement): FieldErrors {
+    const errors: FieldErrors = {};
+    if (mode === 'signup' && !recovery && !name.trim()) errors.name = t('Informe seu nome.', 'Enter your name.');
+    if (!recovery) {
+      const input = form.elements.namedItem('email') as HTMLInputElement;
+      if (!email.trim()) errors.email = t('Informe seu e-mail.', 'Enter your email.');
+      else if (input.validity.typeMismatch)
+        errors.email = t('Informe um e-mail válido, como nome@exemplo.com.', 'Enter a valid email, such as name@example.com.');
+    }
+    if (mode !== 'forgot' || recovery) {
+      if (!password) errors.password = t('Informe sua senha.', 'Enter your password.');
+      else if (newPassword && password.length < 10)
+        errors.password = t('A senha precisa ter pelo menos 10 caracteres.', 'Your password must have at least 10 characters.');
+      else if (newPassword && !/\d|[^a-zA-Z]/.test(password))
+        errors.password = t('Inclua pelo menos um número ou símbolo na senha.', 'Include at least one number or symbol in your password.');
+    }
+    if (recovery) {
+      if (!confirm) errors.confirm = t('Confirme sua nova senha.', 'Confirm your new password.');
+      else if (password !== confirm) errors.confirm = t('As senhas não coincidem.', 'Passwords do not match.');
+    }
+    return errors;
+  }
+  const fieldProps = (field: AuthField) => ({
+    id: `auth-${field}`,
+    name: field,
+    'aria-invalid': !!fieldErrors[field],
+    'aria-describedby':
+      [field === 'password' && newPassword ? 'auth-password-hint' : '', fieldErrors[field] ? `auth-${field}-error` : ''].filter(Boolean).join(' ') || undefined,
+  });
+  function edit(field: AuthField, value: string) {
+    ({ name: setName, email: setEmail, password: setPassword, confirm: setConfirm })[field](value);
     setError('');
-    if (mode === 'signup' && !name.trim()) {
-      setError(t('Informe seu nome.', 'Enter your name.'));
-      return;
-    }
-    if ((mode === 'signup' || recovery) && (!/\d|[^a-zA-Z]/.test(password) || password.length < 10)) {
-      setError(t('Use pelo menos 10 caracteres, incluindo um número ou símbolo.', 'Use at least 10 characters, including a number or symbol.'));
-      return;
-    }
-    if (recovery && password !== confirm) {
-      setError(t('As senhas não coincidem.', 'Passwords do not match.'));
+    setFieldErrors(previous => ({ ...previous, [field]: undefined, ...(field === 'password' ? { confirm: undefined } : {}) }));
+  }
+  const fieldMessage = (field: AuthField) =>
+    fieldErrors[field] && (
+      <p id={`auth-${field}-error`} className="auth-field-error" role="alert">
+        {fieldErrors[field]}
+      </p>
+    );
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!supabase || busy) return;
+    const form = e.currentTarget;
+    setError('');
+    const errors = validate(form);
+    setFieldErrors(errors);
+    const first = Object.keys(errors)[0];
+    if (first) {
+      (form.elements.namedItem(first) as HTMLInputElement).focus();
       return;
     }
     setBusy(true);
@@ -64,12 +112,41 @@ export function AuthScreen({ t }: { t: Translate }) {
         if (result.error) throw result.error;
         setPassword('');
       }
-    } catch {
-      setError(
-        mode === 'login'
-          ? t('E-mail ou senha inválidos. Confira e tente novamente.', 'Invalid email or password. Check and try again.')
-          : t('Não foi possível concluir. Confira os dados e tente novamente.', 'Could not complete this request. Check the fields and try again.'),
-      );
+    } catch (failure) {
+      const code = typeof failure === 'object' && failure !== null && 'code' in failure ? failure.code : undefined;
+      if (code === 'weak_password' || code === 'same_password') {
+        setFieldErrors({
+          password:
+            code === 'same_password'
+              ? t('Escolha uma senha diferente da atual.', 'Choose a password different from your current one.')
+              : t(
+                  'Esta senha não atende aos requisitos de segurança. Escolha outra senha.',
+                  'This password does not meet the security requirements. Choose another password.',
+                ),
+        });
+        pendingFocus.current = form.elements.namedItem('password') as HTMLInputElement;
+      } else if (code === 'over_email_send_rate_limit' || code === 'over_request_rate_limit') {
+        setError(
+          t(
+            'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.',
+            'Too many attempts in a short time. Wait a few minutes and try again.',
+          ),
+        );
+      } else if (code === 'email_not_confirmed') {
+        setError(
+          t(
+            'Confirme seu e-mail antes de entrar. Confira sua caixa de entrada e a pasta de spam.',
+            'Confirm your email before signing in. Check your inbox and spam folder.',
+          ),
+        );
+      } else if (code === 'request_timeout' || (failure instanceof Error && failure.name === 'AuthRetryableFetchError')) {
+        setError(t('Não foi possível conectar. Confira sua conexão e tente novamente.', 'Could not connect. Check your connection and try again.'));
+      } else
+        setError(
+          mode === 'login'
+            ? t('E-mail ou senha inválidos. Confira e tente novamente.', 'Invalid email or password. Check and try again.')
+            : t('Não foi possível concluir. Confira os dados e tente novamente.', 'Could not complete this request. Check the fields and try again.'),
+        );
     } finally {
       setBusy(false);
     }
@@ -121,54 +198,80 @@ export function AuthScreen({ t }: { t: Translate }) {
           {t('Voltar para entrar', 'Back to sign in')}
         </Button>
       ) : (
-        <form onSubmit={e => void submit(e)}>
+        <form noValidate onSubmit={e => void submit(e)}>
           {mode === 'signup' && !recovery && (
-            <label className="form-field">
-              {t('Nome completo', 'Full name')}
-              <Input value={name} onChange={e => setName(e.target.value)} required maxLength={120} autoComplete="name" disabled={busy} />
-            </label>
+            <div className="form-field">
+              <label htmlFor="auth-name">{t('Nome completo', 'Full name')}</label>
+              <Input
+                {...fieldProps('name')}
+                value={name}
+                onChange={e => edit('name', e.target.value)}
+                required
+                maxLength={120}
+                autoComplete="name"
+                disabled={busy}
+              />
+              {fieldMessage('name')}
+            </div>
           )}
           {!recovery && (
-            <label className="form-field">
-              {t('E-mail', 'Email')}
-              <Input type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} disabled={busy || !configured} />
-            </label>
+            <div className="form-field">
+              <label htmlFor="auth-email">{t('E-mail', 'Email')}</label>
+              <Input
+                {...fieldProps('email')}
+                type="email"
+                autoComplete="username"
+                required
+                value={email}
+                onChange={e => edit('email', e.target.value)}
+                disabled={busy || !configured}
+              />
+              {fieldMessage('email')}
+            </div>
           )}
           {(mode !== 'forgot' || recovery) && (
             <div className="form-field">
               <div className="auth-password-label">
                 <label htmlFor="auth-password">{recovery ? t('Nova senha', 'New password') : t('Senha', 'Password')}</label>
                 {mode === 'login' && !recovery && (
-                  <Button className="auth-link" variant="ghost" type="button" onClick={() => change('forgot')}>
+                  <Button className="auth-link" variant="ghost" type="button" disabled={busy} onClick={() => change('forgot')}>
                     {t('Esqueceu a senha?', 'Forgot password?')}
                   </Button>
                 )}
               </div>
               <Input
-                id="auth-password"
+                {...fieldProps('password')}
                 type="password"
                 autoComplete={mode === 'signup' || recovery ? 'new-password' : 'current-password'}
                 required
-                minLength={10}
+                minLength={newPassword ? 10 : undefined}
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={e => edit('password', e.target.value)}
                 disabled={busy || !configured}
               />
+              {newPassword && (
+                <p id="auth-password-hint" className="auth-field-hint">
+                  {t('Use pelo menos 10 caracteres, incluindo um número ou símbolo.', 'Use at least 10 characters, including a number or symbol.')}
+                </p>
+              )}
+              {fieldMessage('password')}
             </div>
           )}
           {recovery && (
-            <label className="form-field">
-              {t('Confirme a senha', 'Confirm password')}
+            <div className="form-field">
+              <label htmlFor="auth-confirm">{t('Confirme a senha', 'Confirm password')}</label>
               <Input
+                {...fieldProps('confirm')}
                 type="password"
                 autoComplete="new-password"
                 required
                 minLength={10}
                 value={confirm}
-                onChange={e => setConfirm(e.target.value)}
+                onChange={e => edit('confirm', e.target.value)}
                 disabled={busy || !configured}
               />
-            </label>
+              {fieldMessage('confirm')}
+            </div>
           )}
           {error && (
             <p role="alert" className="error-message">
@@ -190,13 +293,13 @@ export function AuthScreen({ t }: { t: Translate }) {
       )}
       {mode === 'login' && !recovery && (
         <div className="auth-links">
-          <Button variant="ghost" onClick={() => change('signup')}>
+          <Button variant="ghost" disabled={busy} onClick={() => change('signup')}>
             {t('Criar conta', 'Create account')}
           </Button>
         </div>
       )}
       {(mode === 'signup' || mode === 'forgot') && !recovery && (
-        <Button variant="ghost" onClick={() => change('login')}>
+        <Button variant="ghost" disabled={busy} onClick={() => change('login')}>
           {t('Voltar para entrar', 'Back to sign in')}
         </Button>
       )}
