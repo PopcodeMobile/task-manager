@@ -107,8 +107,8 @@ export class NormalizedRepository {
   async workspaces(fresh = false): Promise<Workspace[]> {
     return (await this.list<Workspace>('list_workspaces', {}, fresh)).filter(w => w.storageVersion === 2);
   }
-  async preferences(): Promise<UserPreferences['preferences']> {
-    const result = await this.query<{ data: UserPreferences | null }>('get_preferences');
+  async preferences(fresh = false): Promise<UserPreferences['preferences']> {
+    const result = await this.query<{ data: UserPreferences | null }>('get_preferences', {}, fresh);
     // Unknown legacy authorship is archived shared state, never a source of current personal settings.
     const preferences = result.data?.userId === this.userId ? result.data.preferences : null;
     return {

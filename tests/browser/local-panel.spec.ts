@@ -2310,3 +2310,56 @@ test('6c fix2 reset refreshes settings baseline and discovery while external wor
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.ws.name)).toBe('External winner');
   await other.close();
 });
+
+test('final fix completed group inline and drawer creation remain atomic completed tasks', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/login');
+  await page.getByRole('link', { name: /Continue on this device|Continuar neste dispositivo/ }).click();
+  await page.getByRole('link', { name: 'Tasks', exact: true }).click();
+  await page.getByRole('textbox', { name: 'New task in group: done', exact: true }).fill('Created completed inline');
+  await page.getByRole('button', { name: 'Add to group: done', exact: true }).click();
+  await expect(page.getByRole('button', { name: /Created completed inline/ })).toBeVisible();
+  await page.getByRole('link', { name: 'My tasks', exact: true }).click();
+  await page.getByRole('button', { name: /^Completed/ }).click();
+  await page.getByRole('button', { name: 'Add task in this group', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
+  await page.getByLabel('Title', { exact: true }).fill('Created completed drawer');
+  await page.getByRole('button', { name: 'Create task', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
+  const rows = await page.evaluate(() =>
+    Object.values(JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records as Record<string, { data: { tasks: { title: string; status: string }[] } }>)
+      .flatMap((r: { data: { tasks: { title: string; status: string }[] } }) => r.data.tasks)
+      .filter((t: { title: string }) => t.title.startsWith('Created completed')),
+  );
+  expect(rows).toHaveLength(2);
+  expect(rows.every((t: { status: string }) => t.status === 'done')).toBe(true);
+});
+test('final fix discussion and search expose later pages without declaring partial history complete', async ({ page }) => {
+  const historyData = {
+    ...data,
+    comments: Array.from({ length: 105 }, (_, i) => ({
+      id: `page-${String(i).padStart(3, '0')}`,
+      task: data.tasks[0].id,
+      by: data.me,
+      at: Date.now(),
+      text: i === 104 ? 'Needle final page' : `Earlier instruction ${i}`,
+      re: {},
+    })),
+  };
+  await page.addInitScript(value => localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en' } })), historyData);
+  await page.goto('/login');
+  await page.getByRole('link', { name: /Continue on this device|Continuar neste dispositivo/ }).click();
+  await page.getByRole('link', { name: 'Tasks', exact: true }).click();
+  await page.getByText(firstTitle, { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Load more history', exact: true })).toBeEnabled();
+  await expect(page.locator('article.comment .rich-content').filter({ hasText: 'Needle final page' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Load more history', exact: true }).click();
+  await expect(page.locator('article.comment .rich-content').filter({ hasText: 'Needle final page' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await page.getByRole('link', { name: 'Search', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search workspace' }).fill('Needle final page');
+  await expect(page.getByText('No results.', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Load more comments', exact: true }).click();
+  await expect(page.locator('.panel-row').filter({ hasText: 'Needle final page' })).toBeVisible();
+});

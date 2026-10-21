@@ -4775,11 +4775,37 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "context",
+            "in": "query",
+            "description": "Current task context; cursor is bound to workspace, task and kind. Deleted comments are absent; authorUserId may be null.",
+            "schema": {
+              "type": "string",
+              "enum": ["comments", "subtasks", "dependencies", "files", "attachments"]
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Task",
+            "description": "Task data with execution state/reason/active. When context requested, context={kind,items,nextCursor}; repeat same selector with nextCursor until null.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5418,6 +5444,44 @@
           }
         }
       }
+    },
+    "/v1/workspaces/{workspaceId}/event-cursor": {
+      "get": {
+        "summary": "Capture high-water before mutable hydration",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized current event cursor, including an empty-workspace sentinel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "cursor": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5919,8 +5983,18 @@
               },
               "claimToken": {
                 "type": ["string", "null"]
+              },
+              "executionState": {
+                "type": "string",
+                "enum": ["running", "blocked"]
+              },
+              "blockingReason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
               }
-            }
+            },
+            "description": "Blocked requires blockingReason; running forbids and clears reason. Omission preserves execution. Current CAS/live claim required."
           }
         }
       },

@@ -133,7 +133,12 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     /** @type {Record<string, any> & {tasks: any[], members?: any[], comments?: any[], projects: any[], _panel: import('./local-panel-types').LocalPanelBookkeeping}} */
     const data = { ...record.data, _panel: panelState(record) };
     if (operation === 'list_task_activity')
-      return data._panel.events.filter(event => event.entityId === query.taskId || event.payload?.taskId === query.taskId);
+      return data._panel.events.filter(event => {
+        const [at, id] = query.cursor ? JSON.parse(String(query.cursor)) : ['', ''];
+        return (
+          (event.entityId === query.taskId || event.payload?.taskId === query.taskId) && (event.createdAt > at || (event.createdAt === at && event.id > id))
+        );
+      });
     if (operation === 'list_agents') return [];
     if (operation === 'list_domain_events') {
       let events = data._panel?.events ?? [];
@@ -176,11 +181,13 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
         ),
       );
     if (operation === 'list_reactions')
-      return (data.comments ?? []).flatMap(c =>
-        Object.entries(c.re ?? {}).flatMap(([reaction, users]) =>
-          /** @type {string[]} */ (users).map(user => ({ workspaceId, commentId: c.id, reaction, legacyUserId: user, userId: user })),
-        ),
-      );
+      return (data.comments ?? [])
+        .filter(c => !query.taskId || c.task === query.taskId || c.taskId === query.taskId)
+        .flatMap(c =>
+          Object.entries(c.re ?? {}).flatMap(([reaction, users]) =>
+            /** @type {string[]} */ (users).map(user => ({ workspaceId, commentId: c.id, reaction, legacyUserId: user, userId: user })),
+          ),
+        );
     if (operation === 'list_team_members')
       return (data.members ?? [])
         .filter(m => m.team && localTeams(data).some((/** @type {any} */ team) => team.id === m.team))
@@ -264,20 +271,33 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
         return structuredClone(
           values.filter(
             row =>
-              (!query.taskId || operation === 'list_task_activity' || row.taskId === query.taskId || row.task === query.taskId) &&
+              (!query.taskId || ['list_task_activity', 'list_reactions'].includes(operation) || row.taskId === query.taskId || row.task === query.taskId) &&
               (!query.projectId || row.projectId === query.projectId || row.project === query.projectId),
           ),
         );
       });
     },
     async query(operation, query = {}) {
+      if (operation === 'get_event_cursor') {
+        const events = await adapter.list('list_domain_events');
+        const last = /** @type {Record<string, unknown> | undefined} */ (events.at(-1));
+        return { data: { cursor: JSON.stringify(last ? [last.createdAt, last.id] : ['', '']) } };
+      }
       if (operation === 'get_preferences') return { data: { userId: identity, workspaceId, preferences: await adapter.preferences() } };
       if (operation === 'get_task' || operation === 'get_project') {
         const values = /** @type {Record<string, unknown>[]} */ (await adapter.list(operation === 'get_task' ? 'list_tasks' : 'list_projects'));
         return { data: values.find(row => row.id === query.id) ?? fail('not_found') };
       }
       const items = await adapter.list(operation, query);
-      return { items, nextCursor: null };
+      const eventPage = ['list_domain_events', 'list_task_activity'].includes(operation);
+      const offset = eventPage ? 0 : Number(query.cursor || 0);
+      const limit = Number(query.limit || 100);
+      const page = items.slice(offset, offset + limit);
+      const last = /** @type {Record<string, unknown>} */ (page.at(-1));
+      return {
+        items: page,
+        nextCursor: items.length > offset + limit ? (eventPage ? JSON.stringify([last.createdAt, last.id]) : String(offset + limit)) : null,
+      };
     },
     async rpc(name, args = {}) {
       if (name === 'get_local_settings')

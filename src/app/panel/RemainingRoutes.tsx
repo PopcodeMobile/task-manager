@@ -1,3 +1,7 @@
+import { useTaskDetails } from '../shell/useWorkspaceData';
+import { usePagedCollection } from '../shell/usePagedCollection';
+import type { Comment, ActivityEntry } from '../../domain/contracts';
+import type { DomainEvent } from '../../workspace/normalized';
 import { useCallback, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 import { iso, addD } from '../../core/calendar.js';
@@ -344,6 +348,7 @@ function NotificationsPage(p: PanelProps) {
   const rows = s.notifications.filter(n => (!unread || !s.preferences.notificationReadStates[n.id]) && (category === 'all' || n.notificationType === category)),
     notification = s.notifications.find(n => n.id === selected),
     task = s.tasks.find(task => task.id === notification?.taskId);
+  const detail = useTaskDetails(p.repo, task?.id, s.tasks.reduce((sum, row) => sum + row.version, 0) + s.events.length, t, s);
   async function action(fn: () => Promise<unknown>) {
     setBusy(true);
     setError('');
@@ -461,13 +466,16 @@ function NotificationsPage(p: PanelProps) {
             {task ? (
               <>
                 <Button onClick={() => p.openTask(task.id)}>{task.title}</Button>
+                {detail.error && <Button onClick={detail.retry}>{t('Tentar histórico novamente', 'Retry history')}</Button>}
                 <TaskDiscussionSection
                   registerDraft={registerReply}
                   task={task}
-                  comments={s.comments.filter(c => c.taskId === task.id)}
-                  reactions={s.reactions}
-                  events={s.events.filter(e => e.entityId === task.id || e.payload.taskId === task.id)}
-                  history={s.activity.filter(e => e.taskId === task.id)}
+                  comments={detail.comments}
+                  more={detail.more}
+                  loadMore={detail.loadMore}
+                  reactions={detail.reactions}
+                  events={detail.events}
+                  history={detail.history}
                   members={s.members}
                   agents={s.agents}
                   actorId={s.actorId}
@@ -476,7 +484,7 @@ function NotificationsPage(p: PanelProps) {
                     await action(fn);
                   }}
                   execute={p.execute}
-                  disabled={p.readOnly || busy}
+                  disabled={p.readOnly || busy || detail.loading || !!detail.error}
                   t={t}
                 />
               </>
@@ -493,6 +501,8 @@ function NotificationsPage(p: PanelProps) {
 }
 function SearchPage(p: PanelProps) {
   const { snapshot: s, t } = p;
+  const commentPage = usePagedCollection<Comment>(p.repo, 'list_comments', {}, s.events.length);
+  const visibleTaskIds = new Set(s.tasks.map(task => task.id));
   const [q, setQ] = useState(p.params.get('q') ?? ''),
     [category, setCategory] = useState('all'),
     [error, setError] = useState('');
@@ -502,7 +512,9 @@ function SearchPage(p: PanelProps) {
     ...s.projects.filter(x => !x.archived).map(x => ({ id: x.id, kind: 'projects', text: x.name, open: () => p.openProject(x.id) })),
     ...s.members.map(x => ({ id: x.user_id, kind: 'people', text: x.name + ' ' + x.email, open: () => p.go('member', { id: x.user_id }) })),
     ...s.files.map(x => ({ id: x.id, kind: 'files', text: x.name, open: () => p.go('files', { file: x.id }) })),
-    ...s.comments.map(x => ({ id: x.id, kind: 'comments', text: DOMPurify.sanitize(x.body, { ALLOWED_TAGS: [] }), open: () => p.openTask(x.taskId) })),
+    ...commentPage.items
+      .filter(x => visibleTaskIds.has(x.taskId))
+      .map(x => ({ id: x.id, kind: 'comments', text: DOMPurify.sanitize(x.body, { ALLOWED_TAGS: [] }), open: () => p.openTask(x.taskId) })),
   ].filter(x => q.trim() && x.text.toLocaleLowerCase().includes(q.toLocaleLowerCase()));
   async function remember() {
     if (q.trim()) await p.savePrefs({ recentSearches: [q, ...recent.filter(x => x !== q)].slice(0, 10) });
@@ -538,6 +550,14 @@ function SearchPage(p: PanelProps) {
         </Button>
       </form>
       {error && <p role="alert">{error}</p>}
+      {(commentPage.more || commentPage.error) && (
+        <p role="status">
+          {t('Busca parcial. Há mais comentários para consultar.', 'Partial search. More comments remain to search.')}{' '}
+          <Button disabled={commentPage.loading} onClick={() => void commentPage.loadMore()}>
+            {t('Carregar mais comentários', 'Load more comments')}
+          </Button>
+        </p>
+      )}
       <div className="button-row">
         {['all', 'tasks', 'projects', 'people', 'files', 'comments'].map(key => (
           <Button key={key} variant={category === key ? 'default' : 'ghost'} onClick={() => setCategory(key)}>
@@ -573,7 +593,7 @@ function SearchPage(p: PanelProps) {
             </button>
           </div>
         ))}
-      {q && !results.length && <p>{t('Nenhum resultado.', 'No results.')}</p>}
+      {q && !results.length && commentPage.complete && <p>{t('Nenhum resultado.', 'No results.')}</p>}
       {!q && (
         <>
           <h2>{t('Buscas recentes', 'Recent searches')}</h2>
@@ -682,15 +702,33 @@ export function ArchivePage(p: PanelProps) {
 }
 function HistoryPage(p: PanelProps & { compact?: boolean }) {
   const { snapshot: s, t } = p;
+  const activityPage = usePagedCollection<ActivityEntry>(p.repo, 'list_activity', {}, s.events.length);
+  const eventPage = usePagedCollection<DomainEvent>(p.repo, 'list_domain_events', {}, s.events.length);
+  const visible = (row: { projectId?: string | null; taskId?: string | null }) =>
+    p.repo.mode === 'cloud' || ((!row.projectId || s.projects.some(p => p.id === row.projectId)) && (!row.taskId || s.tasks.some(t => t.id === row.taskId)));
   const [actor, setActor] = useState(''),
     [category, setCategory] = useState('all');
   const match = (operation: string) =>
     category === 'all' ||
     (category === 'status' ? /status|complete|update_task/.test(operation) : category === 'comments' ? /comment/.test(operation) : /project/.test(operation));
-  const history = s.activity.filter(e => (!actor || e.actorUserId === actor) && match(e.verb)),
-    events = s.events.filter(e => (!actor || e.actorUserId === actor) && match(e.operation));
+  const history = activityPage.items.filter(visible).filter(e => (!actor || e.actorUserId === actor) && match(e.verb)),
+    events = eventPage.items.filter(e => visible(e.payload)).filter(e => (!actor || e.actorUserId === actor) && match(e.operation));
   return (
     <section>
+      {(activityPage.more || eventPage.more || activityPage.error || eventPage.error) && (
+        <p role="status">
+          {t('Histórico parcial. Continue para consultar registros anteriores.', 'Partial history. Continue to view further records.')}
+          <Button
+            disabled={activityPage.loading || eventPage.loading}
+            onClick={() => {
+              if (activityPage.more) void activityPage.loadMore();
+              if (eventPage.more) void eventPage.loadMore();
+            }}
+          >
+            {t('Carregar mais histórico', 'Load more history')}
+          </Button>
+        </p>
+      )}
       {!p.compact && (
         <div className="panel-toolbar">
           <label>

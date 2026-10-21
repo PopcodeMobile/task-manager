@@ -8,7 +8,7 @@ import { copyTask, copyTaskGraph, protectRemoval } from './task-graph.js';
 export function mutateTask({ data, find, cas, bump, dto, initialize, keyFor }, operation, input) {
   if (operation === 'create_task') {
     find('project', input.projectId);
-    if (!input.title?.trim()) fail('validation_error');
+    if (!input.title?.trim() || input.status === 'done') fail('validation_error');
     const row = {
       id: input.id ?? crypto.randomUUID(),
       key: keyFor(input.projectId),

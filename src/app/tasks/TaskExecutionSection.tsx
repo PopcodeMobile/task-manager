@@ -41,6 +41,14 @@ export function TaskExecutionSection({
             ? t('Atribuído, sem reserva ativa', 'Assigned, no active reservation')
             : t('Sem agente executor', 'No executor agent')}
       </p>
+      {current.execution?.state === 'blocked' && (
+        <p role="status">
+          {current.execution.active && active
+            ? t('Execução bloqueada: ', 'Execution blocked: ')
+            : t('Bloqueio anterior, sem execução ativa: ', 'Previous block, no active execution: ')}
+          {current.execution.reason}
+        </p>
+      )}
       {current.reservation && (
         <p className="permission-note">
           {active ? t('Reserva até', 'Reserved until') : t('Reserva expirada em', 'Reservation expired on')}{' '}

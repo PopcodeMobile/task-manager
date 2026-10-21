@@ -29,7 +29,14 @@ const writes = {
     })
     .strict(),
   claim_task: z.object({ id }).strict(),
-  renew_task_claim: z.object({ id, claimToken: z.string().uuid() }).strict(),
+  renew_task_claim: z
+    .object({
+      id,
+      claimToken: z.string().uuid(),
+      executionState: z.enum(['running', 'blocked']).optional(),
+      blockingReason: z.string().trim().min(1).max(2000).optional(),
+    })
+    .strict(),
   release_task_claim: z.object({ id, claimToken: z.string().uuid() }).strict(),
   add_task_comment: z.object({ taskId: id, body: z.string().min(1).max(100000) }).strict(),
   complete_task: z.object({ id, claimToken: z.string().uuid() }).strict(),
@@ -83,11 +90,14 @@ export function taskServer(actor: Actor): McpServer {
   server.registerTool(
     'get_task',
     {
-      description: 'Read a task including its current version before editing or claiming.',
-      inputSchema: z.object({ workspace_id: workspace, id }).strict(),
+      description:
+        'Read current task/version/execution. Optionally page current comments (exact body and nullable authorUserId), subtasks, dependencies, files or attachments with context and nextCursor; deleted rows are absent. Cursors are bound to workspace, task and context.',
+      inputSchema: z
+        .object({ workspace_id: workspace, id, context: z.enum(['comments', 'subtasks', 'dependencies', 'files', 'attachments']).optional(), ...paging })
+        .strict(),
       annotations: { readOnlyHint: true },
     },
-    ({ workspace_id, id }) => result(() => executeQuery(actor, 'get_task', workspace_id, { id })),
+    ({ workspace_id, ...query }) => result(() => executeQuery(actor, 'get_task', workspace_id, query)),
   );
   server.registerTool(
     'list_task_activity',

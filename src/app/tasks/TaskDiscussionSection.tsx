@@ -9,6 +9,8 @@ import { ActivityPage } from '../activity/ActivityPage';
 import { Button } from '../../components/ui/button';
 export function TaskDiscussionSection({
   task,
+  more,
+  loadMore,
   comments,
   reactions,
   events,
@@ -24,6 +26,8 @@ export function TaskDiscussionSection({
   registerDraft,
 }: {
   task: Task;
+  more?: boolean;
+  loadMore?: () => Promise<void>;
   comments: Comment[];
   reactions: CommentReaction[];
   events: DomainEvent[];
@@ -57,7 +61,7 @@ export function TaskDiscussionSection({
       },
     });
     const unload = (event: BeforeUnloadEvent) => {
-      if (body || pending) {
+      if (body || pending || attempt) {
         event.preventDefault();
         event.returnValue = '';
       }
@@ -72,6 +76,11 @@ export function TaskDiscussionSection({
   const candidates = mention ? members.filter(m => m.name.toLocaleLowerCase().includes(mention[1].toLocaleLowerCase())) : [];
   return (
     <section className="drawer-section">
+      {more && (
+        <Button variant="outline" disabled={disabled || pending} onClick={() => void loadMore?.()}>
+          {t('Carregar mais histórico', 'Load more history')}
+        </Button>
+      )}
       <div role="tablist" aria-label={t('Discussão da tarefa', 'Task discussion')} className="button-row">
         {['comments', 'activity'].map(key => (
           <Button

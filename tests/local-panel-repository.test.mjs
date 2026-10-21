@@ -490,3 +490,38 @@ test('an overlapping bootstrap preference write preserves both legacy migration 
   assert.deepEqual(stored.unknown, ['retain']);
   assert.deepEqual(stored.views, { [originalId]: { p1: { sort: 'due' } }, [selectedId]: { secondary: { sort: 'title' } } });
 });
+test('completed creation uses atomic create then complete; raw done creation is denied and replay creates one row', async () => {
+  const { repo } = await setup();
+  const projectId = (await repo.list('list_projects'))[0].id;
+  await assert.rejects(command(repo, 'create_task', { id: 'invalid-done', projectId, title: 'Invalid', status: 'done' }), { code: 'validation_error' });
+  const input = {
+    commands: [
+      { operation: 'create_task', input: { id: 'done-once', projectId, title: 'Done once', status: 'todo' } },
+      { operation: 'complete_task', input: { id: 'done-once' }, expectedVersion: 1 },
+    ],
+  };
+  const first = await command(repo, 'batch', input, undefined, 'done-once');
+  assert.deepEqual(await command(repo, 'batch', input, undefined, 'done-once'), first);
+  assert.equal(first.data.results.at(-1).data.status, 'done');
+  assert.equal((await repo.list('list_tasks')).filter(task => task.id === 'done-once').length, 1);
+});
+test('local task-event continuation advances beyond the first hundred records', async () => {
+  const { repo, disk } = await setup();
+  const task = (await repo.list('list_tasks'))[0];
+  await command(repo, 'add_task_comment', { taskId: task.id, body: 'Initialize ledger' });
+  const state = JSON.parse(disk.getItem('gr8r.workspaces.v1'));
+  state.reactPanels[repo.workspaceId].events = Array.from({ length: 105 }, (_, i) => ({
+    id: `event-${i}`,
+    createdAt: new Date(1700000000000 + i).toISOString(),
+    operation: 'update_task',
+    entityId: task.id,
+    payload: { taskId: task.id },
+  }));
+  disk.setItem('gr8r.workspaces.v1', JSON.stringify(state));
+  const first = await repo.query('list_task_activity', { taskId: task.id, limit: 100 });
+  const later = await repo.query('list_task_activity', { taskId: task.id, limit: 100, cursor: first.nextCursor });
+  assert.equal(first.items.length, 100);
+  assert.equal(later.items.length, 5);
+  assert.equal(later.items[0].id, 'event-100');
+  assert.equal(later.nextCursor, null);
+});

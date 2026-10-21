@@ -21,6 +21,7 @@ export type BatchResult = { results: { data: Json; eventId: string }[] };
 export type Task = VersionedEntity & {
   /** Present on reads. Assignment executorAgentId is independent from this live reservation. */
   reservation?: TaskReservation | null;
+  execution?: { state: 'running' | 'blocked'; reason: string | null; active: boolean } | null;
   projectId: string;
   key: string | null;
   title: string;

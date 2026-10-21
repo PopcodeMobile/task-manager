@@ -20,7 +20,7 @@ export const commandRules: Record<string, Rule> = {
   archive_task: rule('id claimToken', 'id', true),
   restore_task: rule('id claimToken', 'id', true),
   claim_task: rule('id', 'id', true),
-  renew_task_claim: rule('id claimToken', 'id claimToken', true),
+  renew_task_claim: rule('id claimToken executionState blockingReason', 'id claimToken', true),
   release_task_claim: rule('id claimToken', 'id claimToken', true),
   complete_task: rule('id claimToken', 'id', true),
   intervene_task: rule('id action executorAgentId', 'id action', true),
@@ -71,6 +71,7 @@ const queryNames = new Set([
   'list_workspaces',
   'get_workspace',
   'get_preferences',
+  'get_event_cursor',
   'get_task',
   'list_projects',
   'list_tasks',
@@ -189,7 +190,7 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
     } else if (
       typeof item !== 'string' ||
       (key !== 'description' && !item.trim()) ||
-      item.length > (key === 'description' ? 100000 : key === 'body' ? 20000 : ['title', 'name'].includes(key) ? 500 : 128)
+      item.length > (key === 'description' ? 100000 : key === 'blockingReason' ? 2000 : key === 'body' ? 20000 : ['title', 'name'].includes(key) ? 500 : 128)
     )
       invalid();
     if (['userId', 'assigneeUserId', 'leadUserId', 'claimToken'].includes(key) && !uuid(item)) invalid();
@@ -246,6 +247,9 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
     )
       invalid();
   }
+  if (input.executionState !== undefined && !['running', 'blocked'].includes(input.executionState as string)) invalid();
+  if (input.executionState === 'blocked' && (typeof input.blockingReason !== 'string' || !input.blockingReason.trim())) invalid();
+  if (input.blockingReason !== undefined && input.executionState !== 'blocked') invalid();
   const allowedStatus = operation.endsWith('task') ? ['backlog', 'todo', 'progress', 'review'] : ['planning', 'active', 'risk', 'hold', 'complete'];
   if (input.status !== undefined && !allowedStatus.includes(input.status as string)) invalid();
   if (input.priority !== undefined && !['none', 'low', 'medium', 'high', 'urgent'].includes(input.priority as string)) {
@@ -275,12 +279,22 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
   return value as Command<Record<string, unknown>>;
 }
 export function validateQuery(operation: string, query: unknown): Record<string, unknown> {
-  if (!queryNames.has(operation) || !object(query) || Object.keys(query).some(key => !['id', 'projectId', 'taskId', 'status', 'cursor', 'limit'].includes(key)))
+  if (
+    !queryNames.has(operation) ||
+    !object(query) ||
+    Object.keys(query).some(key => !['id', 'projectId', 'taskId', 'status', 'context', 'cursor', 'limit'].includes(key))
+  )
     invalid();
   if (query.limit !== undefined && (!Number.isInteger(query.limit) || (query.limit as number) < 1 || (query.limit as number) > 100)) invalid();
   for (const [key, value] of Object.entries(query)) {
     if (key !== 'limit' && (typeof value !== 'string' || !value || value.length > 1024)) invalid();
   }
   if ((operation === 'get_task' && typeof query.id !== 'string') || (operation === 'list_task_activity' && typeof query.taskId !== 'string')) invalid();
+  if (
+    query.context !== undefined &&
+    (operation !== 'get_task' || !['comments', 'subtasks', 'dependencies', 'files', 'attachments'].includes(query.context as string))
+  )
+    invalid();
+  if (operation === 'get_event_cursor' && Object.keys(query).length) invalid();
   return query;
 }

@@ -1,3 +1,4 @@
+import { taskCreateCommand, knownNonCommitting } from './task-create-command';
 import { iso, addD } from '../../core/calendar.js';
 import { useEffect, useMemo, useState } from 'react';
 import { List, Columns3, Table2, Plus, GripVertical } from 'lucide-react';
@@ -610,15 +611,17 @@ export function TaskViews(props: TaskViewsProps) {
                         projects={projects}
                         t={t}
                         disabled={busy}
+                        creationContext={props.creationContext}
                         create={async input => {
                           setBusy(true);
                           setError('');
                           try {
-                            await execute('create_task', { ...input, ...props.creationContext });
+                            const command = taskCreateCommand(input);
+                            await execute(command.operation, command.input);
                             return true;
                           } catch (err) {
                             if (!repo.controller.signal.aborted) setError(errorMessage(err, t));
-                            return false;
+                            throw err;
                           } finally {
                             setBusy(false);
                           }
@@ -673,6 +676,7 @@ export function TaskViews(props: TaskViewsProps) {
   );
 }
 function GroupComposer({
+  creationContext,
   projectId,
   group,
   groupId,
@@ -687,10 +691,12 @@ function GroupComposer({
   projects: Project[];
   t: Translate;
   disabled: boolean;
+  creationContext?: Record<string, unknown>;
   create: (input: Record<string, unknown>) => Promise<boolean>;
 }) {
   const [title, setTitle] = useState(''),
-    [project, setProject] = useState(projectId || projects[0]?.id || '');
+    [project, setProject] = useState(projectId || projects[0]?.id || ''),
+    [attempt, setAttempt] = useState<Record<string, unknown> | null>(null);
   const targetProject = group === 'project' ? groupId : projectId || projects.find(p => p.id === project)?.id || projects[0]?.id || '';
   const validProject = projects.some(p => p.id === targetProject);
   return (
@@ -699,15 +705,24 @@ function GroupComposer({
       onSubmit={e => {
         e.preventDefault();
         if (disabled || !validProject) return;
-        const input: Record<string, unknown> = { id: crypto.randomUUID(), title, projectId: targetProject };
-        if (group === 'status') input.status = groupId;
-        if (group === 'priority') input.priority = groupId;
-        if (group === 'assignee') input.assigneeUserId = groupId === 'none' ? null : groupId;
-        if (group === 'due' && ['today', 'week', 'overdue'].includes(groupId))
+        const input: Record<string, unknown> = attempt ?? { id: crypto.randomUUID(), title, projectId: targetProject };
+        if (!attempt && group === 'status') input.status = groupId;
+        if (!attempt && group === 'priority') input.priority = groupId;
+        if (!attempt && group === 'assignee') input.assigneeUserId = groupId === 'none' ? null : groupId;
+        if (!attempt && group === 'due' && ['today', 'week', 'overdue'].includes(groupId))
           input.dueDate = iso(addD(new Date(), groupId === 'overdue' ? -1 : groupId === 'week' ? 7 : 0));
-        void create(input).then(ok => {
-          if (ok) setTitle('');
-        });
+        if (!attempt) Object.assign(input, creationContext);
+        setAttempt(input);
+        void create(input)
+          .then(ok => {
+            if (ok) {
+              setTitle('');
+              setAttempt(null);
+            }
+          })
+          .catch(error => {
+            if (knownNonCommitting(error)) setAttempt(null);
+          });
       }}
     >
       <input
@@ -716,7 +731,7 @@ function GroupComposer({
         aria-label={t('Nova tarefa no grupo', 'New task in group') + ': ' + groupId}
         placeholder={t('Nova tarefa...', 'New task...')}
         value={title}
-        disabled={disabled || !validProject}
+        disabled={disabled || !!attempt || !validProject}
         onChange={e => setTitle(e.target.value)}
       />
       {!projectId && group !== 'project' && (
@@ -724,7 +739,7 @@ function GroupComposer({
           aria-label={t('Projeto da nova tarefa', 'New task project') + ': ' + groupId}
           value={validProject ? targetProject : ''}
           onChange={e => setProject(e.target.value)}
-          disabled={disabled || !validProject}
+          disabled={disabled || !!attempt || !validProject}
         >
           {projects.map(p => (
             <option key={p.id} value={p.id}>
@@ -733,6 +748,7 @@ function GroupComposer({
           ))}
         </select>
       )}
+      {attempt && !disabled && <p role="status">{t('Confirme o envio anterior tentando novamente.', 'Retry to confirm the previous submission.')}</p>}
       {!validProject && <p>{t('Crie um projeto antes de adicionar tarefas.', 'Create a project before adding tasks.')}</p>}
       <Button variant="ghost" type="submit" disabled={disabled || !validProject}>
         <Plus size={16} />

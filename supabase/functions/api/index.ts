@@ -98,6 +98,7 @@ export async function handleRequest(request: Request): Promise<Response> {
       let operation: string;
       if (path.length === 2) operation = 'list_workspaces';
       else if (path.length === 3) operation = 'get_workspace';
+      else if (path[3] === 'event-cursor' && path.length === 4) operation = 'get_event_cursor';
       else if (path[3] === 'preferences' && path.length === 4) operation = 'get_preferences';
       else if (path[3] === 'tasks' && path.length === 5) {
         operation = 'get_task';

@@ -214,6 +214,11 @@ export function WorkspacePanel({
     selected = shown.tasks.find(task => task.id === taskId),
     readOnly = current?.role === 'guest',
     admin = current?.role === 'owner' || current?.role === 'admin';
+  const retainedTask = useRef<{ scope: string; task: import('../../domain/contracts').Task } | null>(null);
+  const editorScope = `${workspaceId}:${taskId}`;
+  if (selected) retainedTask.current = { scope: editorScope, task: selected };
+  else if (retainedTask.current?.scope !== editorScope) retainedTask.current = null;
+  const editorTask = selected ?? retainedTask.current?.task;
   const pageLocation = [workspaceId, route, projectId, url.searchParams.get('tab'), url.searchParams.get('id'), url.searchParams.get('sec')].join(':');
   useEffect(() => {
     const content = document.getElementById('work-content');
@@ -736,11 +741,12 @@ export function WorkspacePanel({
               {taskId &&
                 !loading &&
                 (nav.some(item => item.id === route) || ['project', 'member', 'team'].includes(route)) &&
-                (selected || taskId === 'new') && (
+                (editorTask || taskId === 'new') && (
                   <TaskDrawer
                     key={`${workspaceId}:${taskId}`}
                     graph={shown}
-                    task={selected ?? 'new'}
+                    task={editorTask ?? 'new'}
+                    removed={!!editorTask && !selected}
                     tasks={shown.tasks}
                     projects={projects}
                     agents={shown.agents}
@@ -770,7 +776,7 @@ export function WorkspacePanel({
               {taskId &&
                 !loading &&
                 (nav.some(item => item.id === route) || ['project', 'member', 'team'].includes(route)) &&
-                !selected &&
+                !editorTask &&
                 taskId !== 'new' && <p role="status">{t('Tarefa não encontrada nesta organização.', 'Task not found in this workspace.')}</p>}
             </>
           )}

@@ -19,7 +19,7 @@ export interface WorkspaceRepository {
   command<T>(operation: string, command: Omit<Command<Record<string, unknown>>, 'workspaceId'>): Promise<CommandResult<T>>;
   rpc<T>(name: string, args?: Record<string, unknown>): Promise<T>;
   workspaces(fresh?: boolean): Promise<Workspace[]>;
-  preferences(): Promise<UserPreferences['preferences']>;
+  preferences(fresh?: boolean): Promise<UserPreferences['preferences']>;
   personal?(): Promise<PersonalState>;
   savePersonal?(patch: Partial<PersonalState>): Promise<void>;
 }

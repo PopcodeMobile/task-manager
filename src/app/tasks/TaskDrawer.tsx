@@ -1,8 +1,9 @@
+import { taskCreateCommand, knownNonCommitting } from './task-create-command';
 import { prepareTaskAction } from './task-view-model';
 import { TaskCoreActions } from './TaskCoreActions';
 import { TaskExecutionSection } from './TaskExecutionSection';
 import type { WorkspaceRepository } from '../../workspace/repository';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { safeRichText } from '../../core/rich-text.js';
 import { TaskRelationSection } from './TaskRelationSection';
 import { TaskSubtasksSection } from './TaskSubtasksSection';
@@ -29,6 +30,7 @@ import { statuses, statusLabel, priorityLabel } from './TaskList';
 export type DraftGuard = { dirty: boolean; flush: () => Promise<boolean> };
 export function TaskDrawer({
   task,
+  removed = false,
   projects,
   tasks,
   agents,
@@ -54,6 +56,7 @@ export function TaskDrawer({
   graph,
 }: {
   task: Task | 'new';
+  removed?: boolean;
   projects: Project[];
   tasks: Task[];
   agents: Agent[];
@@ -78,6 +81,12 @@ export function TaskDrawer({
   copyLink: () => Promise<void>;
   graph: TaskGraph;
 }) {
+  const discussionGuard = useRef<DraftGuard | null>(null);
+  const registerDiscussion = useCallback((guard: DraftGuard | null) => {
+    discussionGuard.current = guard;
+  }, []);
+  const [attempt, setAttempt] = useState<{ operation: string; input: Record<string, unknown>; version?: number } | null>(null);
+  const unavailable = readOnly || removed;
   const initial = task === 'new' ? null : task;
   const [newTaskId] = useState(() => crypto.randomUUID());
   const [title, setTitle] = useState(initial?.title ?? ''),
@@ -113,7 +122,7 @@ export function TaskDrawer({
       setError(t('Salve a subtarefa antes de continuar.', 'Save subtask before continuing.'));
       return false;
     }
-    if (conflict || busy) return false;
+    if (conflict || busy || removed) return false;
     if (!title.trim() || !project) {
       setError(t('Informe o título e o projeto antes de continuar.', 'Enter a title and project before continuing.'));
       return false;
@@ -121,22 +130,23 @@ export function TaskDrawer({
     setBusy(true);
     setError('');
     try {
-      const saved = await execute<Task>(
-        current ? 'update_task' : 'create_task',
-        {
-          ...(current ? { id: current.id } : { id: newTaskId, projectId: project }),
-          title,
-          description,
-          priority,
-          assigneeUserId: assignee || null,
-          dueDate: due || null,
-          startDate: start || null,
-          recurrence: recurrence || null,
-          ...(estimate === String(current?.legacyMetadata.estimate ?? '') ? {} : { attributes: { estimate } }),
-          ...(status === current?.status ? {} : { status }),
-        },
-        current ? editVersion : undefined,
-      );
+      const input = {
+        ...(current ? { id: current.id } : { id: newTaskId, projectId: project }),
+        title,
+        description,
+        priority,
+        assigneeUserId: assignee || null,
+        dueDate: due || null,
+        startDate: start || null,
+        recurrence: recurrence || null,
+        ...(estimate === String(current?.legacyMetadata.estimate ?? '') ? {} : { attributes: { estimate } }),
+        ...(status === current?.status ? {} : { status }),
+      };
+      const command = attempt ?? (current ? { operation: 'update_task', input, version: editVersion } : taskCreateCommand(input));
+      setAttempt(command);
+      const result = await execute<Task | { results: { data: Task }[] }>(command.operation, command.input, 'version' in command ? command.version : undefined);
+      const saved = 'results' in result ? result.results.at(-1)!.data : result;
+      setAttempt(null);
       savedFingerprint.current = fingerprint;
       setEditVersion(saved.version);
       setConflict(false);
@@ -144,6 +154,7 @@ export function TaskDrawer({
       if (!current) created(saved.id);
       return true;
     } catch (err) {
+      if (knownNonCommitting(err)) setAttempt(null);
       if (!repo.controller.signal.aborted) {
         setError(errorMessage(err, t));
         if ((err as { code?: string }).code === 'version_conflict') setConflict(true);
@@ -154,21 +165,29 @@ export function TaskDrawer({
     }
   }
   useEffect(() => {
-    registerDraft({ dirty: dirty || busy || subDirty, flush: save });
+    registerDraft({
+      get dirty() {
+        return dirty || busy || subDirty || !!attempt || !!discussionGuard.current?.dirty;
+      },
+      flush: async () => {
+        if (discussionGuard.current?.dirty && !(await discussionGuard.current.flush())) return false;
+        return removed ? false : save();
+      },
+    });
     return () => registerDraft(null);
   });
   useEffect(() => {
     const before = (event: BeforeUnloadEvent) => {
-      if (dirty || busy || subDirty) {
+      if (dirty || busy || subDirty || attempt || discussionGuard.current?.dirty) {
         event.preventDefault();
         event.returnValue = '';
       }
     };
     addEventListener('beforeunload', before);
     return () => removeEventListener('beforeunload', before);
-  }, [dirty, busy, subDirty]);
+  }, [dirty, busy, subDirty, attempt, discussionGuard]);
   useEffect(() => {
-    if (!current || dirty || busy) return;
+    if (!current || dirty || busy || attempt || removed) return;
     setTitle(current.title);
     setDescription(current.description);
     setProject(current.projectId);
@@ -199,7 +218,7 @@ export function TaskDrawer({
     link => link.taskId !== current?.id && details.files.some(file => file.id === link.fileId && file.taskId === current?.id),
   );
   async function action(run: () => Promise<unknown>) {
-    if (busy) return;
+    if (busy || removed) return;
     setBusy(true);
     setError('');
     try {
@@ -214,6 +233,10 @@ export function TaskDrawer({
     }
   }
   function requireSaved(includeSubtask = true) {
+    if (removed || attempt || discussionGuard.current?.dirty) {
+      if (discussionGuard.current?.dirty) void discussionGuard.current.flush();
+      return false;
+    }
     if (includeSubtask && subDirty) {
       setError(t('Salve a subtarefa antes de continuar.', 'Save subtask before continuing.'));
       return false;
@@ -258,6 +281,21 @@ export function TaskDrawer({
         <Button variant="ghost" aria-pressed={full} onClick={() => setFull(value => !value)}>
           {full ? t('Minimizar tarefa', 'Minimize task') : t('Maximizar tarefa', 'Maximize task')}
         </Button>
+        {removed && (
+          <div role="alert">
+            <p>{t('Esta tarefa foi excluída. Seu rascunho foi mantido para cópia.', 'This task was deleted. Your draft is retained for copying.')}</p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                registerDraft(null);
+                close();
+              }}
+            >
+              {t('Descartar rascunhos e fechar', 'Discard drafts and close')}
+            </Button>
+          </div>
+        )}
+        {attempt && !busy && <p role="status">{t('Confirme a gravação anterior tentando salvar novamente.', 'Save again to confirm the previous write.')}</p>}
         <form
           onSubmit={e => {
             e.preventDefault();
@@ -266,12 +304,12 @@ export function TaskDrawer({
         >
           <label className="form-field">
             {t('Título', 'Title')}
-            <Input required maxLength={500} value={title} onChange={e => setTitle(e.target.value)} disabled={readOnly || busy || subDirty} />
+            <Input required maxLength={500} value={title} onChange={e => setTitle(e.target.value)} disabled={unavailable || busy || subDirty || !!attempt} />
           </label>
           <div className="drawer-fields">
             <label className="form-field">
               {t('Projeto', 'Project')}
-              <select value={project} onChange={e => setProject(e.target.value)} disabled={!!current || readOnly || busy || subDirty} required>
+              <select value={project} onChange={e => setProject(e.target.value)} disabled={!!current || unavailable || busy || subDirty || !!attempt} required>
                 {projects.map(p => (
                   <option value={p.id} key={p.id}>
                     {p.name}
@@ -281,9 +319,9 @@ export function TaskDrawer({
             </label>
             <label className="form-field">
               {t('Status', 'Status')}
-              <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)} disabled={readOnly || busy || subDirty}>
+              <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)} disabled={unavailable || busy || subDirty || !!attempt}>
                 {statuses
-                  .filter(s => s !== 'done' || current?.status === 'done')
+                  .filter(s => !current || s !== 'done' || current.status === 'done')
                   .map(s => (
                     <option key={s} value={s}>
                       {statusLabel(s, t)}
@@ -293,7 +331,7 @@ export function TaskDrawer({
             </label>
             <label className="form-field">
               {t('Prioridade', 'Priority')}
-              <select value={priority} onChange={e => setPriority(e.target.value as TaskPriority)} disabled={readOnly || busy || subDirty}>
+              <select value={priority} onChange={e => setPriority(e.target.value as TaskPriority)} disabled={unavailable || busy || subDirty || !!attempt}>
                 {['none', 'low', 'medium', 'high', 'urgent'].map(p => (
                   <option key={p} value={p}>
                     {priorityLabel(p, t)}
@@ -303,7 +341,7 @@ export function TaskDrawer({
             </label>
             <label className="form-field">
               {t('Responsável', 'Assignee')}
-              <select value={assignee} onChange={e => setAssignee(e.target.value)} disabled={readOnly || busy || subDirty}>
+              <select value={assignee} onChange={e => setAssignee(e.target.value)} disabled={unavailable || busy || subDirty || !!attempt}>
                 <option value="">{t('Sem responsável', 'Unassigned')}</option>
                 {members.map(member => (
                   <option key={member.user_id} value={member.user_id}>
@@ -314,11 +352,11 @@ export function TaskDrawer({
             </label>
             <label className="form-field">
               {t('Prazo', 'Due date')}
-              <Input type="date" value={due} onChange={e => setDue(e.target.value)} disabled={readOnly || busy || subDirty} />
+              <Input type="date" value={due} onChange={e => setDue(e.target.value)} disabled={unavailable || busy || subDirty || !!attempt} />
             </label>
             <label className="form-field">
               {t('Início', 'Start date')}
-              <Input type="date" value={start} onChange={e => setStart(e.target.value)} disabled={readOnly || busy || subDirty} />
+              <Input type="date" value={start} onChange={e => setStart(e.target.value)} disabled={unavailable || busy || subDirty || !!attempt} />
             </label>
             <label className="form-field">
               {t('Recorrência', 'Recurrence')}
@@ -326,7 +364,7 @@ export function TaskDrawer({
                 aria-label={t('Recorrência', 'Recurrence')}
                 value={recurrence}
                 onChange={e => setRecurrence(e.target.value as Recurrence | '')}
-                disabled={readOnly || busy || subDirty}
+                disabled={unavailable || busy || subDirty || !!attempt}
               >
                 <option value="">{t('Nenhuma', 'None')}</option>
                 {(['Daily', 'Weekly', 'Every 2 weeks', 'Monthly'] as const).map(r => (
@@ -345,7 +383,7 @@ export function TaskDrawer({
             </label>
             <label className="form-field">
               {t('Estimativa', 'Estimate')}
-              <Input value={estimate} maxLength={120} onChange={e => setEstimate(e.target.value)} disabled={readOnly || busy || subDirty} />
+              <Input value={estimate} maxLength={120} onChange={e => setEstimate(e.target.value)} disabled={unavailable || busy || subDirty || !!attempt} />
             </label>
           </div>
           <label className="form-field">
@@ -355,11 +393,11 @@ export function TaskDrawer({
               value={description}
               maxLength={100000}
               onChange={e => setDescription(e.target.value)}
-              disabled={readOnly || busy || subDirty}
+              disabled={unavailable || busy || subDirty || !!attempt}
             />
           </label>
           {description && <div className="rich-content" dangerouslySetInnerHTML={{ __html: safeRichText(description) }} />}
-          <Button ref={saveButton} type="submit" disabled={busy || readOnly || conflict || !project}>
+          <Button ref={saveButton} type="submit" disabled={busy || unavailable || conflict || !project}>
             {current ? t('Salvar alterações', 'Save changes') : t('Criar tarefa', 'Create task')}
           </Button>
         </form>
@@ -455,7 +493,7 @@ export function TaskDrawer({
               agent={agent}
               agents={agents}
               setAgent={setAgent}
-              readOnly={readOnly}
+              readOnly={unavailable}
               busy={busy}
               t={t}
               onAssign={() => taskAction('intervene_task', { action: 'reassign', executorAgentId: agent })}
@@ -464,7 +502,7 @@ export function TaskDrawer({
               }}
               onComplete={() => taskAction('complete_task')}
             />
-            <TaskCoreActions task={current} projects={projects} t={t} disabled={busy || readOnly || active} run={taskAction} />
+            <TaskCoreActions task={current} projects={projects} t={t} disabled={busy || unavailable || active} run={taskAction} />
             <div className="button-row">
               <Button variant="outline" disabled={busy} onClick={() => void action(toggleFavorite)}>
                 {favorite ? t('Remover dos favoritos', 'Remove from favorites') : t('Adicionar aos favoritos', 'Add to favorites')}
@@ -489,7 +527,7 @@ export function TaskDrawer({
               dependencies={details.dependencies}
               execute={execute}
               action={detailAction}
-              disabled={busy || readOnly || active || details.loading || !!details.error}
+              disabled={busy || unavailable || active || details.loading || !!details.error}
               t={t}
               open={created}
             />
@@ -501,7 +539,7 @@ export function TaskDrawer({
               action={(run, parent) => detailAction(run, parent, true)}
               registerDirty={setSubDirty}
               canOpen={requireSaved}
-              disabled={busy || readOnly || active || details.loading || !!details.error}
+              disabled={busy || unavailable || active || details.loading || !!details.error}
               t={t}
               open={id => {
                 registerDraft(null);
@@ -514,11 +552,14 @@ export function TaskDrawer({
               attachments={details.attachments}
               execute={execute}
               action={detailAction}
-              disabled={busy || readOnly || active || details.loading || !!details.error}
+              disabled={busy || unavailable || active || details.loading || !!details.error}
               t={t}
             />
             <TaskDiscussionSection
+              registerDraft={registerDiscussion}
               task={current}
+              more={details.more}
+              loadMore={details.loadMore}
               comments={details.comments}
               reactions={details.reactions}
               events={details.events}
@@ -529,7 +570,7 @@ export function TaskDrawer({
               admin={repo.mode === 'cloud' && admin}
               execute={execute}
               action={detailAction}
-              disabled={busy || readOnly || details.loading || !!details.error}
+              disabled={busy || unavailable || details.loading || !!details.error}
               t={t}
             />
             {!!sharedFiles.length && (
@@ -545,7 +586,7 @@ export function TaskDrawer({
             <section className="drawer-section">
               <Button
                 variant="destructive"
-                disabled={busy || readOnly || active}
+                disabled={busy || unavailable || active}
                 onClick={() => {
                   if (requireSaved()) {
                     if (prefs.confirmDel === false && !incoming.length && !sharedFiles.length && !details.loading && !details.error)

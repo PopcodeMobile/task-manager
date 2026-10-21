@@ -50,6 +50,8 @@ async function fixture(page: Page) {
     writeOffline = false,
     eventOffline = false;
   const taskLabels: Record<string, unknown>[] = [];
+  let dropNext = false;
+  const receipts = new Map<string, Record<string, unknown>>();
   let reachedLate = () => {},
     releaseLate = () => {},
     finishedLate = () => {};
@@ -76,6 +78,8 @@ async function fixture(page: Page) {
     if (name === 'execute_operation') {
       if (writeOffline) return route.abort('failed');
       commands.push(body);
+      const receiptKey = `${op}:${body.p_idempotency_key}`;
+      if (receipts.has(receiptKey)) return route.fulfill({ json: receipts.get(receiptKey) });
       if (conflict) {
         conflict = false;
         tasks = tasks.map(t => ({ ...t, version: Number(t.version) + 1 }));
@@ -83,6 +87,11 @@ async function fixture(page: Page) {
       }
       const input = body.p_command;
       let data: Record<string, unknown> = {};
+      if (op === 'batch' && input.commands?.[0]?.operation === 'create_task') {
+        const created = { ...baseTask, ...input.commands[0].input, status: 'done', version: 2 };
+        tasks.push(created);
+        data = { results: [{ data: { ...created, status: 'todo', version: 1 } }, { data: created }] };
+      }
       if (op === 'create_task') {
         data = { ...baseTask, ...input, id: input.id ?? 'created', key: 'WEB-2' };
         tasks.push(data);
@@ -117,7 +126,13 @@ async function fixture(page: Page) {
         createdAt: new Date().toISOString(),
         payload: { taskId: 'task-1' },
       });
-      return route.fulfill({ json: { data, eventId: `event-${events.length}` } });
+      const receipt = { data, eventId: `event-${events.length}` };
+      receipts.set(receiptKey, receipt);
+      if (dropNext) {
+        dropNext = false;
+        return route.abort('failed');
+      }
+      return route.fulfill({ json: receipt });
     }
     let data: unknown = { items: [], nextCursor: null };
     if (name === 'list_workspace_members') data = [{ user_id: userId, name: 'Rafa Costa', email: user.email, role: 'owner' }];
@@ -129,6 +144,10 @@ async function fixture(page: Page) {
         ],
         nextCursor: null,
       };
+    if (op === 'get_event_cursor') {
+      const last = events.at(-1);
+      data = { data: { cursor: JSON.stringify(last ? [last.createdAt, last.id] : ['', '']) } };
+    }
     if (op === 'get_preferences') data = { data: null };
     if (op === 'list_projects')
       data = {
@@ -157,7 +176,10 @@ async function fixture(page: Page) {
     if (op === 'list_task_labels') data = { items: taskLabels, nextCursor: null };
     if (op === 'list_comments') data = { items: comments, nextCursor: null };
     if (op === 'list_agents') data = { items: [{ id: 'agent-1', name: 'Assistente de produto', authUserId: userId, clientId: 'client-1' }], nextCursor: null };
-    if (op === 'list_domain_events' || op === 'list_task_activity') data = { items: body.p_query?.cursor ? [] : events, nextCursor: null };
+    if (op === 'list_domain_events' || op === 'list_task_activity') {
+      const cursor = body.p_query?.cursor ? JSON.parse(body.p_query.cursor) : ['', ''];
+      data = { items: events.filter(e => String(e.createdAt) > cursor[0] || (e.createdAt === cursor[0] && String(e.id) > cursor[1])), nextCursor: null };
+    }
     if (name === 'list_integration_connections') data = { items: [] };
     if (name === 'list_webhook_subscriptions') data = [];
     try {
@@ -168,6 +190,21 @@ async function fixture(page: Page) {
   });
   return {
     commands,
+    blocked: () => {
+      tasks[0] = {
+        ...tasks[0],
+        execution: { state: 'blocked', reason: 'Preciso de uma decisão humana', active: true },
+        reservation: { agentId: 'agent-1', active: true, expiresAt: '2099-01-01T00:00:00Z' },
+      };
+    },
+    dropResponse: () => {
+      dropNext = true;
+    },
+    tasks: () => tasks,
+    removeTask: (operation = 'delete_task') => {
+      tasks = [];
+      events.push({ id: 'removed', operation, entityId: 'task-1', actorUserId: userId, createdAt: new Date().toISOString(), payload: { taskId: 'task-1' } });
+    },
     eventOffline: (value: boolean) => {
       eventOffline = value;
     },
@@ -1983,4 +2020,72 @@ test('actual cloud fix team absent membership conflicts replan and ambiguous ret
     await setupActor.auth.signOut();
   }
   expect(cleanup).toEqual([]);
+});
+
+for (const operation of ['delete_task', 'delete_project'])
+  test(`final fix dirty drawer survives remote ${operation}`, async ({ page }) => {
+    const f = await fixture(page);
+    await login(page);
+    await page.getByText('Revisar navegação', { exact: true }).click();
+    await page.getByLabel('Título', { exact: true }).fill('Texto preservado após exclusão');
+    f.removeTask(operation);
+    await expect(page.getByText('Esta tarefa foi excluída. Seu rascunho foi mantido para cópia.')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Texto preservado após exclusão');
+    await expect(page.getByRole('button', { name: 'Salvar alterações', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Descartar rascunhos e fechar' }).click();
+    await expect(page.getByRole('heading', { name: 'Detalhes da tarefa', exact: true })).toHaveCount(0);
+  });
+test('final fix discussion guard composes with core draft and uncertain send retry', async ({ page }) => {
+  const f = await fixture(page);
+  await login(page);
+  await page.getByText('Revisar navegação', { exact: true }).click();
+  await page.getByRole('textbox', { name: 'Comentário', exact: true }).fill('Resposta preservada');
+  await page.getByRole('button', { name: 'Fechar painel' }).click();
+  await expect(page.getByRole('textbox', { name: 'Comentário', exact: true })).toHaveValue('Resposta preservada');
+  await page.getByLabel('Organização', { exact: true }).selectOption(other);
+  await expect(page).toHaveURL(new RegExp(workspace));
+  await page.goBack();
+  await expect(page.getByRole('textbox', { name: 'Comentário', exact: true })).toHaveValue('Resposta preservada');
+  f.writeOffline(true);
+  await page.getByRole('button', { name: 'Comentar', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'conexão' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Comentário', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Fechar painel' }).click();
+  await expect(page.getByRole('textbox', { name: 'Comentário', exact: true })).toHaveValue('Resposta preservada');
+  f.writeOffline(false);
+  await page.getByRole('button', { name: 'Comentar', exact: true }).click();
+  await expect(page.locator('article.comment .rich-content').filter({ hasText: 'Resposta preservada' })).toBeVisible();
+  expect(f.commands.filter(c => c.p_operation === 'add_task_comment')).toHaveLength(1);
+  await page.getByRole('button', { name: 'Fechar painel' }).click();
+  await expect(page.getByRole('heading', { name: 'Detalhes da tarefa', exact: true })).toHaveCount(0);
+});
+
+test('final fix completed inline creation retries identical committed operation after lost response', async ({ page }) => {
+  const f = await fixture(page);
+  await login(page);
+  const composer = page.getByRole('textbox', { name: 'Nova tarefa no grupo: done', exact: true });
+  await composer.fill('Criada concluída uma vez');
+  f.dropResponse();
+  await page.getByRole('button', { name: 'Adicionar ao grupo: done', exact: true }).click();
+  await expect(composer).toBeDisabled();
+  await expect(page.getByText('Confirme o envio anterior tentando novamente.')).toBeVisible();
+  await page.getByRole('button', { name: 'Adicionar ao grupo: done', exact: true }).click();
+  await expect(composer).toBeEnabled();
+  await expect(composer).toHaveValue('');
+  const writes = f.commands.filter(c => c.p_operation === 'batch');
+  expect(writes).toHaveLength(2);
+  expect(writes[1]).toEqual(writes[0]);
+  const created = f.tasks().filter(t => t.title === 'Criada concluída uma vez');
+  expect(created).toHaveLength(1);
+  expect(created[0].status).toBe('done');
+});
+
+test('final fix blocked execution reason is visible independently from workflow status', async ({ page }) => {
+  const f = await fixture(page);
+  f.blocked();
+  await login(page);
+  await page.getByText('Revisar navegação', { exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Execução bloqueada: Preciso de uma decisão humana');
+  await page.screenshot({ path: '/tmp/final-execution-blocked.png', fullPage: true });
+  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('todo');
 });

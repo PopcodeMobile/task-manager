@@ -22,8 +22,12 @@ import type { WorkspaceRepository } from '../../workspace/repository';
 import type { Translate } from '../auth/ConsentPage';
 import type { Execute } from '../projects/ProjectsPage';
 import { errorMessage } from './messages';
-import { loadTaskDiscussion, type CompleteDiscussion } from '../tasks/task-discussion-data';
+import { type CompleteDiscussion } from '../tasks/task-discussion-data';
+import { affectedCollections } from './refresh-dependencies';
+import { usePagedCollection } from './usePagedCollection';
 export type TaskGraph = CompleteDiscussion & {
+  historyComplete?: boolean;
+  actorId?: string;
   labels: Label[];
   taskLabels: TaskLabel[];
   dependencies: TaskDependency[];
@@ -33,6 +37,7 @@ export type TaskGraph = CompleteDiscussion & {
   attachments?: TaskAttachment[];
 };
 export type Snapshot = {
+  historyComplete: boolean;
   actorId: string;
   actorTeamId: string | null;
   teams: Team[];
@@ -58,6 +63,7 @@ export type Snapshot = {
   preferences: UserPreferences['preferences'];
 };
 export const emptySnapshot: Snapshot = {
+  historyComplete: false,
   actorId: '',
   actorTeamId: null,
   teams: [],
@@ -99,7 +105,8 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
       const serial = ++refreshSerial.current;
       try {
         // Capture the event boundary BEFORE reading mutable rows. Later commits remain visible to polling.
-        const events = initial ? await repo.list<DomainEvent>('list_domain_events', {}, true) : null;
+        const boundary = initial ? await repo.query<{ data: { cursor: string } }>('get_event_cursor', {}, true) : null;
+        const affected = affectedCollections(operations);
         const [
           tasks,
           projects,
@@ -126,50 +133,26 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
           repo.list<Task>('list_tasks', {}, true),
           repo.list<Project>('list_projects', {}, true),
           repo.list<Agent>('list_agents', {}, true),
-          initial || operations.some(op => /team|local_|workspace/.test(op))
-            ? repo.rpc<Member[]>('list_workspace_members', { p_workspace_id: repo.workspaceId })
-            : Promise.resolve(null),
-          initial || operations.includes('set_preferences') ? repo.preferences() : Promise.resolve(null),
-          initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
-            ? repo.list<Label>('list_labels', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
-            ? repo.list<TaskLabel>('list_task_labels', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /dependency$|duplicate_task_graph|delete_project|delete_task/.test(op))
-            ? repo.list<TaskDependency>('list_dependencies', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /subtask$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
-            ? repo.list<Subtask>('list_subtasks', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /file$|attachment$|delete_project|delete_task|duplicate_task|complete_task|move_task/.test(op))
-            ? repo.list<FileMetadata>('list_files', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /attachment$|delete_project|delete_task|duplicate_task|complete_task/.test(op))
-            ? repo.list<TaskAttachment>('list_attachments', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /calendar_event$|delete_project/.test(op))
-            ? repo.list<CalendarEvent>('list_calendar_events', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /team|local_/.test(op)) ? repo.list<Team>('list_teams', {}, true) : Promise.resolve(null),
-          initial || operations.some(op => /team|local_/.test(op))
-            ? repo.list<{ teamId: string; userId: string }>('list_team_members', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /notification|local_reset/.test(op))
-            ? repo.list<Notification>('list_notifications', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /reaction|comment|delete_task|local_reset/.test(op))
-            ? repo.list<CommentReaction>('list_reactions', {}, true)
-            : Promise.resolve(null),
-          initial || operations.some(op => /_view$|delete_project/.test(op)) ? repo.list<SavedView>('list_views', {}, true) : Promise.resolve(null),
-          initial || operations.some(op => /_project$|project_member|local_project_sharing/.test(op))
+          initial || affected.has('members') ? repo.rpc<Member[]>('list_workspace_members', { p_workspace_id: repo.workspaceId }) : Promise.resolve(null),
+          initial || affected.has('preferences') ? repo.preferences(true) : Promise.resolve(null),
+          initial || affected.has('labels') ? repo.list<Label>('list_labels', {}, true) : Promise.resolve(null),
+          initial || affected.has('taskLabels') ? repo.list<TaskLabel>('list_task_labels', {}, true) : Promise.resolve(null),
+          initial || affected.has('dependencies') ? repo.list<TaskDependency>('list_dependencies', {}, true) : Promise.resolve(null),
+          initial || affected.has('subtasks') ? repo.list<Subtask>('list_subtasks', {}, true) : Promise.resolve(null),
+          initial || affected.has('files') ? repo.list<FileMetadata>('list_files', {}, true) : Promise.resolve(null),
+          initial || affected.has('attachments') ? repo.list<TaskAttachment>('list_attachments', {}, true) : Promise.resolve(null),
+          initial || affected.has('calendarEvents') ? repo.list<CalendarEvent>('list_calendar_events', {}, true) : Promise.resolve(null),
+          initial || affected.has('teams') ? repo.list<Team>('list_teams', {}, true) : Promise.resolve(null),
+          initial || affected.has('teamMembers') ? repo.list<{ teamId: string; userId: string }>('list_team_members', {}, true) : Promise.resolve(null),
+          initial || affected.has('notifications') ? repo.list<Notification>('list_notifications', {}, true) : Promise.resolve(null),
+          Promise.resolve(null),
+          initial || affected.has('views') ? repo.list<SavedView>('list_views', {}, true) : Promise.resolve(null),
+          initial || affected.has('projectMembers')
             ? repo.list<{ projectId: string; userId: string }>('list_project_members', {}, true)
             : Promise.resolve(null),
-          initial || operations.some(op => /comment$|delete_task|delete_project/.test(op))
-            ? repo.list<Comment>('list_comments', {}, true)
-            : Promise.resolve(null),
-          initial || operations.length > 0 ? repo.list<ActivityEntry>('list_activity', {}, true) : Promise.resolve(null),
-          initial || operations.some(op => /team|local_/.test(op))
+          Promise.resolve(null),
+          Promise.resolve(null),
+          initial || affected.has('members')
             ? repo.mode === 'local'
               ? repo.rpc<{ currentMemberId: string; teamId?: string | null }>('get_local_actor')
               : Promise.resolve({ currentMemberId: repo.userId, teamId: null })
@@ -178,16 +161,17 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
         if (repo.controller.signal.aborted || serial !== refreshSerial.current) return;
         setSnapshot(old => ({
           tasks,
+          historyComplete: false,
           actorId: actorId?.currentMemberId ?? old.actorId,
           actorTeamId: actorId ? (actorId.teamId ?? null) : old.actorTeamId,
           teams: teams ?? old.teams,
           teamMembers: teamMembers ?? old.teamMembers,
           notifications: notifications ?? old.notifications,
-          reactions: reactions ?? old.reactions,
+          reactions: reactions ?? [],
           views: views ?? old.views,
           projectMembers: projectMembers ?? old.projectMembers,
-          comments: comments ?? old.comments,
-          activity: activity ?? old.activity,
+          comments: comments ?? [],
+          activity: activity ?? [],
           files: files ?? old.files,
           attachments: attachments ?? old.attachments,
           calendarEvents: calendarEvents ?? old.calendarEvents,
@@ -197,11 +181,11 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
           subtasks: subtasks ?? old.subtasks,
           projects,
           agents,
-          events: events ?? old.events,
+          events: initial ? [] : old.events,
           members: members ?? old.members,
           preferences: preferences ?? old.preferences,
         }));
-        if (events?.length) eventWatermark.current = eventCursor(events.at(-1)!);
+        if (boundary) eventWatermark.current = boundary.data.cursor;
         setSnapshotScope(workspaceId);
         setRevision(value => value + 1);
         setError('');
@@ -237,7 +221,13 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
       try {
         tick(value => value + 1);
         if (document.visibilityState !== 'hidden') {
-          const events = await repo.list<DomainEvent>('list_domain_events', eventWatermark.current ? { cursor: eventWatermark.current } : {}, true);
+          const events = (
+            await repo.query<import('../../domain/contracts').Page<DomainEvent>>(
+              'list_domain_events',
+              { limit: 100, ...(eventWatermark.current ? { cursor: eventWatermark.current } : {}) },
+              true,
+            )
+          ).items;
           if (!alive) return;
           if (events.length) {
             setSnapshot(old => ({ ...old, events: [...new Map([...old.events, ...events].map(e => [e.id, e])).values()] }));
@@ -279,7 +269,13 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
       }));
     let events: DomainEvent[] = [];
     try {
-      events = await repo.list<DomainEvent>('list_domain_events', eventWatermark.current ? { cursor: eventWatermark.current } : {}, true);
+      events = (
+        await repo.query<import('../../domain/contracts').Page<DomainEvent>>(
+          'list_domain_events',
+          { limit: 100, ...(eventWatermark.current ? { cursor: eventWatermark.current } : {}) },
+          true,
+        )
+      ).items;
     } catch (err) {
       if (!repo.controller.signal.aborted) setError(errorMessage(err, t));
     }
@@ -300,7 +296,7 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
 
   async function toggleFavorite(taskId: string, kind: 'task' | 'project' = 'task') {
     const field = kind === 'project' ? 'favoriteProjectIds' : 'favoriteTaskIds';
-    const preferences = await repo.preferences();
+    const preferences = await repo.preferences(true);
     const next = {
       ...preferences,
       [field]: preferences[field].includes(taskId) ? preferences[field].filter(id => id !== taskId) : [...preferences[field], taskId],
@@ -310,14 +306,14 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
     if (!repo.controller.signal.aborted) setSnapshot(old => ({ ...old, preferences: next }));
   }
   async function markNotifications(ids: string[], read: boolean) {
-    const existing = await repo.preferences();
+    const existing = await repo.preferences(true);
     const notificationReadStates = { ...existing.notificationReadStates, ...Object.fromEntries(ids.map(id => [id, read])) };
     if (repo.mode === 'local' && repo.savePersonal) await repo.savePersonal({ preferences: { notificationReadStates } });
     else await execute('set_preferences', { preferences: { notificationReadStates } });
     if (!repo.controller.signal.aborted) setSnapshot(old => ({ ...old, preferences: { ...old.preferences, notificationReadStates } }));
   }
   async function addCopiedFavorites(ids: string[]) {
-    const current = await repo.preferences();
+    const current = await repo.preferences(true);
     const next = { ...current, favoriteTaskIds: [...new Set([...current.favoriteTaskIds, ...ids])] };
     if (repo.mode === 'local' && repo.savePersonal) await repo.savePersonal({ preferences: { favoriteTaskIds: next.favoriteTaskIds } });
     else await execute('set_preferences', { preferences: { favoriteTaskIds: next.favoriteTaskIds } });
@@ -341,61 +337,64 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
 }
 
 export function useTaskDetails(repo: WorkspaceRepository, taskId: string | undefined, revision: number, t: Translate, graph: TaskGraph) {
-  const [details, setDetails] = useState<{
-    comments: import('../../domain/contracts').Comment[];
-    files: import('../../domain/contracts').FileMetadata[];
-    attachments: import('../../domain/contracts').TaskAttachment[];
-    reactions: import('../../domain/contracts').CommentReaction[];
-    history: import('../../domain/contracts').ActivityEntry[];
-    actorId: string | null;
-  }>({
-    comments: [],
-    files: [],
-    attachments: [],
-    reactions: [],
-    history: [],
-    actorId: null,
-  });
-  const [error, setError] = useState(''),
-    [loading, setLoading] = useState(true),
-    [attempt, retry] = useState(0);
-  useEffect(() => {
-    if (!taskId) return;
-    let alive = true;
-    setLoading(true);
-    void Promise.all([
-      loadTaskDiscussion(repo, taskId, graph, attempt > 0),
-      graph.files ? Promise.resolve(graph.files) : repo.list<import('../../domain/contracts').FileMetadata>('list_files', {}, true),
-      graph.attachments ? Promise.resolve(graph.attachments) : repo.list<import('../../domain/contracts').TaskAttachment>('list_attachments', {}, true),
-      repo.mode === 'local'
-        ? repo.rpc<{ currentMemberId: string; teamId?: string | null }>('get_local_actor')
-        : Promise.resolve({ currentMemberId: repo.userId, teamId: null }),
-    ])
-      .then(([discussion, files, attachments, actorId]) => {
-        if (alive && !repo.controller.signal.aborted) {
-          setDetails({ ...discussion, files, attachments, actorId: actorId.currentMemberId });
-          setError('');
-        }
-      })
-      .catch(err => {
-        if (alive && !repo.controller.signal.aborted) setError(errorMessage(err, t));
-      })
-      .finally(() => {
-        if (alive && !repo.controller.signal.aborted) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [repo, taskId, revision, t, attempt]);
+  const complete = graph.historyComplete !== false;
+  const comments = usePagedCollection<Comment>(
+    repo,
+    'list_comments',
+    { taskId: taskId ?? '' },
+    revision,
+    complete ? graph.comments?.filter(c => c.taskId === taskId) : undefined,
+    !!taskId,
+  );
+  const reactions = usePagedCollection<CommentReaction>(
+    repo,
+    'list_reactions',
+    { taskId: taskId ?? '' },
+    revision,
+    complete ? graph.reactions : undefined,
+    !!taskId,
+  );
+  const history = usePagedCollection<ActivityEntry>(
+    repo,
+    'list_activity',
+    { taskId: taskId ?? '' },
+    revision,
+    complete ? graph.activity?.filter(c => c.taskId === taskId) : undefined,
+    !!taskId,
+  );
+  const events = usePagedCollection<DomainEvent>(
+    repo,
+    'list_task_activity',
+    { taskId: taskId ?? '' },
+    revision,
+    complete ? graph.events.filter(e => e.entityId === taskId || e.payload?.taskId === taskId) : undefined,
+    !!taskId,
+  );
+  const commentIds = new Set(comments.items.map(c => c.id));
   return {
-    ...details,
+    comments: comments.items,
+    reactions: reactions.items.filter(r => commentIds.has(r.commentId)),
+    history: history.items,
+    files: graph.files ?? [],
+    attachments: graph.attachments ?? [],
+    actorId: graph.actorId ?? repo.userId,
     subtasks: graph.subtasks.filter(s => s.taskId === taskId),
     dependencies: graph.dependencies,
     labels: graph.labels,
     links: graph.taskLabels.filter(l => l.taskId === taskId),
-    events: graph.events.filter(event => event.entityId === taskId || event.payload?.taskId === taskId),
-    error,
-    loading,
-    retry: () => retry(value => value + 1),
+    events: events.items,
+    error:
+      comments.error || reactions.error || history.error || events.error ? t('Não foi possível carregar o histórico.', 'History could not be loaded.') : '',
+    loading: comments.loading || reactions.loading || history.loading || events.loading,
+    more: comments.more || reactions.more || history.more || events.more,
+    loadMore: async () => {
+      for (const page of [comments, reactions, history, events]) if (page.more) await page.loadMore();
+    },
+    retry: () => {
+      comments.retry();
+      reactions.retry();
+      history.retry();
+      events.retry();
+    },
   };
 }

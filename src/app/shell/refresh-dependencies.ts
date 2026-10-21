@@ -1,0 +1,58 @@
+/** Authoritative cascade families; batch callers expand child operations before using this map. */
+const taskGraph = ['labels', 'taskLabels', 'dependencies', 'subtasks', 'files', 'attachments', 'calendarEvents', 'notifications', 'comments', 'reactions'];
+const projectGraph = [...taskGraph, 'views', 'projectMembers'];
+const map: Record<string, readonly string[]> = {
+  delete_task: taskGraph,
+  delete_project: projectGraph,
+  intervene_task: taskGraph,
+  complete_task: taskGraph,
+  duplicate_task: taskGraph,
+  duplicate_task_graph: taskGraph,
+  move_task: ['files'],
+  create_label: ['labels'],
+  update_label: ['labels'],
+  delete_label: ['labels', 'taskLabels'],
+  set_task_label: ['taskLabels'],
+  remove_task_label: ['taskLabels'],
+  set_task_dependency: ['dependencies'],
+  remove_task_dependency: ['dependencies'],
+  create_subtask: ['subtasks'],
+  update_subtask: ['subtasks'],
+  delete_subtask: ['subtasks'],
+  create_file: ['files'],
+  duplicate_file: ['files'],
+  update_file: ['files'],
+  delete_file: ['files', 'attachments'],
+  set_task_attachment: ['attachments', 'files'],
+  remove_task_attachment: ['attachments', 'files'],
+  create_calendar_event: ['calendarEvents'],
+  update_calendar_event: ['calendarEvents'],
+  delete_calendar_event: ['calendarEvents'],
+  create_team: ['teams', 'teamMembers', 'members'],
+  update_team: ['teams', 'teamMembers', 'members'],
+  delete_team: ['teams', 'teamMembers', 'members'],
+  set_team_member: ['teamMembers', 'members'],
+  remove_team_member: ['teamMembers', 'members'],
+  create_project: ['projectMembers'],
+  update_project: ['projectMembers'],
+  archive_project: ['projectMembers'],
+  restore_project: ['projectMembers'],
+  set_project_member: ['projectMembers'],
+  remove_project_member: ['projectMembers'],
+  local_project_sharing: ['projectMembers'],
+  create_view: ['views'],
+  update_view: ['views'],
+  delete_view: ['views'],
+  add_task_comment: ['comments', 'reactions'],
+  delete_comment: ['comments', 'reactions'],
+  add_reaction: ['reactions'],
+  remove_reaction: ['reactions'],
+  set_preferences: ['preferences'],
+};
+export function affectedCollections(operations: string[]) {
+  return new Set(
+    operations.flatMap(operation =>
+      operation.startsWith('local_') ? [...projectGraph, 'teams', 'teamMembers', 'members', 'preferences'] : (map[operation] ?? []),
+    ),
+  );
+}
