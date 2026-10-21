@@ -162,6 +162,11 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
     return value as Command<Record<string, unknown>>;
   }
   for (const [key, item] of Object.entries(input)) {
+    if (operation === 'duplicate_file' && (key === 'id' || key === 'newId')) {
+      // PostgreSQL text cannot represent NUL or lone UTF-16 surrogates.
+      if (typeof item !== 'string' || !item.trim() || item.length > 128 || item.includes('\0') || /[\uD800-\uDFFF]/u.test(item)) invalid();
+      continue;
+    }
     if (item === null) {
       if (!nullable.has(key)) invalid();
       continue;

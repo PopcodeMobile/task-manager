@@ -273,3 +273,80 @@ test('local historical files without a date read honestly without materializing 
   assert.equal((await repo.list('list_files')).find(f => f.id === 'source').createdAt, '');
   assert.equal(storage.getItem('gr8r.workspaces.v1'), before);
 });
+
+for (const field of ['id', 'newId'])
+  test(`duplicate ${field} accepts cloud-compatible strings and rejects matching boundaries locally/SQL`, async () => {
+    const { acceptedFileIds, rejectedFileIds, unrepresentableFileIds } = await import('./fixtures/file-duplication-ids.js');
+    const { repo, persistence } = await local();
+    const { db, ws, command } = await sql();
+    try {
+      if (field === 'id') {
+        const loaded = await persistence.load(repo.workspaceId);
+        loaded.data.files.push(...acceptedFileIds.map(id => ({ id, name: 'Boundary.pdf', type: 'pdf' })));
+        await persistence.save(repo.workspaceId, loaded.data, loaded.revision);
+        await db.exec('reset role');
+        for (const id of acceptedFileIds) await db.query("insert into public.files(workspace_id,id,name) values($1,$2,'Boundary.pdf')", [ws, id]);
+        await db.exec('set role authenticated');
+      }
+      for (const [index, value] of acceptedFileIds.entries()) {
+        const input = field === 'id' ? { id: value, newId: `boundary-copy-${index}` } : { id: 'source', newId: value };
+        const version = (await repo.list('list_files')).find(f => f.id === input.id).version;
+        assert.equal((await invoke(repo, input, version)).data.id, input.newId);
+        assert.equal((await command('duplicate_file', input, 1)).data.id, input.newId);
+      }
+      for (const value of rejectedFileIds) {
+        const input = { id: 'source', [field]: value };
+        await assert.rejects(invoke(repo, input), { code: 'validation_error' });
+        await assert.rejects(command('duplicate_file', input, 1), e => e.message === 'validation_error');
+      }
+      for (const value of unrepresentableFileIds) {
+        const input = { id: 'source', [field]: value };
+        await assert.rejects(invoke(repo, input), { code: 'validation_error' });
+        // PostgreSQL rejects invalid Unicode during JSONB decoding, before the RPC body.
+        await assert.rejects(command('duplicate_file', input, 1), e => ['22P05', '22P02', '22021'].includes(e.code));
+      }
+    } finally {
+      await db.close();
+    }
+  });
+
+test('punctuated duplicate IDs compose atomically in local/SQL batches without normalizing strings', async () => {
+  const { repo, storage } = await local();
+  const { db, command, read } = await sql();
+  const commands = [
+    { operation: 'duplicate_file', input: { id: 'source', newId: ' .batch-copy ' }, expectedVersion: 1 },
+    { operation: 'duplicate_file', input: { id: ' .batch-copy ', newId: '/next.copy' }, expectedVersion: 2 },
+  ];
+  try {
+    const before = storage.getItem('gr8r.workspaces.v1');
+    const source = (await read('list_files')).items;
+    await assert.rejects(invoke(repo, { commands }, undefined, 'ids-rollback', 'batch'), { code: 'version_conflict' });
+    assert.equal(storage.getItem('gr8r.workspaces.v1'), before);
+    await assert.rejects(command('batch', { commands }), e => e.message === 'version_conflict');
+    assert.deepEqual((await read('list_files')).items, source);
+    commands[1].expectedVersion = 1;
+    assert.equal((await invoke(repo, { commands }, undefined, 'ids-success', 'batch')).data.results[1].data.id, '/next.copy');
+    assert.equal((await command('batch', { commands })).data.results[1].data.id, '/next.copy');
+  } finally {
+    await db.close();
+  }
+});
+
+test('SQL duplicate ID validator matches UTF-16 length and ECMAScript whitespace boundaries', async () => {
+  const { acceptedFileIds, rejectedFileIds } = await import('./fixtures/file-duplication-ids.js');
+  const { db } = await sql();
+  try {
+    await db.exec('reset role');
+    for (const field of ['id', 'newId']) {
+      for (const value of acceptedFileIds)
+        await db.query("select public.operation_validate('duplicate_file',$1)", [JSON.stringify({ id: 'source', [field]: value })]);
+      for (const value of rejectedFileIds)
+        await assert.rejects(
+          db.query("select public.operation_validate('duplicate_file',$1)", [JSON.stringify({ id: 'source', [field]: value })]),
+          e => e.message === 'validation_error',
+        );
+    }
+  } finally {
+    await db.close();
+  }
+});

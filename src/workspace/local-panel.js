@@ -434,6 +434,11 @@ function validateLocalInput(data, operation, input) {
       }
   }
   for (const [key, value] of Object.entries(input)) {
+    if (operation === 'duplicate_file' && (key === 'id' || key === 'newId')) {
+      // Preserve the shared API's UTF-16 bound and exact string, including punctuation.
+      if (typeof value !== 'string' || !value.trim() || value.length > 128 || value.includes('\0') || /[\uD800-\uDFFF]/u.test(value)) fail('validation_error');
+      continue;
+    }
     if (value == null) {
       if (
         ![

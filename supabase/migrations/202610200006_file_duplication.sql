@@ -4,13 +4,23 @@
 alter function public.operation_validate(text,jsonb) rename to operation_validate_before_file_duplication;
 create function public.operation_validate(p_operation text,p_input jsonb) returns void
 language plpgsql set search_path='' as $$
+declare id_key text; id_value text;
 begin
  if p_operation='duplicate_file' then
   if jsonb_typeof(p_input) is distinct from 'object' then raise exception 'validation_error' using errcode='PT422';end if;
   if exists(select 1 from jsonb_object_keys(p_input) k where k not in ('id','newId','name')) then raise exception 'validation_error' using errcode='PT422';end if;
-  -- Reuse the existing ID/name/type/size rules without exposing writable metadata.
+  -- Reuse remaining strict shape/name/size rules without exposing writable metadata.
   perform public.operation_validate_before_file_duplication('update_file',p_input-'newId');
   if p_input?'newId' then perform public.operation_validate_before_file_duplication('update_file',jsonb_build_object('id',p_input->'newId'));end if;
+  -- Match the shared API: preserve strings, count UTF-16 units, reject JS-trim blanks.
+  -- NUL/lone surrogates cannot reach this function through PostgreSQL JSONB decoding.
+  foreach id_key in array array['id','newId'] loop
+   if p_input?id_key then
+    id_value:=p_input->>id_key;
+    if jsonb_typeof(p_input->id_key) is distinct from 'string' or length(btrim(id_value,U&'\0009\000A\000B\000C\000D\0020\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000\FEFF'))=0 then raise exception 'validation_error' using errcode='PT422';end if;
+    if length(id_value)+(select count(*) from generate_series(1,length(id_value)) i where ascii(substr(id_value,i,1))>65535)>128 then raise exception 'validation_error' using errcode='PT422';end if;
+   end if;
+  end loop;
  else
   perform public.operation_validate_before_file_duplication(p_operation,p_input);
  end if;
