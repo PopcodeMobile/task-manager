@@ -1823,3 +1823,159 @@ test('actual cloud remaining teams workspace notifications and unavailable setti
   }
   expect(cleanup).toEqual([]);
 });
+
+test('actual cloud fix team absent membership conflicts replan and ambiguous retry preserve identity', async ({ page }) => {
+  test.skip(!process.env.TEST_SUPABASE_URL || !process.env.TEST_SUPABASE_SERVICE_ROLE_KEY, 'Requires dedicated local Supabase');
+  test.setTimeout(90000);
+  const { createClient } = await import('@supabase/supabase-js');
+  const base = process.env.TEST_SUPABASE_URL!,
+    key = process.env.TEST_SUPABASE_ANON_KEY!,
+    options = { auth: { persistSession: false, autoRefreshToken: false } };
+  const service = createClient(base, process.env.TEST_SUPABASE_SERVICE_ROLE_KEY!, options),
+    human = createClient(base, key, options),
+    setupActor = createClient(base, key, options),
+    suffix = crypto.randomUUID(),
+    password = `Remaining-${crypto.randomUUID()}!`,
+    addresses = [`remaining-${suffix}@example.test`, `remaining-setup-${suffix}@example.test`],
+    users: string[] = [],
+    cleanup: string[] = [],
+    counts: Record<string, number> = {};
+  let ws = '';
+  page.on('response', response => {
+    if (response.url().includes('/rest/v1/rpc/')) {
+      const k = response.url().split('/').pop() + ':' + response.status();
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+  });
+  try {
+    for (const [index, email] of addresses.entries()) {
+      const made = await service.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { name: index ? 'Remaining teammate' : 'Remaining owner' },
+      });
+      expect(made.error).toBeNull();
+      users.push(made.data.user!.id);
+    }
+    expect((await human.auth.signInWithPassword({ email: addresses[0], password })).error).toBeNull();
+    expect((await setupActor.auth.signInWithPassword({ email: addresses[1], password })).error).toBeNull();
+    const made = await human.rpc('create_workspace_v2', { p_name: 'Remaining actual', p_slug: `remaining-${suffix}`, p_idempotency_key: suffix });
+    expect(made.error).toBeNull();
+    ws = made.data.data.id;
+    expect((await service.from('workspace_memberships').insert({ workspace_id: ws, user_id: users[1], role: 'member' })).error).toBeNull();
+    const command = async (operation: string, input: Record<string, unknown>, version?: number) => {
+      const result = await setupActor.rpc('execute_operation', {
+        p_workspace_id: ws,
+        p_operation: operation,
+        p_command: input,
+        p_expected_version: version ?? null,
+        p_idempotency_key: crypto.randomUUID(),
+      });
+      expect(result.error?.message ?? '').toBe('');
+      return result.data.data;
+    };
+    const read = async (operation: string) => {
+      const result = await setupActor.rpc('read_operation', { p_workspace_id: ws, p_operation: operation, p_query: {} });
+      expect(result.error).toBeNull();
+      return result.data;
+    };
+    const project = await command('create_project', { id: 'remaining-project', name: 'Remaining project' });
+    const task = await command('create_task', { id: 'remaining-task', projectId: project.id, title: 'Remaining Home <literal>', assigneeUserId: users[0] });
+    const first = await command('create_team', { id: 'remaining-old-team', name: 'Old team' });
+    await command('set_team_member', { id: first.id, userId: users[1] }, first.version);
+    expect(
+      (
+        await service.from('notifications').insert({
+          workspace_id: ws,
+          id: 'remaining-notification',
+          task_id: task.id,
+          notification_type: 'comment',
+          legacy_metadata: { text: 'Remaining notification', snippet: 'Literal cloud', at: new Date().toISOString() },
+        })
+      ).error,
+    ).toBeNull();
+    await page.goto(`/app/w/${ws}/teams`);
+    await page.getByLabel('E-mail').fill(addresses[0]);
+    await page.getByLabel('Senha', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await expect(page.getByRole('button', { name: 'Create team', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Create team', exact: true }).click();
+    await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Cloud <team>');
+    await page.getByRole('dialog').getByLabel('Remaining teammate', { exact: true }).check();
+    await page.getByRole('button', { name: 'Save team', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Remaining teammate', exact: true })).toBeVisible();
+    const teams = (await read('list_teams')).items,
+      newTeam = teams.find((team: { name: string }) => team.name === 'Cloud <team>');
+    expect(newTeam).toBeTruthy();
+    expect((await read('list_team_members')).items.filter((r: { userId: string }) => r.userId === users[1]).map((r: { teamId: string }) => r.teamId)).toEqual([
+      newTeam.id,
+    ]);
+    await page.getByRole('button', { name: 'Edit team', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Name', { exact: true }).fill('Reviewed team draft');
+    await dialog.getByLabel('Remaining owner', { exact: true }).check();
+    const old = (await read('list_teams')).items.find((item: { id: string }) => item.id === first.id);
+    await command('set_team_member', { id: first.id, userId: users[0] }, old.version);
+    await dialog.getByRole('button', { name: 'Save team', exact: true }).click();
+    await expect(dialog.getByRole('button', { name: 'Review current memberships and keep draft', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Save team', exact: true })).toBeDisabled();
+    await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue('Reviewed team draft');
+    expect((await read('list_teams')).items.find((item: { id: string }) => item.id === newTeam.id).version).toBe(newTeam.version);
+    expect((await read('list_team_members')).items.filter((r: { userId: string }) => r.userId === users[0]).map((r: { teamId: string }) => r.teamId)).toEqual([
+      first.id,
+    ]);
+    await page.screenshot({ path: '/tmp/task6c-fix1-team-conflict.png', fullPage: true });
+    await dialog.getByRole('button', { name: 'Review current memberships and keep draft', exact: true }).click();
+    await expect(dialog).toContainText('Old team');
+    await dialog.getByRole('button', { name: 'Save team', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    expect((await read('list_team_members')).items.filter((r: { userId: string }) => r.userId === users[0]).map((r: { teamId: string }) => r.teamId)).toEqual([
+      newTeam.id,
+    ]);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Reviewed team draft', exact: true, level: 1 })).toBeVisible();
+    await page.goto(`/app/w/${ws}/teams`);
+    await page.getByRole('button', { name: 'Create team', exact: true }).click();
+    await dialog.getByLabel('Name', { exact: true }).fill('Ambiguous team once');
+    const attempts: { p_command: unknown; p_idempotency_key: string }[] = [];
+    await page.route('**/rest/v1/rpc/execute_operation', async route => {
+      const body = route.request().postDataJSON();
+      if (body.p_operation !== 'batch') return route.continue();
+      attempts.push({ p_command: body.p_command, p_idempotency_key: body.p_idempotency_key });
+      if (attempts.length === 1) {
+        const response = await route.fetch();
+        expect(response.ok()).toBe(true);
+        await route.abort('failed');
+      } else await route.continue();
+    });
+    await dialog.getByRole('button', { name: 'Save team', exact: true }).click();
+    await expect(dialog.getByLabel('Name', { exact: true })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'Save team', exact: true })).toBeEnabled();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeVisible();
+    const beforeUnload = page.waitForEvent('dialog');
+    await page.close({ runBeforeUnload: true });
+    const prompt = await beforeUnload;
+    expect(prompt.type()).toBe('beforeunload');
+    await prompt.dismiss();
+    await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue('Ambiguous team once');
+    await page.screenshot({ path: '/tmp/task6c-fix1-team-ambiguous.png', fullPage: true });
+    await dialog.getByRole('button', { name: 'Save team', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1]).toEqual(attempts[0]);
+    expect((await read('list_teams')).items.filter((item: { name: string }) => item.name === 'Ambiguous team once')).toHaveLength(1);
+    expect(Object.keys(counts).filter(k => k.endsWith(':429'))).toEqual([]);
+    test.info().annotations.push({ type: 'fix-team-actual-cloud-counts', description: JSON.stringify(counts) });
+  } finally {
+    if (ws && (await service.from('workspaces').delete().eq('id', ws)).error) cleanup.push('workspace');
+    for (const id of users) if ((await service.auth.admin.deleteUser(id)).error) cleanup.push('user');
+    await human.auth.signOut();
+    await setupActor.auth.signOut();
+  }
+  expect(cleanup).toEqual([]);
+});

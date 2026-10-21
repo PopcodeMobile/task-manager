@@ -4,6 +4,7 @@ import type { Snapshot } from '../shell/useWorkspaceData';
 import type { Translate } from '../auth/ConsentPage';
 import type { Execute } from '../projects/ProjectsPage';
 export type PanelProps = {
+  registerDraft: (guard: import('../tasks/TaskDrawer').DraftGuard | null) => void;
   snapshot: Snapshot;
   repo: WorkspaceRepository;
   workspace: Workspace;

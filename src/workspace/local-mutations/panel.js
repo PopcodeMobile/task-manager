@@ -71,12 +71,11 @@ export function mutatePanel({ data, find, cas, bump, dto, initialize }, operatio
     for (const key of Object.keys(data)) delete data[key];
     Object.assign(data, seed(), { ws, _panel: panel });
     delete data.workspaces;
-    for (const [kind, rows] of [
-      ['task', data.tasks],
-      ['project', data.projects],
-      ['team', localTeams(data)],
-    ])
-      for (const row of rows) bump(kind, row);
+    // panelState registered the canonical union (including embedded files/labels)
+    // before this transaction. Invalidate every known CAS identity, even when the
+    // reset removes it; keep receipts and never recycle an old entity version.
+    for (const key of Object.keys(panel.versions)) panel.versions[key] += 1;
+    data.ws.version = panel.versions[`workspace:${ws.id}`];
     return { id: ws.id, demo: true };
   }
   // Run on the transaction's current graph, before this command changes any team.

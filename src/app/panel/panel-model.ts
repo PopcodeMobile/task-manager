@@ -10,7 +10,12 @@ export function teamCommands(draft: TeamDraft, teams: Team[], relations: TeamRel
     commands.push({ operation, input, expectedVersion: versions.get(id) });
     versions.set(id, (versions.get(id) ?? 0) + 1);
   };
-  const input = { id: draft.id, name: draft.name, description: draft.description, attributes: { icon: draft.icon, color: draft.color } };
+  const affected = new Set([...draft.members, ...relations.filter(r => r.teamId === draft.id).map(r => r.userId)]);
+  const expectedMemberships = [...affected].sort().map(userId => ({
+    userId,
+    teamIds: [...new Set(relations.filter(r => r.userId === userId).map(r => r.teamId))].sort(),
+  }));
+  const input = { id: draft.id, name: draft.name, description: draft.description, attributes: { icon: draft.icon, color: draft.color }, expectedMemberships };
   if (existing) add('update_team', input, draft.id);
   else {
     commands.push({ operation: 'create_team', input });

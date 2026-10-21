@@ -1,3 +1,4 @@
+import { iso } from '../../core/calendar.js';
 import DOMPurify from 'dompurify';
 import { CommandPalette, type PaletteItem } from '../panel/CommandPalette';
 import { RemainingRoutes, remainingRoutes } from '../panel/RemainingRoutes';
@@ -65,14 +66,22 @@ export function WorkspacePanel({
   t: Translate;
   controls: ReactNode;
 }) {
-  const draft = useRef<DraftGuard | null>(null);
-  const { url, navigate: commitNavigation } = useNavigation(async () => !draft.current?.dirty || (await draft.current.flush()));
+  const draft = useRef<DraftGuard | null>(null),
+    panelDraft = useRef<DraftGuard | null>(null);
+  const canLeave = async () => {
+    for (const guard of [draft.current, panelDraft.current]) if (guard?.dirty && !(await guard.flush())) return false;
+    return true;
+  };
+  const { url, navigate: commitNavigation } = useNavigation(canLeave);
+  const registerPanelDraft = useCallback((value: DraftGuard | null) => {
+    panelDraft.current = value;
+  }, []);
   const registerDraft = useCallback((value: DraftGuard | null) => {
     draft.current = value;
   }, []);
   const navigate = (href: string, replace = false) => {
     void (async () => {
-      if (!replace && draft.current?.dirty && !(await draft.current.flush())) return;
+      if (!replace && !(await canLeave())) return;
       commitNavigation(href, replace);
     })();
   };
@@ -253,7 +262,7 @@ export function WorkspacePanel({
           : url.searchParams.get('filter') === 'open'
             ? task.status !== 'done'
             : url.searchParams.get('filter') === 'overdue'
-              ? task.status !== 'done' && !!task.dueDate && task.dueDate < new Date().toISOString().slice(0, 10)
+              ? task.status !== 'done' && !!task.dueDate && task.dueDate < iso(new Date())
               : true),
     ),
     projects = shown.projects
@@ -475,11 +484,11 @@ export function WorkspacePanel({
           <div
             className="shell-controls"
             onClickCapture={event => {
-              if ((event.target as HTMLElement).closest('[data-action="logout"]') && draft.current?.dirty) {
+              if ((event.target as HTMLElement).closest('[data-action="logout"]') && (draft.current?.dirty || panelDraft.current?.dirty)) {
                 event.preventDefault();
                 event.stopPropagation();
                 void (async () => {
-                  if (await draft.current!.flush()) {
+                  if (await canLeave()) {
                     try {
                       await onSignOut?.();
                     } catch (err) {
@@ -547,6 +556,11 @@ export function WorkspacePanel({
                   projectId={route === 'project' ? projectId : undefined}
                   tab={url.searchParams.get('tab') || defaultProjectTab(prefs)}
                   initialCreate={url.searchParams.get('create') === 'true'}
+                  consumeCreate={() => {
+                    const next = new URL(url.href);
+                    next.searchParams.delete('create');
+                    navigate(next.pathname + next.search, true);
+                  }}
                   back={() => navigate(`${base}/projects`)}
                   href={taskHref}
                   navigate={navigate}
@@ -682,6 +696,7 @@ export function WorkspacePanel({
                 )
               ) : remainingRoutes.includes(route) ? (
                 <RemainingRoutes
+                  registerDraft={registerPanelDraft}
                   key={`${workspaceId}:${route}:${route === 'settings' ? (url.searchParams.get('sec') ?? 'workspace') : ''}`}
                   route={route}
                   params={url.searchParams}

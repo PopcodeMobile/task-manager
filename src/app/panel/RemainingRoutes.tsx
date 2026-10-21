@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 import { iso, addD } from '../../core/calendar.js';
 import { Button } from '../../components/ui/button';
@@ -326,6 +326,16 @@ function MyTasks(p: PanelProps) {
 }
 function NotificationsPage(p: PanelProps) {
   const { snapshot: s, t } = p;
+  const replyGuard = useRef<import('../tasks/TaskDrawer').DraftGuard | null>(null);
+  const registerReply = useCallback(
+    (guard: import('../tasks/TaskDrawer').DraftGuard | null) => {
+      replyGuard.current = guard;
+      p.registerDraft(guard);
+    },
+    [p.registerDraft],
+  );
+  const canSwitch = async () => !busy && (!replyGuard.current?.dirty || (await replyGuard.current.flush()));
+
   const [unread, setUnread] = useState(false),
     [category, setCategory] = useState('all'),
     [selected, setSelected] = useState<string | null>(null),
@@ -408,12 +418,15 @@ function NotificationsPage(p: PanelProps) {
                 <button
                   className="inline-link"
                   onClick={() =>
-                    void action(async () => {
-                      await p.markNotifications([n.id], true);
-                      if (p.route === 'inbox') setSelected(n.id);
-                      else if (n.taskId) p.openTask(n.taskId);
-                      else if (n.projectId) p.openProject(n.projectId);
-                    })
+                    void (async () => {
+                      if (n.id !== selected && !(await canSwitch())) return;
+                      await action(async () => {
+                        await p.markNotifications([n.id], true);
+                        if (p.route === 'inbox') setSelected(n.id);
+                        else if (n.taskId) p.openTask(n.taskId);
+                        else if (n.projectId) p.openProject(n.projectId);
+                      });
+                    })()
                   }
                 >
                   <strong>{String(n.legacyMetadata.text ?? n.legacyMetadata.title ?? n.notificationType)}</strong>
@@ -434,7 +447,14 @@ function NotificationsPage(p: PanelProps) {
         </div>
         {notification && (
           <section className="inbox-preview" aria-label={t('Conversa selecionada', 'Selected conversation')}>
-            <Button variant="outline" onClick={() => setSelected(null)}>
+            <Button
+              variant="outline"
+              onClick={() =>
+                void canSwitch().then(allowed => {
+                  if (allowed) setSelected(null);
+                })
+              }
+            >
               {t('Voltar', 'Back')}
             </Button>
             <h2>{String(notification.legacyMetadata.text ?? notification.notificationType)}</h2>
@@ -442,6 +462,7 @@ function NotificationsPage(p: PanelProps) {
               <>
                 <Button onClick={() => p.openTask(task.id)}>{task.title}</Button>
                 <TaskDiscussionSection
+                  registerDraft={registerReply}
                   task={task}
                   comments={s.comments.filter(c => c.taskId === task.id)}
                   reactions={s.reactions}

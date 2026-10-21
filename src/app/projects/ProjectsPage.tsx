@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FolderKanban, Plus, Star, Target, Globe, Megaphone, Palette, Code, Heart, Rocket, Briefcase, Layers } from 'lucide-react';
 import type { Project, SavedView } from '../../domain/contracts';
 import type { Translate } from '../auth/ConsentPage';
@@ -73,6 +73,7 @@ export function ProjectsPage({
   extraTaskMenuActions,
   refresh,
   initialCreate = false,
+  consumeCreate,
 }: {
   snapshot: Snapshot;
   repo: WorkspaceRepository;
@@ -95,6 +96,7 @@ export function ProjectsPage({
   extraTaskMenuActions: ExtraTaskMenuAction[];
   refresh: () => Promise<unknown>;
   initialCreate?: boolean;
+  consumeCreate: () => void;
 }) {
   const [edit, setEdit] = useState<ProjectEdit | null>(initialCreate && !readOnly ? { kind: 'new', opener: null } : null),
     [share, setShare] = useState<{ project: Project; opener: HTMLElement | null } | null>(null),
@@ -103,6 +105,11 @@ export function ProjectsPage({
     [typed, setTyped] = useState(''),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!initialCreate || readOnly) return;
+    setEdit(current => current ?? { kind: 'new', opener: document.activeElement as HTMLElement });
+    consumeCreate();
+  }, [initialCreate, readOnly]);
   const confirmTrigger = useRef<HTMLElement | null>(null);
   const collection = useSurfaceView(repo, 'projects', readCollection, t);
   const available = snapshot.projects.filter(

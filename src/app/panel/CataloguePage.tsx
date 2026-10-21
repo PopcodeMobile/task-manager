@@ -62,9 +62,9 @@ export function CataloguePage(p: PanelProps) {
                 value={String(p.prefs.theme ?? 'light')}
                 onChange={e => void p.savePrefs({ theme: e.target.value }).catch(e => setError(errorMessage(e, t)))}
               >
-                {['light', 'dark', 'system'].map(v => (
-                  <option key={v}>{v}</option>
-                ))}
+                <option value="light">{t('Claro', 'Light')}</option>
+                <option value="dark">{t('Escuro', 'Dark')}</option>
+                <option value="system">{t('Sistema', 'System')}</option>
               </select>
             </label>
           </div>

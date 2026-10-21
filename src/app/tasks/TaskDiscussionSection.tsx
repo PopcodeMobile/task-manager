@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 import type { Task, Comment, CommentReaction, ActivityEntry } from '../../domain/contracts';
 import type { Member, DomainEvent, Agent } from '../../workspace/normalized';
@@ -21,6 +21,7 @@ export function TaskDiscussionSection({
   execute,
   disabled,
   t,
+  registerDraft,
 }: {
   task: Task;
   comments: Comment[];
@@ -35,11 +36,38 @@ export function TaskDiscussionSection({
   execute: Execute;
   disabled: boolean;
   t: Translate;
+  registerDraft?: (guard: import('./TaskDrawer').DraftGuard | null) => void;
 }) {
   const [tab, setTab] = useState('comments'),
-    [body, setBody] = useState(''),
-    [id, setId] = useState(() => crypto.randomUUID());
+    [drafts, setDrafts] = useState<Record<string, { body: string; id: string }>>({}),
+    [pending, setPending] = useState(false),
+    [blocked, setBlocked] = useState(false),
+    [attempt, setAttempt] = useState<{ taskId: string; body: string; id: string } | null>(null);
+  const emptyDraft = useMemo(() => ({ body: '', id: crypto.randomUUID() }), [task.id]);
+  const { body, id } = drafts[task.id] ?? emptyDraft;
+  const setBody = (body: string) => setDrafts(old => ({ ...old, [task.id]: { ...(old[task.id] ?? emptyDraft), body } }));
   const textarea = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    registerDraft?.({
+      dirty: !!body || pending || !!attempt,
+      flush: async () => {
+        setBlocked(true);
+        textarea.current?.focus();
+        return false;
+      },
+    });
+    const unload = (event: BeforeUnloadEvent) => {
+      if (body || pending) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    if (registerDraft) addEventListener('beforeunload', unload);
+    return () => {
+      registerDraft?.(null);
+      removeEventListener('beforeunload', unload);
+    };
+  }, [body, pending, attempt, registerDraft]);
   const mention = body.match(/(?:^|\s)@([^@\s]*)$/u);
   const candidates = mention ? members.filter(m => m.name.toLocaleLowerCase().includes(mention[1].toLocaleLowerCase())) : [];
   return (
@@ -90,7 +118,7 @@ export function TaskDiscussionSection({
                       key={reaction}
                       aria-label={t('Reagir: ', 'React: ') + reaction}
                       aria-pressed={mine}
-                      disabled={disabled || !actorId}
+                      disabled={disabled || pending || !actorId}
                       title={people.map(r => members.find(m => m.user_id === (r.userId ?? r.legacyUserId))?.name ?? r.legacyUserId).join(', ')}
                       onClick={() => void action(() => execute(mine ? 'remove_reaction' : 'add_reaction', { commentId: item.id, reaction }))}
                     >
@@ -107,19 +135,45 @@ export function TaskDiscussionSection({
               )}
             </article>
           ))}
+          {blocked && (
+            <p role="alert">
+              {t(
+                'Envie ou descarte esta resposta antes de sair da conversa. Um envio pendente precisa terminar.',
+                'Post or discard this reply before leaving the conversation. A pending send must finish.',
+              )}
+            </p>
+          )}
           <form
             onSubmit={e => {
               e.preventDefault();
+              if (pending) return;
+              const command = attempt ?? { taskId: task.id, id, body };
+              setAttempt(command);
+              setPending(true);
               void action(async () => {
-                await execute('add_task_comment', { id, taskId: task.id, body });
-                setBody('');
-                setId(crypto.randomUUID());
-              });
+                try {
+                  await execute('add_task_comment', command);
+                } catch (error) {
+                  const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+                  if (['validation_error', 'forbidden', 'not_found', 'storage', 'version_conflict', 'rate_limited'].includes(code)) setAttempt(null);
+                  throw error;
+                }
+                setDrafts(old => ({ ...old, [command.taskId]: { body: '', id: crypto.randomUUID() } }));
+                setAttempt(null);
+                setBlocked(false);
+              }).finally(() => setPending(false));
             }}
           >
             <label className="form-field">
               {t('Comentário', 'Comment')}
-              <textarea ref={textarea} required maxLength={20000} value={body} disabled={disabled || !actorId} onChange={e => setBody(e.target.value)} />
+              <textarea
+                ref={textarea}
+                required
+                maxLength={20000}
+                value={body}
+                disabled={disabled || pending || !!attempt || !actorId}
+                onChange={e => setBody(e.target.value)}
+              />
             </label>
             {candidates.length > 0 && (
               <div className="mention-choices" aria-label={t('Mencionar pessoa', 'Mention person')}>
@@ -139,9 +193,22 @@ export function TaskDiscussionSection({
                 ))}
               </div>
             )}
-            <Button type="submit" disabled={disabled || !actorId}>
+            <Button type="submit" disabled={disabled || pending || !actorId}>
               {t('Comentar', 'Post comment')}
             </Button>
+            {registerDraft && body && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={disabled || pending || !!attempt}
+                onClick={() => {
+                  setDrafts(old => ({ ...old, [task.id]: { body: '', id: crypto.randomUUID() } }));
+                  setBlocked(false);
+                }}
+              >
+                {t('Descartar rascunho da resposta', 'Discard reply draft')}
+              </Button>
+            )}
           </form>
         </div>
       )}

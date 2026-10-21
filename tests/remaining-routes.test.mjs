@@ -253,3 +253,69 @@ test('aggregate routes never expose inaccessible private project children or arc
   assert.equal(visiblePanelSnapshot(s, false).projects.length, 2);
   assert.equal(s.projects.length, 2);
 });
+
+test('reset invalidates all canonical CAS families including materialized and embedded files and retains replay receipts', async () => {
+  const { repo, storage, data } = await setup();
+  const materialized = (await repo.list('list_files')).find(f => f.id === 'f1');
+  const embedded = (await repo.list('list_files')).find(f => f.id === 'a1');
+  const label = (await repo.list('list_labels'))[0];
+  const view = (await repo.list('list_views'))[0];
+  const comment = (await repo.list('list_comments')).find(c => c.authorUserId === 'm1') ?? (await repo.list('list_comments'))[0];
+  const parent = (await repo.list('list_tasks')).find(t => data.tasks.find(row => row.id === t.id)?.subtasks?.some(sub => sub.id === 's1'));
+  for (const file of [materialized, embedded]) await run(repo, 'update_file', { id: file.id, name: 'before-reset.pdf' }, file.version, 'reset-file-' + file.id);
+  const files = (await repo.list('list_files')).filter(f => [materialized.id, embedded.id].includes(f.id));
+  const before = JSON.parse(storage.getItem('gr8r.workspaces.v1')).reactPanels[repo.workspaceId];
+  await run(repo, 'local_reset_demo', { confirmWorkspaceId: repo.workspaceId });
+  const after = JSON.parse(storage.getItem('gr8r.workspaces.v1')).reactPanels[repo.workspaceId];
+  for (const [key, version] of Object.entries(before.versions)) assert.ok(after.versions[key] > version, key);
+  for (const file of files) {
+    const restored = (await repo.list('list_files')).find(f => f.id === file.id);
+    assert.ok(restored.version > file.version);
+    await assert.rejects(run(repo, 'update_file', { id: file.id, name: 'stale.pdf' }, file.version), { code: 'version_conflict' });
+    const original = [materialized, embedded].find(f => f.id === file.id);
+    await run(repo, 'update_file', { id: file.id, name: 'before-reset.pdf' }, original.version, 'reset-file-' + file.id);
+    assert.equal((await repo.list('list_files')).find(f => f.id === file.id).name, restored.name);
+  }
+  await assert.rejects(run(repo, 'update_label', { id: label.id, name: 'stale' }, label.version), { code: 'version_conflict' });
+  await assert.rejects(run(repo, 'update_view', { id: view.id, name: 'stale' }, view.version), { code: 'version_conflict' });
+  await assert.rejects(run(repo, 'delete_comment', { id: comment.id }, comment.version), { code: 'version_conflict' });
+  await assert.rejects(run(repo, 'update_subtask', { id: 's1', taskId: parent.id, title: 'stale' }, parent.version), { code: 'version_conflict' });
+});
+
+test('team plans guard complete original membership sets of selected and removed users including absence', async () => {
+  const { teamCommands } = await import('../src/app/panel/panel-model.ts');
+  const teams = [
+    { id: 'A', name: 'A', version: 1 },
+    { id: 'B', name: 'B', version: 1 },
+  ];
+  const draft = { id: 'B', name: 'B', description: '', icon: 'users', color: 'teal', members: ['unassigned', 'multi'] };
+  const relations = [
+    { teamId: 'A', userId: 'multi' },
+    { teamId: 'B', userId: 'multi' },
+    { teamId: 'B', userId: 'removed' },
+  ];
+  const commands = teamCommands(draft, teams, relations);
+  assert.deepEqual(commands[0].input.expectedMemberships, [
+    { userId: 'multi', teamIds: ['A', 'B'] },
+    { userId: 'removed', teamIds: ['B'] },
+    { userId: 'unassigned', teamIds: [] },
+  ]);
+  assert.equal(
+    commands.slice(1).some(c => 'expectedMemberships' in c.input),
+    false,
+  );
+  const { repo, persistence } = await setup();
+  const record = await persistence.load(repo.workspaceId);
+  record.data.members[0].team = '';
+  await persistence.save(repo.workspaceId, record.data, record.revision);
+  const actualTeams = await repo.list('list_teams'),
+    actualRelations = await repo.list('list_team_members');
+  const a = { ...draft, id: actualTeams[0].id, name: actualTeams[0].name, members: [record.data.members[0].id] };
+  const b = { ...a, id: actualTeams[1].id, name: actualTeams[1].name };
+  const plannedA = teamCommands(a, actualTeams, actualRelations),
+    plannedB = teamCommands(b, actualTeams, actualRelations);
+  await run(repo, 'batch', { commands: plannedA });
+  const before = await persistence.load(repo.workspaceId);
+  await assert.rejects(run(repo, 'batch', { commands: plannedB }), { code: 'version_conflict' });
+  assert.deepEqual(await persistence.load(repo.workspaceId), before);
+});

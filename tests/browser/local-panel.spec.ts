@@ -2012,3 +2012,221 @@ test('remaining home and my tasks create complete filters palette scopes and loc
   await page.getByLabel('Search workspace').fill('Remaining Today task');
   await expect(page.getByRole('button', { name: 'Remaining Today task', exact: true })).toBeVisible();
 });
+
+test('6c fix inbox drafts stay with their task across failed send navigation and mobile Back', async ({ page }) => {
+  const fixture = structuredClone(data);
+  fixture.notifs = [
+    { ...fixture.notifs[0], id: 'draft-notif-a', task: fixture.tasks[0].id, text: 'Conversation A', read: false },
+    { ...fixture.notifs[0], id: 'draft-notif-b', task: fixture.tasks[1].id, text: 'Conversation B', read: false },
+  ];
+  await page.addInitScript(value => {
+    if (!localStorage.getItem('gr8r.v2')) localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en' } }));
+  }, fixture);
+  await page.goto('/app-local/w/w1/inbox');
+  await page.getByRole('button', { name: /^Conversation A/ }).click();
+  const preview = page.getByRole('region', { name: 'Selected conversation' });
+  await preview.getByRole('textbox', { name: 'Comment', exact: true }).fill('Draft belongs to A');
+  await page.getByRole('button', { name: /^Conversation B/ }).click();
+  await expect(preview.getByRole('heading', { name: 'Conversation A', exact: true })).toBeVisible();
+  await expect(preview.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('Draft belongs to A');
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Home', exact: true }).click();
+  await expect(page).toHaveURL(/\/inbox$/);
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'gr8r.workspaces.v1' && JSON.parse(value).records.w1.data.comments.some((c: { text: string }) => c.text === 'Draft belongs to A')) {
+        Storage.prototype.setItem = original;
+        throw Error('Simulated write failure');
+      }
+      return original.call(this, key, value);
+    };
+  });
+  await preview.getByRole('button', { name: 'Post comment', exact: true }).click();
+  await expect(page.getByRole('alert').first()).toBeVisible();
+  await expect(preview.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('Draft belongs to A');
+  await page.getByRole('button', { name: /^Conversation B/ }).click();
+  await expect(preview.getByRole('heading', { name: 'Conversation A', exact: true })).toBeVisible();
+  await preview.getByRole('button', { name: 'Post comment', exact: true }).click();
+  await expect(preview.locator('.rich-content').filter({ hasText: 'Draft belongs to A' })).toHaveCount(1);
+  await expect(preview.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('');
+  await page.getByRole('button', { name: /^Conversation B/ }).click();
+  await expect(preview.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('');
+  await preview.getByRole('textbox', { name: 'Comment', exact: true }).fill('Discard only B');
+  await preview.getByRole('button', { name: 'Discard reply draft', exact: true }).click();
+  await expect(preview.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: '/tmp/task6c-fix1-inbox-mobile.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await preview.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(preview).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Conversation A/ })).toBeVisible();
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.comments.filter((c: { text: string }) => c.text === 'Draft belongs to A'),
+  );
+  expect(saved).toHaveLength(1);
+  expect(saved[0].task).toBe(fixture.tasks[0].id);
+});
+
+test.describe('6c fix local calendar boundary', () => {
+  test.use({ timezoneId: 'America/Maceio' });
+  test('overdue metric opens the same tasks at 22:30 local after UTC midnight', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-10-20T22:30:00-03:00'));
+    const fixture = structuredClone(data);
+    fixture.tasks = [
+      { ...fixture.tasks[0], id: 'yesterday', title: 'Yesterday overdue', due: '2026-10-19', status: 'todo', subtasks: [], deps: [], attachments: [] },
+      { ...fixture.tasks[0], id: 'today', title: 'Due today not overdue', due: '2026-10-20', status: 'todo', subtasks: [], deps: [], attachments: [] },
+    ];
+    await page.addInitScript(value => {
+      if (!localStorage.getItem('gr8r.v2')) localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en', tz: 'Unknown/StoreOnly' } }));
+    }, fixture);
+    await page.goto('/app-local/w/w1/home');
+    const overdue = page.getByRole('button', { name: /Overdue$/ });
+    await expect(overdue).toContainText('1');
+    await overdue.click();
+    await expect(page.getByRole('button', { name: /Yesterday overdue$/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Due today not overdue$/ })).toHaveCount(0);
+  });
+});
+
+test('6c fix project creation requests reopen mounted collection and project with dirty guard', async ({ page }) => {
+  await prepareRemaining(page, 'projects');
+  for (const origin of ['projects', 'project?project=p1&tab=overview']) {
+    await page.goto('/app-local/w/w1/' + origin);
+    for (let round = 0; round < 2; round++) {
+      await page.keyboard.press('p');
+      await expect(page.getByRole('dialog').getByLabel('Name', { exact: true })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+    }
+    await page.keyboard.press('Control+k');
+    await page.getByLabel('Search commands').fill('Create project');
+    await page.getByLabel('Search commands').press('Enter');
+    await expect(page.getByRole('dialog').getByLabel('Name', { exact: true })).toBeVisible();
+    await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Keep mounted draft');
+    await page.goBack();
+    await expect(page.getByRole('dialog').getByLabel('Name', { exact: true })).toHaveValue('Keep mounted draft');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Discard draft', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  }
+});
+
+test('6c evidence overview workload and milestone links preserve destination', async ({ page }) => {
+  await prepareRemaining(page, 'overview');
+  await page.locator('#work-content .panel-row').getByRole('button', { name: data.members[0].name, exact: true }).click();
+  await expect(page).toHaveURL(/\/member\?id=m1$/);
+  await expect(page.getByRole('heading', { name: data.members[0].name, exact: true, level: 1 })).toBeVisible();
+  await page.goBack();
+  await page.getByRole('button', { name: /^Wireframes aprovados/ }).click();
+  await expect(page).toHaveURL(/project=p1&tab=timeline/);
+  await expect(page.locator('.project-tabs').getByRole('link', { name: 'Timeline', exact: true })).toHaveAttribute('aria-current', 'page');
+});
+
+test('6c evidence states controls simulate safely and restore keyboard focus', async ({ page }) => {
+  await prepareRemaining(page, 'states');
+  const content = page.locator('#work-content');
+  const before = await page.evaluate(() => localStorage.getItem('gr8r.workspaces.v1'));
+  await content.getByRole('button', { name: 'Simulate offline', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Offline simulation active.');
+  await page.getByRole('button', { name: 'Exit simulation', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Simulate loading', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Loading demonstration...' })).toHaveAttribute('aria-busy', 'true');
+  await page.getByRole('button', { name: 'Stop loading', exact: true }).click();
+  await expect(page.getByText('Loading demonstration...', { exact: true })).toHaveCount(0);
+  const modal = page.getByRole('button', { name: 'Open sample modal', exact: true });
+  await modal.click();
+  await page.getByRole('button', { name: 'Finish example', exact: true }).click();
+  await expect(modal).toBeFocused();
+  await modal.click();
+  await page.keyboard.press('Escape');
+  await expect(modal).toBeFocused();
+  const confirmation = page.getByRole('button', { name: 'Open confirmation', exact: true });
+  await confirmation.click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(confirmation).toBeFocused();
+  await confirmation.click();
+  await page.getByRole('button', { name: 'Confirm example', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Example confirmed.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
+  await page.getByRole('button', { name: 'Show message', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Demonstration message.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
+  await content.getByRole('button', { name: 'Open commands', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  expect(await page.evaluate(() => localStorage.getItem('gr8r.workspaces.v1'))).toBe(before);
+  await page.getByRole('button', { name: 'Open 404 example', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Page not found', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Go to Home', exact: true }).click();
+  await expect(page).toHaveURL(/\/home$/);
+});
+
+test('6c evidence project and task favorites star unstar and survive reload', async ({ page }) => {
+  const fixture = structuredClone(data);
+  fixture.projects.forEach(project => {
+    project.fav = false;
+  });
+  fixture.tasks.forEach(task => {
+    task.fav = false;
+  });
+  await page.addInitScript(value => {
+    if (!localStorage.getItem('gr8r.v2')) localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en' } }));
+  }, fixture);
+  await page.goto('/app-local/w/w1/projects');
+  await page.getByRole('button', { name: 'Favorite project ' + fixture.projects[0].name, exact: true }).click();
+  await page.goto('/app-local/w/w1/tasks');
+  await page.getByRole('button', { name: new RegExp(firstTitle + '$') }).click();
+  await page.getByRole('button', { name: 'Add to favorites', exact: true }).click();
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await page.goto('/app-local/w/w1/favorites');
+  await page.reload();
+  await expect(page.locator('#work-content').getByRole('button', { name: fixture.projects[0].name, exact: true })).toBeVisible();
+  await expect(page.locator('#work-content').getByRole('button', { name: firstTitle, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Remove favorite', exact: true }).click();
+  await page.locator('#work-content').getByRole('button', { name: firstTitle, exact: true }).click();
+  await page.getByRole('button', { name: 'Remove from favorites', exact: true }).click();
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await page.reload();
+  await expect(page.locator('#work-content').getByRole('button', { name: fixture.projects[0].name, exact: true })).toHaveCount(0);
+  await expect(page.locator('#work-content').getByRole('button', { name: firstTitle, exact: true })).toHaveCount(0);
+});
+
+test('6c evidence activity category and actor filters retain historical literals and localize new events', async ({ page }) => {
+  const fixture = structuredClone(data);
+  fixture.activity = [
+    { ...fixture.activity[0], id: 'history-status', by: 'm1', verb: 'status literal <kept>' },
+    { ...fixture.activity[0], id: 'history-comment', by: 'm2', verb: 'comment literal <kept>' },
+    { ...fixture.activity[0], id: 'history-project', by: 'm1', verb: 'project literal <kept>' },
+  ];
+  await page.addInitScript(value => {
+    if (!localStorage.getItem('gr8r.v2')) localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en' } }));
+  }, fixture);
+  await page.goto('/app-local/w/w1/settings?sec=workspace');
+  await page.getByLabel('Workspace name', { exact: true }).fill('Localized activity');
+  await page.getByRole('button', { name: 'Save workspace', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
+  await page.goto('/app-local/w/w1/activity');
+  await expect(page.locator('.activity-feed')).toContainText('updated the workspace');
+  const rows = page.locator('#work-content .panel-row');
+  for (const [value, text] of [
+    ['status', 'status literal <kept>'],
+    ['comments', 'comment literal <kept>'],
+    ['projects', 'project literal <kept>'],
+  ]) {
+    await page.getByRole('combobox', { name: 'Type', exact: true }).selectOption(value);
+    await expect(rows).toHaveCount(1);
+    await expect(rows).toContainText(text);
+  }
+  await page.getByRole('combobox', { name: 'Type', exact: true }).selectOption('all');
+  await expect(rows).toHaveCount(3);
+  await page.getByRole('combobox', { name: 'Person', exact: true }).selectOption('m2');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('comment literal <kept>');
+  await page.getByRole('combobox', { name: 'Person', exact: true }).selectOption('');
+  await page.getByLabel('Language', { exact: true }).selectOption('pt-BR');
+  await expect(page.locator('.activity-feed')).toContainText('alterou o espaço de trabalho');
+  await expect(rows.filter({ hasText: 'comment literal <kept>' })).toBeVisible();
+  await page.goto('/app-local/w/w1/system');
+  await expect(page.getByRole('combobox', { name: 'Tema', exact: true }).locator('option')).toHaveText(['Claro', 'Escuro', 'Sistema']);
+});

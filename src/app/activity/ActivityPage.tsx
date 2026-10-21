@@ -38,6 +38,17 @@ export function ActivityPage({
     update_view: t('renomeou uma visualização', 'renamed a view'),
     delete_view: t('excluiu uma visualização', 'deleted a view'),
     duplicate_task_graph: t('duplicou a tarefa', 'duplicated the task'),
+    update_workspace: t('alterou o espaço de trabalho', 'updated the workspace'),
+    create_team: t('criou uma equipe', 'created a team'),
+    update_team: t('alterou uma equipe', 'updated a team'),
+    delete_team: t('excluiu uma equipe', 'deleted a team'),
+    set_team_member: t('adicionou uma pessoa à equipe', 'added a team member'),
+    remove_team_member: t('removeu uma pessoa da equipe', 'removed a team member'),
+    local_update_profile: t('alterou o perfil local', 'updated the local profile'),
+    local_workspace_member: t('alterou um membro local', 'updated a local member'),
+    local_demo_setting: t('alterou uma configuração da demonstração', 'updated a demo setting'),
+    local_reset_demo: t('restaurou os dados da demonstração', 'reset the demo data'),
+    set_preferences: t('alterou suas preferências', 'updated their preferences'),
   };
   return (
     <div className="activity-feed">

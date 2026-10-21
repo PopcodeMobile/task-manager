@@ -1,6 +1,6 @@
 import { Users, Code, Palette, Megaphone, Briefcase, Heart } from 'lucide-react';
-import { useRef, useState } from 'react';
-import type { Team } from '../../domain/contracts';
+import { useEffect, useRef, useState } from 'react';
+import type { BatchCommand, Team } from '../../domain/contracts';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '../../components/ui/sheet';
@@ -39,7 +39,8 @@ function Avatar({ name, color }: { name: string; color?: string }) {
 }
 export function PeoplePages(p: PanelProps) {
   const { snapshot: s, t } = p;
-  const opener = useRef<HTMLElement | null>(null);
+  const opener = useRef<HTMLElement | null>(null),
+    originalTeam = useRef(false);
   const restore = (event: Event) => {
     event.preventDefault();
     if (opener.current?.isConnected) opener.current.focus();
@@ -54,7 +55,68 @@ export function PeoplePages(p: PanelProps) {
     [busy, setBusy] = useState(false),
     [confirm, setConfirm] = useState<null | (() => Promise<unknown>)>(null),
     [invite, setInvite] = useState(false),
-    [email, setEmail] = useState('');
+    [email, setEmail] = useState(''),
+    [submission, setSubmission] = useState<BatchCommand[] | null>(null),
+    [conflict, setConflict] = useState(false),
+    [reviewed, setReviewed] = useState(false);
+  useEffect(() => {
+    if (!edit) return;
+    p.registerDraft({
+      dirty: true,
+      flush: async () => {
+        setError(
+          t(
+            'Conclua ou feche o editor de equipe antes de sair. Um envio sem resposta precisa ser recuperado.',
+            'Finish or close the team editor before leaving. A save with no response must be recovered.',
+          ),
+        );
+        return false;
+      },
+    });
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    addEventListener('beforeunload', beforeUnload);
+    return () => {
+      p.registerDraft(null);
+      removeEventListener('beforeunload', beforeUnload);
+    };
+  }, [!!edit, p.registerDraft, t]);
+  async function saveTeam() {
+    if (!edit || conflict || busy) return;
+    await action(async () => {
+      const commands = submission ?? teamCommands(edit, baseline.teams, baseline.relations);
+      setSubmission(commands);
+      try {
+        await p.execute('batch', { commands });
+      } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+        if (code === 'version_conflict') {
+          setConflict(true);
+          setSubmission(null);
+          await p.refresh();
+        } else if (['validation_error', 'forbidden', 'not_found', 'rate_limited', 'storage'].includes(code)) setSubmission(null);
+        throw error;
+      }
+      setSubmission(null);
+      p.registerDraft(null);
+      setEdit(null);
+      p.go('team', { id: edit.id });
+    });
+  }
+  async function reviewMemberships() {
+    await action(async () => {
+      const [teams, relations] = await Promise.all([
+        p.repo.list<Team>('list_teams', {}, true),
+        p.repo.list<{ teamId: string; userId: string }>('list_team_members', {}, true),
+      ]);
+      if (originalTeam.current && !teams.some(team => team.id === edit?.id)) throw { code: 'not_found' };
+      setBaseline({ teams, relations });
+      setConflict(false);
+      setReviewed(true);
+    });
+  }
   async function action(fn: () => Promise<unknown>) {
     setBusy(true);
     setError('');
@@ -68,6 +130,11 @@ export function PeoplePages(p: PanelProps) {
   }
   function editor(team?: Team) {
     opener.current = document.activeElement as HTMLElement;
+    originalTeam.current = !!team;
+    setSubmission(null);
+    setConflict(false);
+    setReviewed(false);
+    setError('');
     setBaseline({ teams: s.teams, relations: s.teamMembers });
     setEdit({
       id: team?.id ?? crypto.randomUUID(),
@@ -119,7 +186,7 @@ export function PeoplePages(p: PanelProps) {
   const assigned = member ? s.tasks.filter(task => !task.archived && task.assigneeUserId === member.user_id) : [];
   return (
     <section className="panel-page">
-      {error && <p role="alert">{error}</p>}
+      {error && !edit && <p role="alert">{error}</p>}
       {p.route === 'members' && (
         <div className="button-row">
           {[
@@ -326,7 +393,7 @@ export function PeoplePages(p: PanelProps) {
       <Sheet
         open={!!edit}
         onOpenChange={open => {
-          if (!open && !busy) setEdit(null);
+          if (!open && !busy && !submission) setEdit(null);
         }}
       >
         <SheetContent onCloseAutoFocus={restore} closeLabel={t('Fechar', 'Close')}>
@@ -336,59 +403,94 @@ export function PeoplePages(p: PanelProps) {
             <form
               onSubmit={e => {
                 e.preventDefault();
-                void action(async () => {
-                  await p.execute('batch', { commands: teamCommands(edit, baseline.teams, baseline.relations) });
-                  setEdit(null);
-                  p.go('team', { id: edit.id });
-                });
+                void saveTeam();
               }}
             >
-              <label className="form-field">
-                {t('Nome', 'Name')}
-                <Input required value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} />
-              </label>
-              <label className="form-field">
-                {t('Descrição', 'Description')}
-                <textarea value={edit.description} onChange={e => setEdit({ ...edit, description: e.target.value })} />
-              </label>
-              <label className="form-field">
-                {t('Ícone', 'Icon')}
-                <select value={edit.icon} onChange={e => setEdit({ ...edit, icon: e.target.value })}>
-                  {['users', 'code', 'palette', 'megaphone', 'briefcase', 'heart'].map(v => (
-                    <option key={v}>{v}</option>
+              <fieldset disabled={busy || !!submission || conflict}>
+                <label className="form-field">
+                  {t('Nome', 'Name')}
+                  <Input required value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} />
+                </label>
+                <label className="form-field">
+                  {t('Descrição', 'Description')}
+                  <textarea value={edit.description} onChange={e => setEdit({ ...edit, description: e.target.value })} />
+                </label>
+                <label className="form-field">
+                  {t('Ícone', 'Icon')}
+                  <select value={edit.icon} onChange={e => setEdit({ ...edit, icon: e.target.value })}>
+                    {['users', 'code', 'palette', 'megaphone', 'briefcase', 'heart'].map(v => (
+                      <option key={v}>{v}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="form-field">
+                  {t('Cor', 'Color')}
+                  <Input value={edit.color} onChange={e => setEdit({ ...edit, color: e.target.value })} />
+                </label>
+                <fieldset>
+                  <legend>{t('Membros', 'Members')}</legend>
+                  {s.members.map(m => (
+                    <label className="panel-check" key={m.user_id}>
+                      <input
+                        type="checkbox"
+                        checked={edit.members.includes(m.user_id)}
+                        onChange={e =>
+                          setEdit({ ...edit, members: e.target.checked ? [...edit.members, m.user_id] : edit.members.filter(id => id !== m.user_id) })
+                        }
+                      />
+                      {m.name}
+                    </label>
                   ))}
-                </select>
-              </label>
-              <label className="form-field">
-                {t('Cor', 'Color')}
-                <Input value={edit.color} onChange={e => setEdit({ ...edit, color: e.target.value })} />
-              </label>
-              <fieldset>
-                <legend>{t('Membros', 'Members')}</legend>
-                {s.members.map(m => (
-                  <label className="panel-check" key={m.user_id}>
-                    <input
-                      type="checkbox"
-                      checked={edit.members.includes(m.user_id)}
-                      onChange={e =>
-                        setEdit({ ...edit, members: e.target.checked ? [...edit.members, m.user_id] : edit.members.filter(id => id !== m.user_id) })
-                      }
-                    />
-                    {m.name}
-                  </label>
-                ))}
+                </fieldset>
               </fieldset>
-              {error && <p role="alert">{error}</p>}
+              {error && (
+                <p role="alert">
+                  {conflict
+                    ? t(
+                        'As relações da equipe mudaram. Seu rascunho foi mantido; revise as relações atuais antes de salvar.',
+                        'Team memberships changed. Your draft was kept; review current memberships before saving.',
+                      )
+                    : error}
+                </p>
+              )}
+              {conflict && (
+                <Button type="button" variant="outline" disabled={busy} onClick={() => void reviewMemberships()}>
+                  {t('Revisar relações atuais e manter rascunho', 'Review current memberships and keep draft')}
+                </Button>
+              )}
+              {submission && !busy && (
+                <p role="status">
+                  {t(
+                    'A resposta do envio é incerta. Tente novamente para recuperar o mesmo envio antes de editar ou sair.',
+                    'The save response is uncertain. Retry to recover the same submission before editing or leaving.',
+                  )}
+                </p>
+              )}
+              {reviewed && (
+                <section aria-label={t('Relações atuais', 'Current memberships')}>
+                  <h3>{t('Revise antes de salvar', 'Review before saving')}</h3>
+                  {[...new Set([...edit.members, ...baseline.relations.filter(r => r.teamId === edit.id).map(r => r.userId)])].map(userId => (
+                    <p key={userId}>
+                      {s.members.find(m => m.user_id === userId)?.name ?? userId}:{' '}
+                      {baseline.relations
+                        .filter(r => r.userId === userId)
+                        .map(r => baseline.teams.find(team => team.id === r.teamId)?.name ?? r.teamId)
+                        .join(', ') || t('Sem equipe', 'No team')}
+                    </p>
+                  ))}
+                </section>
+              )}
               <div className="button-row">
-                <Button disabled={busy}>{t('Salvar equipe', 'Save team')}</Button>
+                <Button disabled={busy || conflict}>{t('Salvar equipe', 'Save team')}</Button>
                 {s.teams.some(team => team.id === edit.id) && (
                   <Button
                     type="button"
                     variant="destructive"
-                    disabled={busy}
+                    disabled={busy || !!submission || conflict}
                     onClick={() =>
                       setConfirm(() => async () => {
                         await p.execute('delete_team', { id: edit.id }, baseline.teams.find(team => team.id === edit.id)!.version);
+                        p.registerDraft(null);
                         setEdit(null);
                         p.go('teams');
                       })
@@ -425,7 +527,7 @@ export function PeoplePages(p: PanelProps) {
                 Email
                 <Input type="email" required value={email} onChange={e => setEmail(e.target.value)} />
               </label>
-              {error && <p role="alert">{error}</p>}
+              {error && !edit && <p role="alert">{error}</p>}
               <Button disabled={busy}>{t('Criar convite local', 'Create local invitation')}</Button>
             </form>
           )}
