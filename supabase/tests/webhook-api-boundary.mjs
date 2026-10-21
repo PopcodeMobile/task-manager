@@ -23,6 +23,12 @@ export function auditWebhookApiSurface({ sql, exposedSchemas, extraSearchPath })
  ) surface;
  `).trim(),
   );
+  const predecessor = name => {
+    const matches = objects.filter(object => object.name === name && object.schema === 'public' && object.kind === 'function');
+    assert.equal(matches.length, 1, `missing or ambiguous reviewed predecessor: ${name}`);
+    return matches[0];
+  };
+  const hasPredecessor = name => objects.some(object => object.name === name);
   // Deliberately includes INVOKER functions/views and private helper chains, not only DEFINER roots.
   const reachable = new Set();
   const visit = object => {
@@ -38,21 +44,51 @@ export function auditWebhookApiSurface({ sql, exposedSchemas, extraSearchPath })
       checkedSource = source.replace("pgmq.send('webhook_delivery',jsonb_build_object('delivery_id',d.id))", 'reviewed_fixed_delivery_replay()');
     }
     assert.doesNotMatch(checkedSource, /\b(?:net|vault|pgmq|cron)\s*\./, `sensitive API bridge: ${object.name}`);
-    if (object.name === 'operation_task') {
+    if (['operation_task', 'operation_task_before_execution'].includes(object.name)) {
       assert.equal(object.definer, false, 'reservation projection must retain the private invoker seam');
       assert.equal(object.anon || object.authenticated, false, 'reservation helper is never an RPC');
       assert.doesNotMatch(source, /claim_token|to_jsonb\(c/);
+      if (object.name === 'operation_task' && (hasPredecessor('operation_task_before_execution') || source.includes('operation_task_before_execution'))) {
+        predecessor('operation_task_before_execution');
+        assert.match(source, /data\s*:=\s*public\.operation_task_before_execution\(p_row\);/, 'reviewed reservation delegation must preserve its row');
+        assert.match(
+          source,
+          /return \(data-'executionstate'-'blockingreason'\)\|\|jsonb_build_object\('execution',/,
+          'reviewed wrapper must preserve the reservation projection',
+        );
+      } else {
+        // 009 renamed the reviewed projection; pre-009 catalogs still use the original name.
+        assert.match(
+          source,
+          /jsonb_build_object\('agentid',c.agent_id,'claimedat',c.claimed_at,'expiresat',c.expires_at,'active',c.expires_at>clock_timestamp\(\)\)/,
+        );
+        assert.match(source, /c.workspace_id=\(p_row->>'workspace_id'\)::uuid and c.task_id=p_row->>'id'/);
+      }
+    }
+    if (object.name === 'read_operation' && (hasPredecessor('read_operation_before_context') || source.includes('read_operation_before_context'))) {
+      predecessor('read_operation_before_context');
+      assert.equal(object.definer, true, 'reviewed read entrypoint must retain its authorization boundary');
       assert.match(
         source,
-        /jsonb_build_object\('agentid',c.agent_id,'claimedat',c.claimed_at,'expiresat',c.expires_at,'active',c.expires_at>clock_timestamp\(\)\)/,
+        /return public\.read_operation_before_context\(p_workspace_id,p_operation,p_query\);/,
+        'reviewed read delegation must preserve workspace, operation and query',
       );
-      assert.match(source, /c.workspace_id=\(p_row->>'workspace_id'\)::uuid and c.task_id=p_row->>'id'/);
+    }
+    if (object.name === 'read_operation_before_context') {
+      assert.equal(object.anon || object.authenticated, false, 'read predecessor must remain private, never an RPC');
+      assert.equal(object.definer, true, 'read predecessor retains the reviewed authorization boundary');
+      assert.match(
+        predecessor('read_operation').source.toLowerCase(),
+        /return public\.read_operation_before_context\(p_workspace_id,p_operation,p_query\);/,
+        'reviewed read predecessor requires its scoped delegation',
+      );
     }
     if (
       [
         'operation_capability',
         'operation_batch_allowed',
         'operation_validate',
+        'operation_validate_before_execution',
         'operation_validate_before_file_duplication',
         'operation_graph',
         'operation_graph_before_file_duplication',
@@ -66,7 +102,7 @@ export function auditWebhookApiSurface({ sql, exposedSchemas, extraSearchPath })
     if (/\bexecute\s+/.test(source)) {
       // These reviewed domain dispatchers interpolate only fixed allowlisted entity tables/columns.
       assert.ok(
-        ['operation_graph', 'operation_graph_before_file_duplication', 'read_operation'].includes(object.name),
+        ['operation_graph', 'operation_graph_before_file_duplication', 'read_operation', 'read_operation_before_context'].includes(object.name),
         `unreviewed dynamic SQL: ${object.name}`,
       );
     }
