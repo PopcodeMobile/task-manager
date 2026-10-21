@@ -1,9 +1,10 @@
 // @ts-check
 import { assertTaskGraphActor } from './local-mutations/task-graph.js';
 import { RepositoryError } from './normalized.ts';
-import { localDTO, localWorkspaceDTO, entityVersion, localFiles } from './local-dto.js';
+import { localDTO, localWorkspaceDTO, entityVersion, localFiles, localTeams } from './local-dto.js';
 import { localCommandRules as commandRules } from './local-command-rules.js';
 import { mutateTask } from './local-mutations/tasks.js';
+import { mutateView } from './local-mutations/views.js';
 import { mutateProject } from './local-mutations/projects.js';
 import { mutateComment, assertCommentReplay } from './local-mutations/comments.js';
 import { mutateSubtask } from './local-mutations/subtasks.js';
@@ -139,6 +140,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     }
     if (operation === 'list_members')
       return (data.members ?? []).map(m => ({ user_id: m.id, name: m.name, email: m.email, role: String(m.role).toLowerCase() }));
+    if (operation === 'list_teams') return localTeams(data).map((/** @type {any} */ team) => localDTO(data, workspaceId, 'team', team));
     if (operation === 'list_labels') {
       const labels = new Map((data.labels ?? []).map((/** @type {any} */ label) => [label.id, label]));
       for (const task of data.tasks) for (const id of task.labels ?? []) if (!labels.has(id)) labels.set(id, { id, name: id });
@@ -235,7 +237,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
         return guarded(async () => {
           const { data } = await persistence.loadPanel(workspaceId);
           if (typeof data.me !== 'string' || !data.members?.some((/** @type {{id: string}} */ member) => member.id === data.me)) fail('not_found');
-          return { currentMemberId: data.me };
+          return { currentMemberId: data.me, teamId: data.members.find((/** @type {{id:string}} */ member) => member.id === data.me)?.team ?? null };
         });
       if (name === 'list_workspace_members') return adapter.list('list_members');
       if (name === 'create_workspace_v2')
@@ -337,6 +339,7 @@ function appendEvent(data, operation, input, result) {
 /** @param {any} data @param {string | null} workspaceId @param {string} operation @param {Record<string, any>} input @param {number | undefined} expectedVersion */
 function mutate(data, workspaceId, operation, input, expectedVersion) {
   if (/claim|intervene|executor|webhook|connection/.test(operation)) fail('cloud_required');
+  if ((operation.endsWith('_project') || operation === 'local_project_sharing') && !Object.hasOwn(data, 'teams')) data.teams = localTeams(data);
   validateLocalInput(data, operation, input);
   assertTaskGraphActor(data, operation);
   /** @param {string} kind @param {string} id */
@@ -396,7 +399,19 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
     ].includes(operation)
   )
     return mutateTask(context, operation, input);
-  if (['create_project', 'update_project', 'delete_project', 'archive_project', 'restore_project'].includes(operation))
+  if (['create_view', 'update_view', 'delete_view'].includes(operation)) return mutateView(context, operation, input);
+  if (
+    [
+      'create_project',
+      'update_project',
+      'delete_project',
+      'archive_project',
+      'restore_project',
+      'set_project_member',
+      'remove_project_member',
+      'local_project_sharing',
+    ].includes(operation)
+  )
     return mutateProject(context, operation, input);
   if (['add_task_comment', 'delete_comment', 'add_reaction', 'remove_reaction'].includes(operation)) return mutateComment(context, operation, input);
   if (['create_subtask', 'update_subtask', 'delete_subtask'].includes(operation)) return mutateSubtask(context, operation, input);
@@ -423,6 +438,9 @@ function validateLocalInput(data, operation, input) {
     Object.keys(input).some(key => !rule.fields.includes(key) || key === 'claimToken') ||
     rule.required.some(key => input[key] === undefined || input[key] === null)
   )
+    fail('validation_error');
+  if (input.filters !== undefined && !Array.isArray(input.filters)) fail('validation_error');
+  if (input.viewType !== undefined && !['board', 'list', 'table', 'calendar', 'timeline', 'files', 'overview'].includes(input.viewType))
     fail('validation_error');
   if (operation === 'duplicate_task_graph' && !['task', 'project'].includes(input.mode)) fail('validation_error');
   if (input.attributes !== undefined) {
@@ -473,7 +491,7 @@ function validateLocalInput(data, operation, input) {
           'teamId',
           'leadUserId',
           'sizeLabel',
-          ...(/_file$/.test(operation) ? ['taskId', 'projectId'] : []),
+          ...(/_(file|view)$/.test(operation) ? ['taskId', 'projectId'] : []),
         ].includes(key)
       )
         fail('validation_error');

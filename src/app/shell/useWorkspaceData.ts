@@ -10,6 +10,10 @@ import type {
   FileMetadata,
   TaskAttachment,
   CalendarEvent,
+  SavedView,
+  Team,
+  Comment,
+  ActivityEntry,
 } from '../../domain/contracts';
 import { eventCursor, type Agent, type DomainEvent, type Member } from '../../workspace/normalized';
 import type { WorkspaceRepository } from '../../workspace/repository';
@@ -25,7 +29,14 @@ export type TaskGraph = {
   files?: FileMetadata[];
   attachments?: TaskAttachment[];
 };
-type Snapshot = {
+export type Snapshot = {
+  actorId: string;
+  actorTeamId: string | null;
+  teams: Team[];
+  views: SavedView[];
+  projectMembers: { projectId: string; userId: string }[];
+  comments: Comment[];
+  activity: ActivityEntry[];
   files: FileMetadata[];
   attachments: TaskAttachment[];
   calendarEvents: CalendarEvent[];
@@ -41,6 +52,13 @@ type Snapshot = {
   preferences: UserPreferences['preferences'];
 };
 export const emptySnapshot: Snapshot = {
+  actorId: '',
+  actorTeamId: null,
+  teams: [],
+  views: [],
+  projectMembers: [],
+  comments: [],
+  activity: [],
   files: [],
   attachments: [],
   calendarEvents: [],
@@ -72,38 +90,79 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
       try {
         // Capture the event boundary BEFORE reading mutable rows. Later commits remain visible to polling.
         const events = initial ? await repo.list<DomainEvent>('list_domain_events', {}, true) : null;
-        const [tasks, projects, agents, members, preferences, labels, taskLabels, dependencies, subtasks, files, attachments, calendarEvents] =
-          await Promise.all([
-            repo.list<Task>('list_tasks', {}, true),
-            repo.list<Project>('list_projects', {}, true),
-            repo.list<Agent>('list_agents', {}, true),
-            initial ? repo.rpc<Member[]>('list_workspace_members', { p_workspace_id: repo.workspaceId }) : Promise.resolve(null),
-            initial ? repo.preferences() : Promise.resolve(null),
-            initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
-              ? repo.list<Label>('list_labels', {}, true)
-              : Promise.resolve(null),
-            initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
-              ? repo.list<TaskLabel>('list_task_labels', {}, true)
-              : Promise.resolve(null),
-            initial || operations.some(op => /dependency$|duplicate_task_graph|delete_project|delete_task/.test(op))
-              ? repo.list<TaskDependency>('list_dependencies', {}, true)
-              : Promise.resolve(null),
-            initial || operations.some(op => /subtask$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
-              ? repo.list<Subtask>('list_subtasks', {}, true)
-              : Promise.resolve(null),
-            initial || operations.some(op => /file$|attachment$|delete_project|delete_task|duplicate_task|complete_task|move_task/.test(op))
-              ? repo.list<FileMetadata>('list_files', {}, true)
-              : Promise.resolve(null),
-            initial || operations.some(op => /attachment$|delete_project|delete_task|duplicate_task|complete_task/.test(op))
-              ? repo.list<TaskAttachment>('list_attachments', {}, true)
-              : Promise.resolve(null),
-            initial || operations.some(op => /calendar_event$|delete_project/.test(op))
-              ? repo.list<CalendarEvent>('list_calendar_events', {}, true)
-              : Promise.resolve(null),
-          ]);
+        const [
+          tasks,
+          projects,
+          agents,
+          members,
+          preferences,
+          labels,
+          taskLabels,
+          dependencies,
+          subtasks,
+          files,
+          attachments,
+          calendarEvents,
+          teams,
+          views,
+          projectMembers,
+          comments,
+          activity,
+          actorId,
+        ] = await Promise.all([
+          repo.list<Task>('list_tasks', {}, true),
+          repo.list<Project>('list_projects', {}, true),
+          repo.list<Agent>('list_agents', {}, true),
+          initial || operations.includes('local_project_sharing')
+            ? repo.rpc<Member[]>('list_workspace_members', { p_workspace_id: repo.workspaceId })
+            : Promise.resolve(null),
+          initial ? repo.preferences() : Promise.resolve(null),
+          initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
+            ? repo.list<Label>('list_labels', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
+            ? repo.list<TaskLabel>('list_task_labels', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /dependency$|duplicate_task_graph|delete_project|delete_task/.test(op))
+            ? repo.list<TaskDependency>('list_dependencies', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /subtask$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
+            ? repo.list<Subtask>('list_subtasks', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /file$|attachment$|delete_project|delete_task|duplicate_task|complete_task|move_task/.test(op))
+            ? repo.list<FileMetadata>('list_files', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /attachment$|delete_project|delete_task|duplicate_task|complete_task/.test(op))
+            ? repo.list<TaskAttachment>('list_attachments', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /calendar_event$|delete_project/.test(op))
+            ? repo.list<CalendarEvent>('list_calendar_events', {}, true)
+            : Promise.resolve(null),
+          initial ? repo.list<Team>('list_teams', {}, true) : Promise.resolve(null),
+          initial || operations.some(op => /_view$|delete_project/.test(op)) ? repo.list<SavedView>('list_views', {}, true) : Promise.resolve(null),
+          initial || operations.some(op => /_project$|project_member|local_project_sharing/.test(op))
+            ? repo.list<{ projectId: string; userId: string }>('list_project_members', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /comment$|delete_task|delete_project/.test(op))
+            ? repo.list<Comment>('list_comments', {}, true)
+            : Promise.resolve(null),
+          initial ? repo.list<ActivityEntry>('list_activity', {}, true) : Promise.resolve(null),
+          initial
+            ? repo.mode === 'local'
+              ? repo.rpc<{ currentMemberId: string; teamId?: string | null }>('get_local_actor')
+              : Promise.resolve({ currentMemberId: repo.userId, teamId: null })
+            : Promise.resolve(null),
+        ]);
         if (repo.controller.signal.aborted || serial !== refreshSerial.current) return;
         setSnapshot(old => ({
           tasks,
+          actorId: actorId?.currentMemberId ?? old.actorId,
+          actorTeamId: actorId?.teamId ?? old.actorTeamId,
+          teams: teams ?? old.teams,
+          views: views ?? old.views,
+          projectMembers: projectMembers ?? old.projectMembers,
+          comments: comments ?? old.comments,
+          activity: activity ?? old.activity,
           files: files ?? old.files,
           attachments: attachments ?? old.attachments,
           calendarEvents: calendarEvents ?? old.calendarEvents,
@@ -214,19 +273,25 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
     return result.data;
   };
 
-  async function toggleFavorite(taskId: string) {
+  async function toggleFavorite(taskId: string, kind: 'task' | 'project' = 'task') {
+    const field = kind === 'project' ? 'favoriteProjectIds' : 'favoriteTaskIds';
     const preferences = await repo.preferences();
     const next = {
       ...preferences,
-      favoriteTaskIds: preferences.favoriteTaskIds.includes(taskId)
-        ? preferences.favoriteTaskIds.filter(id => id !== taskId)
-        : [...preferences.favoriteTaskIds, taskId],
+      [field]: preferences[field].includes(taskId) ? preferences[field].filter(id => id !== taskId) : [...preferences[field], taskId],
     };
+    if (repo.mode === 'local' && repo.savePersonal) await repo.savePersonal({ preferences: { [field]: next[field] } });
+    else await execute('set_preferences', { preferences: { [field]: next[field] } });
+    if (!repo.controller.signal.aborted) setSnapshot(old => ({ ...old, preferences: next }));
+  }
+  async function addCopiedFavorites(ids: string[]) {
+    const current = await repo.preferences();
+    const next = { ...current, favoriteTaskIds: [...new Set([...current.favoriteTaskIds, ...ids])] };
     if (repo.mode === 'local' && repo.savePersonal) await repo.savePersonal({ preferences: { favoriteTaskIds: next.favoriteTaskIds } });
     else await execute('set_preferences', { preferences: { favoriteTaskIds: next.favoriteTaskIds } });
     if (!repo.controller.signal.aborted) setSnapshot(old => ({ ...old, preferences: next }));
   }
-  return { snapshot, snapshotScope, loading, error, setError, revision, search, setSearch, refresh, execute, toggleFavorite };
+  return { addCopiedFavorites, snapshot, snapshotScope, loading, error, setError, revision, search, setSearch, refresh, execute, toggleFavorite };
 }
 
 export function useTaskDetails(repo: WorkspaceRepository, taskId: string | undefined, revision: number, t: Translate, graph: TaskGraph) {
@@ -258,11 +323,13 @@ export function useTaskDetails(repo: WorkspaceRepository, taskId: string | undef
       graph.attachments ? Promise.resolve(graph.attachments) : repo.list<import('../../domain/contracts').TaskAttachment>('list_attachments', {}, true),
       repo.list<import('../../domain/contracts').CommentReaction>('list_reactions', {}, true),
       repo.list<import('../../domain/contracts').ActivityEntry>('list_activity', { taskId }, true),
-      repo.mode === 'local' ? repo.rpc<{ currentMemberId: string }>('get_local_actor').then(r => r.currentMemberId) : Promise.resolve(repo.userId),
+      repo.mode === 'local'
+        ? repo.rpc<{ currentMemberId: string; teamId?: string | null }>('get_local_actor')
+        : Promise.resolve({ currentMemberId: repo.userId, teamId: null }),
     ])
       .then(([comments, files, attachments, reactions, history, actorId]) => {
         if (alive && !repo.controller.signal.aborted) {
-          setDetails({ comments, files, attachments, reactions, history, actorId });
+          setDetails({ comments, files, attachments, reactions, history, actorId: actorId.currentMemberId });
           setError('');
         }
       })

@@ -101,7 +101,12 @@ export function WorkspacePanel({
   const creationAttempt = useRef<{ name: string; key: string; slug: string } | null>(null);
   const current = workspaces.find(w => w.id === workspaceId);
   const repo = useMemo(() => repositoryFactory(workspaceId || null), [repositoryFactory, workspaceId]);
-  const { snapshot, snapshotScope, loading, error, setError, revision, refresh, execute, toggleFavorite } = useWorkspaceData(repo, current?.id, workspaceId, t);
+  const { snapshot, snapshotScope, loading, error, setError, revision, refresh, execute, toggleFavorite, addCopiedFavorites } = useWorkspaceData(
+    repo,
+    current?.id,
+    workspaceId,
+    t,
+  );
   useEffect(() => {
     if (current && repo.savePersonal) void repo.savePersonal({ activeWorkspace: current.id }).catch(err => setError(errorMessage(err, t)));
   }, [repo, current?.id, t]);
@@ -112,7 +117,7 @@ export function WorkspacePanel({
       if (value) q.set(key, value);
       else q.delete(key);
     }
-    return `${base}/${['calendar', 'timeline', 'files'].includes(route) ? route : 'tasks'}${q.size ? '?' + q.toString() : ''}`;
+    return `${base}/${['calendar', 'timeline', 'files', 'project'].includes(route) ? route : 'tasks'}${q.size ? '?' + q.toString() : ''}`;
   };
   const openTask = (id: string) => navigate(taskHref({ task: id, due: '', file: '' }));
   const shown = snapshotScope === workspaceId ? snapshot : emptySnapshot;
@@ -132,12 +137,18 @@ export function WorkspacePanel({
     { id: 'activity', label: t('Atividade', 'Activity'), icon: Activity },
     { id: 'integrations', label: t('Integrações', 'Integrations'), icon: Plug },
   ];
-  const activeNav = nav.find(item => item.id === route);
+  const activeNav = route === 'project' ? { label: filterProject?.name ?? t('Projeto', 'Project') } : nav.find(item => item.id === route);
   useEffect(() => {
     document.title = `${activeNav?.label ?? 'Gr8r Studio'} | Gr8r Studio`;
   }, [activeNav?.label]);
   const taskList = shown.tasks.filter(task => !task.archived && (!projectId || task.projectId === projectId)),
-    projects = shown.projects.filter(p => !p.archived);
+    projects = shown.projects
+      .filter(
+        p =>
+          !p.archived &&
+          (repo.mode !== 'local' || !p.legacyMetadata.private || shown.projectMembers.some(m => m.projectId === p.id && m.userId === shown.actorId)),
+      )
+      .sort((a, b) => a.sortOrder - b.sortOrder);
   const taskMenuActions: ExtraTaskMenuAction[] = [
     {
       id: 'favorite',
@@ -206,7 +217,7 @@ export function WorkspacePanel({
             <a
               key={p.id}
               className="project-nav"
-              href={`${base}/tasks?project=${encodeURIComponent(p.id)}`}
+              href={`${base}/project?project=${encodeURIComponent(p.id)}&tab=overview`}
               onClick={e => {
                 e.preventDefault();
                 navigate(e.currentTarget.href);
@@ -317,12 +328,28 @@ export function WorkspacePanel({
                   </Button>
                 </div>
               )}
-              {route === 'projects' ? (
+              {['projects', 'project'].includes(route) ? (
                 <ProjectsPage
-                  projects={projects}
+                  key={workspaceId}
+                  snapshot={shown}
+                  repo={repo}
+                  projectId={route === 'project' ? projectId : undefined}
+                  tab={url.searchParams.get('tab') || 'overview'}
+                  back={() => navigate(`${base}/projects`)}
+                  href={taskHref}
+                  navigate={navigate}
+                  openTask={openTask}
+                  createTask={day => navigate(taskHref({ task: 'new', due: day || '' }))}
+                  fileId={url.searchParams.get('file') || undefined}
+                  selectFile={id => navigate(taskHref({ file: id, task: '' }))}
+                  registerDraft={registerDraft}
+                  toggleFavorite={toggleFavorite}
+                  copyFavorites={addCopiedFavorites}
+                  refresh={() => refresh(true)}
+                  extraTaskMenuActions={taskMenuActions}
                   execute={execute}
                   t={t}
-                  openProject={id => navigate(`${base}/tasks?project=${encodeURIComponent(id)}`)}
+                  openProject={(id, tab = 'overview') => navigate(`${base}/project?project=${encodeURIComponent(id)}&tab=${encodeURIComponent(tab)}`)}
                   readOnly={readOnly}
                 />
               ) : (
@@ -406,7 +433,7 @@ export function WorkspacePanel({
                   readOnly={!!readOnly}
                   openTask={openTask}
                   createTask={day => navigate(taskHref({ task: 'new', due: day || '' }))}
-                  openProject={id => navigate(`${base}/tasks?project=${encodeURIComponent(id)}`)}
+                  openProject={id => navigate(`${base}/project?project=${encodeURIComponent(id)}&tab=overview`)}
                 />
               ) : route === 'files' ? (
                 <FilesView
@@ -444,7 +471,7 @@ export function WorkspacePanel({
                   <IntegrationsPanel repo={repo} t={t} admin={admin} />
                 )
               ) : null}
-              {taskId && !loading && ['tasks', 'calendar', 'timeline', 'files'].includes(route) && (selected || taskId === 'new') && (
+              {taskId && !loading && ['tasks', 'calendar', 'timeline', 'files', 'project'].includes(route) && (selected || taskId === 'new') && (
                 <TaskDrawer
                   key={`${workspaceId}:${taskId}`}
                   graph={shown}
@@ -472,7 +499,7 @@ export function WorkspacePanel({
                   copyLink={() => (selected ? navigator.clipboard.writeText(taskLink(selected, repo.mode === 'local', location.origin)) : Promise.resolve())}
                 />
               )}{' '}
-              {taskId && !loading && ['tasks', 'calendar', 'timeline', 'files'].includes(route) && !selected && taskId !== 'new' && (
+              {taskId && !loading && ['tasks', 'calendar', 'timeline', 'files', 'project'].includes(route) && !selected && taskId !== 'new' && (
                 <p role="status">{t('Tarefa não encontrada nesta organização.', 'Task not found in this workspace.')}</p>
               )}
             </>

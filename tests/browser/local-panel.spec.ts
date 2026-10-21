@@ -102,7 +102,9 @@ test('concurrent local edit keeps the original draft and blocks workspace switch
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue('My unsaved draft');
   await page.getByRole('button', { name: 'Reload version and discard draft' }).click();
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Another tab saved');
+  await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('button', { name: 'Another tab saved' })).toBeVisible();
 });
@@ -310,7 +312,7 @@ test('dirty move duplicate archive require save and preserve saved fields', asyn
     await page.getByRole('button', { name: action, exact: true }).click();
     if (action === 'Duplicate task') {
       await expect.poll(() => new URL(page.url()).searchParams.get('task')).not.toBe(beforeTask);
-      await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('todo');
+      await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue(initial.status);
     }
     if (action !== 'Archive task') {
       await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue(action + ' description');
@@ -503,7 +505,7 @@ test('task context menu supports right click, keyboard focus and guarded core ac
   await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toBeVisible();
   const cloneId = new URL(page.url()).searchParams.get('task');
   expect(cloneId).not.toBe(initial.id);
-  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('todo');
+  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
   const cloneKey = await page.locator('.drawer-eyebrow').textContent();
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   await page.getByRole('button', { name: 'Task actions: ' + cloneKey, exact: true }).click();
@@ -1205,8 +1207,416 @@ for (const panel of ['event', 'overflow', 'overflow event'] as const) {
       await opener.press('Enter');
       await page.getByRole('dialog').getByRole('button', { name: '09:00 Focus event 2', exact: true }).press('Enter');
       await page.getByRole('button', { name: 'Open project', exact: true }).press('Enter');
-      await expect(page).toHaveURL(/\/tasks\?project=p1/);
+      await expect(page).toHaveURL(/\/project\?project=p1&tab=overview/);
       await expect(page.getByRole('dialog')).toHaveCount(0);
     }
   });
 }
+
+test('project workflows templates eight tabs saved views and keyboard persist locally', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local');
+  await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Projects', exact: true }).click();
+  const opener = page.getByRole('button', { name: 'New project', exact: true });
+  await opener.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('combobox', { name: 'Template', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(opener).toBeFocused();
+  await opener.click();
+  await page.getByLabel('Name', { exact: true }).fill('Home <project>');
+  await page.getByLabel('Description', { exact: true }).fill('<img src=x onerror=alert(1)> literal project');
+  await page.getByRole('combobox', { name: 'Template', exact: true }).selectOption('software');
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Home <project>', exact: true })).toBeVisible();
+  for (const tab of ['Overview', 'Board', 'List', 'Table', 'Calendar', 'Timeline', 'Files', 'Activity']) {
+    await page.getByRole('link', { name: tab, exact: true }).last().click();
+    await expect(page.locator('.project-tabs [aria-current="page"]')).toHaveText(tab);
+  }
+  await page.getByRole('link', { name: 'Overview', exact: true }).click();
+  await expect(page.getByText('<img src=x onerror=alert(1)> literal project', { exact: true })).toBeVisible();
+  await expect(page.locator('.project-overview img')).toHaveCount(0);
+  await page.getByRole('link', { name: 'List', exact: true }).click();
+  await expect(page.getByRole('button', { name: /HOM-1 Technical spec/ })).toBeVisible();
+  await page.locator('.view-options summary').filter({ hasText: 'Filters' }).click();
+  await page.getByRole('button', { name: 'Add filter', exact: true }).click();
+  await page.getByLabel('Filter field 1', { exact: true }).selectOption('priority');
+  await page.getByRole('group', { name: 'Filter values 1', exact: true }).getByRole('checkbox', { name: 'High', exact: true }).check();
+  await page.getByRole('button', { name: 'Save view', exact: true }).click();
+  await page.getByLabel('View name', { exact: true }).fill('High <view>');
+  await page.getByRole('button', { name: 'Save view', exact: true }).last().click();
+  await expect(page.locator('.project-tabs [aria-current="page"]')).toHaveText('High <view>');
+  await page.reload();
+  await expect(page.getByRole('button', { name: /HOM-1 Technical spec/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /HOM-4 Write tests/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Rename view', exact: true }).click();
+  await page.getByLabel('View name', { exact: true }).fill('High renamed');
+  await page.getByRole('button', { name: 'Save view', exact: true }).last().click();
+  await page.getByRole('button', { name: 'Delete view', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete view', exact: true }).click();
+  await expect(page.locator('.project-tabs [aria-current="page"]')).toHaveText('List');
+  await page.reload();
+  await expect(page.getByRole('link', { name: 'High renamed', exact: true })).toHaveCount(0);
+});
+
+async function projectLocalCommand(page: import('@playwright/test').Page, operation: string, input: Record<string, unknown>, version?: number) {
+  return page.evaluate(
+    async ({ operation, input, version }) => {
+      const load = (path: string) => import(path);
+      const [{ createLocalRepository }, { createLocalWorkspaceRepository }, { seed }, { emptyWorkspace }] = await Promise.all([
+        load('/src/workspace/local.js'),
+        load('/src/workspace/local-panel-repository.ts'),
+        load('/src/data/seed.js'),
+        load('/src/data/workspace.js'),
+      ]);
+      const persistence = createLocalRepository({ storage: localStorage, seed, blank: emptyWorkspace });
+      const repo = createLocalWorkspaceRepository({ persistence, storage: localStorage, workspaceId: 'w1', identity: 'other-client' });
+      return repo.command(operation, { input, expectedVersion: version, idempotencyKey: crypto.randomUUID() });
+    },
+    { operation, input, version },
+  );
+}
+test('project editing members favorites sidebar ordering archive and full graph copies persist', async ({ page }) => {
+  await prepare(page);
+  await page.addInitScript(() => {
+    if (localStorage.getItem('gr8r.workspaces.v1')) return;
+    const raw = JSON.parse(localStorage.getItem('gr8r.v2')!);
+    const task = raw.data.tasks[0];
+    task.title = 'Graph literal';
+    task.status = 'done';
+    task.completedAt = Date.parse('2026-10-19T12:00:00Z');
+    task.desc = '<b>Graph rich</b><img src=x onerror=alert(1)>';
+    task.recur = 'Weekly';
+    task.estimate = '3h';
+    task.subtasks = [{ id: 'graph-sub', title: 'Done detail', done: true, note: '<b>note</b>', unknown: { kept: [1, 2] } }];
+    task.deps = [raw.data.tasks.find((t: { project: string }) => t.project !== task.project).id];
+    task.attachments = [{ id: 'graph-file', name: 'Graph <file>.pdf', type: 'pdf', order: 4, unknown: { kept: true } }];
+    task.unknown = { literal: '<img>', deep: [5] };
+    localStorage.setItem('gr8r.v2', JSON.stringify(raw));
+  });
+  await page.goto('/app-local/w/w1/project?project=p1&tab=overview');
+  await expect(page.getByRole('heading', { name: data.projects[0].name, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Team', exact: true })).toHaveValue('design');
+  await page.getByLabel('Name', { exact: true }).fill('Project <edited>');
+  await page.getByRole('combobox', { name: 'Lead', exact: true }).selectOption('m8');
+  await page.getByRole('combobox', { name: 'Team', exact: true }).selectOption('eng');
+  await page.getByRole('combobox', { name: 'Icon', exact: true }).selectOption('heart');
+  await page.getByRole('combobox', { name: 'Color', exact: true }).selectOption('teal');
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Favorite project Project <edited>', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Favorite project Project <edited>', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('combobox', { name: 'Project status', exact: true }).selectOption('risk');
+  await page.getByRole('button', { name: /^Members \(/ }).click();
+  await expect(page.getByRole('dialog')).toContainText('Local demonstration');
+  const memberRow = page.getByRole('dialog').locator('li').filter({ hasText: 'João Pereira' });
+  await memberRow.getByRole('button', { name: 'Remove', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Add existing member', exact: true }).selectOption('m3');
+  await page.getByLabel('Demo email', { exact: true }).fill('demo-project@example.test');
+  await page.getByRole('combobox', { name: 'Local permission', exact: true }).selectOption('Can view');
+  await page.getByRole('button', { name: 'Add local invitation', exact: true }).click();
+  await expect(page.getByText('demo-project@example.test', { exact: true })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Local general access', exact: true }).selectOption('private');
+  await page.keyboard.press('Escape');
+  await page.goto(`/app-local/w/w1/project?project=p1&tab=list&task=${firstTask.id}`);
+  await expect(page.getByRole('dialog').locator('.rich-content b').filter({ hasText: 'Graph rich' })).toBeVisible();
+  await expect(page.getByRole('dialog').locator('[onerror],script')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add to favorites', exact: true }).click();
+  await page.getByRole('button', { name: 'Duplicate task', exact: true }).click();
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Graph literal (copy)');
+  const individual = new URL(page.url()).searchParams.get('task');
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  expect(new URL(page.url()).pathname).toContain('/project');
+  expect(new URL(page.url()).searchParams.get('tab')).toBe('list');
+  await page.locator('.project-heading .project-options summary').click();
+  await page.getByRole('button', { name: 'Duplicate project', exact: true }).click();
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Project <edited> copy', exact: true })).toBeVisible();
+  const copyId = new URL(page.url()).searchParams.get('project');
+  await page.reload();
+  const stored = await page.evaluate(
+    ({ copyId, individual, sourceId }) => {
+      const d = JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data;
+      const prefs = JSON.parse(localStorage.getItem('gr8r.preferences.local')!).preferences.w1;
+      return {
+        copy: d.projects.find((p: { id: string }) => p.id === copyId),
+        source: d.tasks.find((t: { id: string }) => t.id === sourceId),
+        individual: d.tasks.find((t: { id: string }) => t.id === individual),
+        clones: d.tasks.filter((t: { project: string }) => t.project === copyId),
+        prefs,
+      };
+    },
+    { copyId, individual, sourceId: firstTask.id },
+  );
+  expect(stored.copy.status).toBe('planning');
+  expect(stored.copy.members.sort()).toEqual(['m1', 'm8']);
+  expect(stored.copy.milestones).toEqual([]);
+  expect(stored.prefs.favoriteProjectIds).not.toContain(copyId);
+  expect(stored.individual.status).toBe('done');
+  expect(stored.individual.completedAt).toBe(stored.source.completedAt);
+  expect(stored.prefs.favoriteTaskIds).not.toContain(individual);
+  const copied = stored.clones.find((t: { title: string }) => t.title === 'Graph literal');
+  expect(copied.status).toBe('todo');
+  expect(copied.completedAt ?? null).toBeNull();
+  expect(copied.unknown).toEqual(stored.source.unknown);
+  expect(copied.subtasks[0].done).toBe(true);
+  expect(copied.subtasks[0].id).not.toBe(stored.source.subtasks[0].id);
+  expect(copied.subtasks[0].unknown).toEqual(stored.source.subtasks[0].unknown);
+  expect(copied.deps).toEqual(stored.source.deps);
+  expect(copied.attachments).toEqual(stored.source.attachments);
+  expect(stored.prefs.favoriteTaskIds).toContain(copied.id);
+  await page.getByRole('link', { name: 'Projects', exact: true }).click();
+  const card = page.locator(`[data-project-id="${copyId}"]`);
+  await card.locator('summary').click();
+  await card.getByRole('button', { name: 'Move down in sidebar', exact: true }).click();
+  await page.reload();
+  const order = await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.projOrder);
+  expect(order[0]).not.toBe(copyId);
+  await card.locator('summary').click();
+  await card.getByRole('button', { name: 'Archive project', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Archive project', exact: true }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'Archived', exact: true }).check();
+  await expect(card).toBeVisible();
+  await card.locator('summary').click();
+  await card.getByRole('button', { name: 'Restore project', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Restore project', exact: true }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'Archived', exact: true }).uncheck();
+  await expect(card).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('pt-BR');
+  await page.getByRole('button', { name: /Alternar tema|Toggle theme/ }).click();
+  await page.screenshot({ path: '/tmp/task6b4-projects-mobile-pt-light.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('project and saved view conflicts preserve drafts after external update or deletion', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local/w/w1/project?project=p1&tab=overview');
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Description', exact: true }).fill('Retained project draft');
+  await projectLocalCommand(page, 'update_project', { id: 'p1', name: 'External project' }, 1);
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('draft was kept');
+  await page.getByRole('button', { name: 'Check current version', exact: true }).click();
+  await page.getByRole('button', { name: 'Use current version and keep draft', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue('Retained project draft');
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByText('Retained project draft', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'List', exact: true }).click();
+  await page.getByRole('button', { name: 'Save view', exact: true }).click();
+  await page.getByLabel('View name', { exact: true }).fill('CAS view');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save view', exact: true }).click();
+  await expect(page.locator('.project-tabs [aria-current]')).toHaveText('CAS view');
+  const id = new URL(page.url()).searchParams.get('tab')!.slice(2);
+  await page.getByRole('button', { name: 'Rename view', exact: true }).click();
+  await page.getByLabel('View name', { exact: true }).fill('Retained view draft');
+  await projectLocalCommand(page, 'update_view', { id, name: 'External view' }, 1);
+  await page.getByRole('dialog').getByRole('button', { name: 'Save view', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('draft was kept');
+  await page.getByRole('button', { name: 'Check current version', exact: true }).click();
+  await page.getByRole('button', { name: 'Use current version and keep draft', exact: true }).click();
+  await expect(page.getByLabel('View name', { exact: true })).toHaveValue('Retained view draft');
+  await projectLocalCommand(page, 'delete_view', { id }, 2);
+  await page.getByRole('dialog').getByRole('button', { name: 'Save view', exact: true }).click();
+  await page.getByRole('button', { name: 'Check current version', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('view was removed');
+  await expect(page.getByLabel('View name', { exact: true })).toHaveValue('Retained view draft');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Discard draft', exact: true }).click();
+  await expect(page.getByText('View not found.', { exact: true })).toBeVisible();
+});
+
+test('project saved imported schedules stay scoped and missing project is safe', async ({ page }) => {
+  await prepare(page);
+  await page.addInitScript(() => {
+    if (localStorage.getItem('gr8r.workspaces.v1')) return;
+    const raw = JSON.parse(localStorage.getItem('gr8r.v2')!);
+    raw.data.savedViews = [
+      {
+        id: 'calendar-import',
+        project: 'p1',
+        name: 'Calendar imported',
+        type: 'calendar',
+        filters: [{ f: 'priority', op: 'is', v: ['high'], unknown: { kept: true } }],
+      },
+      { id: 'timeline-import', project: 'p1', name: 'Timeline imported', type: 'timeline', filters: [] },
+    ];
+    localStorage.setItem('gr8r.v2', JSON.stringify(raw));
+  });
+  await page.goto('/app-local/w/w1/project?project=p1&tab=v%3Acalendar-import');
+  await expect(page.locator('.project-tabs [aria-current]')).toHaveText('Calendar imported');
+  await expect(page.locator('.schedule-view')).toBeVisible();
+  await page.getByRole('link', { name: 'Timeline imported', exact: true }).click();
+  await expect(page.locator('.schedule-view')).toBeVisible();
+  const other = data.tasks.find(task => task.project !== 'p1' && task.due)!;
+  await expect(page.locator(`[data-schedule-bar="${other.id}"]`)).toHaveCount(0);
+  await page.goto('/app-local/w/w1/project?project=p2&tab=v%3Acalendar-import');
+  await expect(page.getByText('View not found.', { exact: true })).toBeVisible();
+  await page.goto('/app-local/w/w1/project?project=missing');
+  await expect(page.getByRole('heading', { name: 'Project not found', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Browse projects', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible();
+});
+
+test('project copy atomic limit writes nothing and project deletion keeps live draft', async ({ page }) => {
+  await prepare(page);
+  await page.addInitScript(() => {
+    if (localStorage.getItem('gr8r.workspaces.v1')) return;
+    const raw = JSON.parse(localStorage.getItem('gr8r.v2')!);
+    const source = raw.data.tasks[0];
+    raw.data.tasks = Array.from({ length: 100 }, (_, i) => ({
+      ...source,
+      id: `bound-${i}`,
+      key: `WEB-${i + 1}`,
+      project: 'p1',
+      subtasks: [],
+      attachments: [],
+      deps: [],
+      archived: false,
+    }));
+    raw.data.comments = [];
+    localStorage.setItem('gr8r.v2', JSON.stringify(raw));
+  });
+  await page.goto('/app-local/w/w1/project?project=p1&tab=overview');
+  await page.locator('.project-heading .project-options summary').click();
+  await page.getByRole('button', { name: 'Duplicate project', exact: true }).click();
+  const before = await page.evaluate(() => localStorage.getItem('gr8r.workspaces.v1'));
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('100 changes');
+  expect(await page.evaluate(() => localStorage.getItem('gr8r.workspaces.v1'))).toBe(before);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Description', exact: true }).fill('Deleted project draft remains');
+  await projectLocalCommand(page, 'delete_project', { id: 'p1' }, 1);
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await page.getByRole('button', { name: 'Check current version', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('project was removed');
+  await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue('Deleted project draft remains');
+  await expect(page.getByRole('button', { name: 'Save project', exact: true })).toBeDisabled();
+});
+
+test('project overview status navigation activity and personal view keys remain scoped', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local/w/w1/project?project=p1&tab=overview');
+  await page.screenshot({ path: '/tmp/task6b4-overview-dark-en.png', fullPage: true });
+  const complete = page
+    .locator('.project-overview')
+    .getByRole('button', { name: /^Complete / })
+    .first();
+  const taskName = (await complete.getAttribute('aria-label'))!.slice('Complete '.length);
+  await complete.click();
+  await page
+    .locator('.project-overview')
+    .getByRole('button', { name: /^Done / })
+    .click();
+  await expect(page.locator('.project-tabs [aria-current]')).toHaveText('List');
+  await expect(page.locator('.view-filter-chips')).toContainText('Done');
+  await expect(page.getByRole('button', { name: new RegExp(taskName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Save view', exact: true }).click();
+  await page.getByLabel('View name', { exact: true }).fill('Done only');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save view', exact: true }).click();
+  await expect(page.locator('.project-tabs [aria-current]')).toHaveText('Done only');
+  await page.getByLabel('Search tasks', { exact: true }).fill('No matches saved');
+  await page.reload();
+  await expect(page.getByLabel('Search tasks', { exact: true })).toHaveValue('No matches saved');
+  await page.getByRole('link', { name: 'List', exact: true }).click();
+  await expect(page.getByLabel('Search tasks', { exact: true })).toHaveValue('');
+  await expect(page.locator('.view-filter-chips')).toContainText('Done');
+  await page.getByRole('link', { name: 'Activity', exact: true }).last().click();
+  await expect(page.locator('.project-activity')).toContainText('completed the task');
+  const other = data.tasks.find(task => task.project !== 'p1')!;
+  await expect(page.locator('.project-activity').getByRole('button', { name: other.title, exact: true })).toHaveCount(0);
+  await page.goto('/app-local/w/w1/project?project=p2&tab=list');
+  await expect(page.locator('.view-filter-chips')).toHaveCount(0);
+  await expect(page.getByLabel('Search tasks', { exact: true })).toHaveValue('');
+  await page.goto('/app-local/w/w1/project?project=p1&tab=overview');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('pt-BR');
+  await page.getByRole('button', { name: /Alternar tema|Toggle theme/ }).click();
+  expect((await page.locator('.project-heading h1').boundingBox())!.width).toBeGreaterThan(200);
+  await page.screenshot({ path: '/tmp/task6b4-overview-mobile-pt.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('project copy personal-save retry retains committed result and prevents a second project', async ({ page }) => {
+  await prepare(page);
+  await page.addInitScript(() => {
+    const data = JSON.parse(localStorage.getItem('gr8r.v2')!).data;
+    localStorage.setItem(
+      'gr8r.preferences.local',
+      JSON.stringify({
+        prefs: { lang: 'en', theme: 'dark' },
+        views: {},
+        preferences: { w1: { favoriteTaskIds: [data.tasks[0].id], favoriteProjectIds: [], notificationReadStates: {} } },
+      }),
+    );
+  });
+  await page.goto('/app-local/w/w1/project?project=p1&tab=overview');
+  await page.locator('.project-heading .project-options summary').click();
+  await page.getByRole('button', { name: 'Duplicate project', exact: true }).click();
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'gr8r.preferences.local' && JSON.parse(value).preferences.w1.favoriteTaskIds.length > 1) {
+        Storage.prototype.setItem = original;
+        throw Error('Simulated personal storage failure');
+      }
+      return original.call(this, key, value);
+    };
+  });
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
+  await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
+  const before = await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.projects.length);
+  await page.getByRole('button', { name: 'Save project', exact: true }).click();
+  await expect(page.getByRole('heading', { name: data.projects[0].name + ' copy', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.projects.length)).toBe(before);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.preferences.local')!).preferences.w1.favoriteTaskIds.length)).toBe(2);
+});
+
+test('project saved board view context menu supports keyboard rename delete and focus', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local/w/w1/project?project=p1&tab=board');
+  await page.getByRole('button', { name: 'Save view', exact: true }).click();
+  await page.getByLabel('View name', { exact: true }).fill('Board saved');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save view', exact: true }).click();
+  await expect(page.locator('.project-tabs [aria-current]')).toHaveText('Board saved');
+  const tab = page.getByRole('link', { name: 'Board saved', exact: true });
+  await tab.focus();
+  await page.keyboard.press('Shift+F10');
+  await expect(page.getByRole('menuitem', { name: 'Rename view', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(tab).toBeFocused();
+  await tab.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Rename view', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(tab).toBeFocused();
+  await tab.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Delete view', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(tab).toBeFocused();
+  await page.getByRole('button', { name: 'Rename view', exact: true }).click();
+  await page.getByLabel('View name', { exact: true }).fill('Board renamed');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save view', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Rename view', exact: true })).toBeFocused();
+  await page.reload();
+  await expect(page.locator('.project-tabs [aria-current]')).toHaveText('Board renamed');
+  await expect(page.locator('.task-board')).toBeVisible();
+});
+
+test('project collection table has aligned labeled cells and persists layout', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local/w/w1/projects');
+  await page.getByRole('combobox', { name: 'Project layout', exact: true }).selectOption('table');
+  const table = page.getByRole('table', { name: 'Project collection' });
+  await expect(table.getByRole('columnheader', { name: 'Project', exact: true })).toBeVisible();
+  await expect(table.getByRole('columnheader', { name: 'Status', exact: true })).toBeVisible();
+  await expect(table.getByRole('row').filter({ hasText: data.projects[0].name }).getByRole('cell')).toHaveCount(6);
+  await page.reload();
+  await expect(page.getByRole('table', { name: 'Project collection' })).toBeVisible();
+});

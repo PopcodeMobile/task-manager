@@ -28,6 +28,16 @@ export function ActivityPage({
     release_task_claim: t('liberou a execução', 'released execution'),
     create_project: t('criou um projeto', 'created a project'),
     update_project: t('alterou um projeto', 'updated a project'),
+    archive_project: t('arquivou o projeto', 'archived the project'),
+    restore_project: t('restaurou o projeto', 'restored the project'),
+    delete_project: t('excluiu o projeto', 'deleted the project'),
+    set_project_member: t('adicionou um membro ao projeto', 'added a project member'),
+    remove_project_member: t('removeu um membro do projeto', 'removed a project member'),
+    local_project_sharing: t('alterou o compartilhamento local', 'updated local sharing'),
+    create_view: t('salvou uma visualização', 'saved a view'),
+    update_view: t('renomeou uma visualização', 'renamed a view'),
+    delete_view: t('excluiu uma visualização', 'deleted a view'),
+    duplicate_task_graph: t('duplicou a tarefa', 'duplicated the task'),
   };
   return (
     <div className="activity-feed">

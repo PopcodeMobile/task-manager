@@ -926,8 +926,10 @@ test('actual cloud task views follow cursors, keep atomic CAS/claim guards and r
     await page.getByRole('combobox', { name: 'Destination project', exact: true }).selectOption(second.id);
     await page.getByRole('button', { name: 'Move task', exact: true }).click();
     await expect(page.getByRole('combobox', { name: 'Destination project', exact: true })).toHaveValue(second.id);
+    const sourceTaskId = new URL(page.url()).searchParams.get('task');
     await page.getByRole('button', { name: 'Duplicate task', exact: true }).click();
-    await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('todo');
+    await expect.poll(() => new URL(page.url()).searchParams.get('task')).not.toBe(sourceTaskId);
+    await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
     await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue('<p>Saved cloud draft</p><img src=x onerror=alert(1)>');
     const cloneURL = page.url(),
       cloneId = new URL(cloneURL).searchParams.get('task')!;
@@ -1403,6 +1405,208 @@ test('actual cloud schedules and files preserve duration, CAS, claims, metadata 
     await human.auth.signOut();
     await setupActor.auth.signOut();
     await executor.auth.signOut();
+  }
+  expect(cleanup).toEqual([]);
+});
+
+test('actual cloud projects compose templates members saved views full graph copies and reload', async ({ page }) => {
+  test.skip(!process.env.TEST_SUPABASE_URL || !process.env.TEST_SUPABASE_SERVICE_ROLE_KEY, 'Requires dedicated local Supabase');
+  test.setTimeout(90000);
+  const { createClient } = await import('@supabase/supabase-js');
+  const base = process.env.TEST_SUPABASE_URL!,
+    key = process.env.TEST_SUPABASE_ANON_KEY!,
+    options = { auth: { persistSession: false, autoRefreshToken: false } };
+  const service = createClient(base, process.env.TEST_SUPABASE_SERVICE_ROLE_KEY!, options),
+    human = createClient(base, key, options),
+    setupActor = createClient(base, key, options);
+  const suffix = crypto.randomUUID(),
+    password = `Project-${crypto.randomUUID()}!`,
+    addresses = [`projects-${suffix}@example.test`, `lead-${suffix}@example.test`],
+    users: string[] = [],
+    cleanup: string[] = [],
+    counts: Record<string, number> = {};
+  let ws = '';
+  page.on('response', response => {
+    if (response.url().includes('/rest/v1/rpc/')) {
+      const k = response.url().split('/').pop() + ':' + response.status();
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+  });
+  try {
+    for (const [index, email] of addresses.entries()) {
+      const made = await service.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name: index ? 'Cloud lead' : 'Cloud owner' } });
+      expect(made.error).toBeNull();
+      users.push(made.data.user!.id);
+    }
+    expect((await human.auth.signInWithPassword({ email: addresses[0], password })).error).toBeNull();
+    expect((await setupActor.auth.signInWithPassword({ email: addresses[1], password })).error).toBeNull();
+    const made = await human.rpc('create_workspace_v2', { p_name: 'Project actual', p_slug: `project-${suffix}`, p_idempotency_key: suffix });
+    expect(made.error).toBeNull();
+    ws = made.data.data.id;
+    expect((await service.from('workspace_memberships').insert({ workspace_id: ws, user_id: users[1], role: 'member' })).error).toBeNull();
+    const command = async (operation: string, input: Record<string, unknown>, version?: number) => {
+      const result = await setupActor.rpc('execute_operation', {
+        p_workspace_id: ws,
+        p_operation: operation,
+        p_command: input,
+        p_expected_version: version ?? null,
+        p_idempotency_key: crypto.randomUUID(),
+      });
+      expect(result.error?.message ?? '').toBe('');
+      return result.data.data;
+    };
+    const read = async (operation: string, query = {}) => {
+      const result = await setupActor.rpc('read_operation', { p_workspace_id: ws, p_operation: operation, p_query: query });
+      expect(result.error?.message ?? '').toBe('');
+      return result.data;
+    };
+    const source = await command('create_project', {
+      id: 'project-source',
+      name: 'Source <literal>',
+      description: '<img src=x> project text',
+      leadUserId: users[1],
+      status: 'risk',
+    });
+    const other = await command('create_project', { id: 'project-other', name: 'Other scope' });
+    const target = await command('create_task', { id: 'project-target', projectId: other.id, title: 'Other dependency' });
+    let task = await command('create_task', {
+      id: 'project-task',
+      projectId: source.id,
+      title: 'Source task',
+      description: '<b>Cloud rich</b><img src=x onerror=alert(1)>',
+      priority: 'high',
+      attributes: { estimate: '4h' },
+    });
+    await command('create_subtask', { taskId: task.id, title: 'Completed subtask', done: true, attributes: { note: '<literal> detail' } }, task.version);
+    task = (await read('get_task', { id: task.id })).data;
+    await command('set_task_dependency', { id: task.id, dependsOnTaskId: target.id }, task.version);
+    const file = await command('create_file', { id: 'project-file', projectId: source.id, name: 'Source file', fileType: 'pdf' });
+    task = (await read('get_task', { id: task.id })).data;
+    await command('set_task_attachment', { id: task.id, fileId: file.id, sortOrder: 7 }, task.version);
+    task = (await read('get_task', { id: task.id })).data;
+    await command('complete_task', { id: task.id }, task.version);
+    expect(
+      (
+        await service
+          .from('tasks')
+          .update({ legacy_metadata: { unknown: { literal: '<kept>', nested: [1, 2] } }, recurrence: 'Weekly' })
+          .eq('workspace_id', ws)
+          .eq('id', task.id)
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await service
+          .from('subtasks')
+          .update({ legacy_metadata: { unknown: { kept: true }, note: '<literal> detail' } })
+          .eq('workspace_id', ws)
+          .eq('task_id', task.id)
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await service
+          .from('task_attachments')
+          .update({ legacy_metadata: { unknown: { relation: true } } })
+          .eq('workspace_id', ws)
+          .eq('task_id', task.id)
+      ).error,
+    ).toBeNull();
+    await command('create_view', { id: 'imported-calendar', projectId: source.id, name: 'Imported calendar', viewType: 'calendar', filters: [] });
+    await page.goto(`/app/w/${ws}/projects`);
+    await page.getByLabel('E-mail').fill(addresses[0]);
+    await page.getByLabel('Senha', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Projetos', exact: true })).toBeVisible();
+    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    let loseCreate = true;
+    const createKeys: string[] = [];
+    await page.route('**/rest/v1/rpc/execute_operation', async route => {
+      const body = route.request().postDataJSON();
+      if (body.p_operation === 'batch' && body.p_command.commands.some((c: { operation: string }) => c.operation === 'create_project')) {
+        createKeys.push(body.p_idempotency_key);
+        if (loseCreate) {
+          loseCreate = false;
+          const response = await route.fetch();
+          expect(response.ok()).toBe(true);
+          return route.abort('failed');
+        }
+      }
+      return route.continue();
+    });
+    await page.getByRole('button', { name: 'New project', exact: true }).click();
+    await page.getByLabel('Name', { exact: true }).fill('Cloud created');
+    await page.getByRole('combobox', { name: 'Template', exact: true }).selectOption('personal');
+    await page.getByRole('combobox', { name: 'Lead', exact: true }).selectOption(users[1]);
+    await page.getByRole('button', { name: 'Save project', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
+    await page.getByRole('button', { name: 'Save project', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Cloud created', exact: true })).toBeVisible();
+    expect(createKeys).toHaveLength(2);
+    expect(createKeys[0]).toBe(createKeys[1]);
+    const created = new URL(page.url()).searchParams.get('project')!;
+    expect((await read('list_project_members', { projectId: created })).items.map((m: { userId: string }) => m.userId).sort()).toEqual([...users].sort());
+    expect((await read('list_tasks', { projectId: created })).items).toHaveLength(4);
+    await page.getByRole('button', { name: /^Members \(/ }).click();
+    await expect(page.getByRole('dialog')).toContainText('does not change access permissions');
+    await expect(page.getByLabel('Demo email')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await page.getByRole('link', { name: 'List', exact: true }).click();
+    await page.getByRole('button', { name: 'Save view', exact: true }).click();
+    await page.getByLabel('View name', { exact: true }).fill('Cloud view');
+    await page.getByRole('combobox', { name: 'View type', exact: true }).selectOption('table');
+    await page.getByRole('dialog').getByRole('button', { name: 'Save view', exact: true }).click();
+    await expect(page.locator('.project-tabs [aria-current]')).toHaveText('Cloud view');
+    await page.reload();
+    await expect(page.locator('.project-tabs [aria-current]')).toHaveText('Cloud view');
+    await page.goto(`/app/w/${ws}/project?project=${source.id}&tab=list&task=${task.id}`);
+    await expect(page.getByRole('dialog').locator('.rich-content b').filter({ hasText: 'Cloud rich' })).toBeVisible();
+    await page.getByRole('button', { name: 'Add to favorites', exact: true }).click();
+    await page.getByRole('button', { name: 'Duplicate task', exact: true }).click();
+    await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Source task (copy)');
+    const individual = new URL(page.url()).searchParams.get('task')!;
+    await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+    await page.locator('.project-heading .project-options summary').click();
+    await page.getByRole('button', { name: 'Duplicate project', exact: true }).click();
+    await page.getByRole('button', { name: 'Save project', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Source <literal> copy', exact: true })).toBeVisible();
+    const copied = new URL(page.url()).searchParams.get('project')!;
+    await page.reload();
+    const cloned = (await read('list_tasks', { projectId: copied })).items;
+    expect(cloned).toHaveLength(2);
+    const full = cloned.find((t: { title: string }) => t.title === 'Source task');
+    expect(full.status).toBe('todo');
+    expect(full.completedAt).toBeNull();
+    expect(full.recurrence).toBe('Weekly');
+    expect(full.legacyMetadata.unknown).toEqual({ literal: '<kept>', nested: [1, 2] });
+    const individualCopy = (await read('get_task', { id: individual })).data;
+    expect(individualCopy.status).toBe('done');
+    expect(individualCopy.completedAt).toBe((await read('get_task', { id: task.id })).data.completedAt);
+    const children = (await read('list_subtasks', { taskId: full.id })).items;
+    expect(children[0].done).toBe(true);
+    expect(children[0].legacyMetadata.unknown).toEqual({ kept: true });
+    expect((await read('list_dependencies', { taskId: full.id })).items[0].dependsOnTaskId).toBe(target.id);
+    expect((await service.from('task_attachments').select('legacy_metadata,sort_order').eq('workspace_id', ws).eq('task_id', full.id)).data).toEqual([
+      { legacy_metadata: { unknown: { relation: true } }, sort_order: 7 },
+    ]);
+    expect((await read('list_views', { projectId: copied })).items).toEqual([]);
+    expect((await read('list_comments', { taskId: full.id })).items).toEqual([]);
+    await page.getByRole('link', { name: 'List', exact: true }).click();
+    await page.getByRole('button', { name: /Source task$/ }).click();
+    await expect(page.getByRole('button', { name: 'Remove from favorites', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+    await page.getByRole('link', { name: 'Overview', exact: true }).click();
+    await page.screenshot({ path: '/tmp/task6b4-cloud-overview-en.png', fullPage: true });
+    expect(Object.keys(counts).filter(k => k.endsWith(':429'))).toEqual([]);
+    test.info().annotations.push({ type: 'actual-cloud-project-counts', description: JSON.stringify(counts) });
+  } finally {
+    if (ws) {
+      if ((await service.from('task_claims').delete().eq('workspace_id', ws)).error) cleanup.push('claims');
+      if ((await service.from('workspaces').delete().eq('id', ws)).error) cleanup.push('workspace');
+    }
+    for (const id of users) if ((await service.auth.admin.deleteUser(id)).error) cleanup.push('user');
+    await human.auth.signOut();
+    await setupActor.auth.signOut();
   }
   expect(cleanup).toEqual([]);
 });

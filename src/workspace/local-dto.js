@@ -1,3 +1,4 @@
+import { TEAMS_SEED } from '../core/constants.js';
 // Read projections only. The browser's legacy graph remains the storage authority.
 const iso = value => (value == null ? null : typeof value === 'number' ? new Date(value).toISOString() : value);
 export const entityVersion = (data, kind, id) => data._panel?.versions?.[`${kind}:${id}`] ?? 1;
@@ -106,3 +107,5 @@ export function localFiles(data) {
         });
   return [...files.values()];
 }
+
+export const localTeams = data => (Object.hasOwn(data, 'teams') ? data.teams : TEAMS_SEED.map(team => ({ ...team })));

@@ -76,7 +76,7 @@ export type CalendarEvent = EntityRef & {
   eventTime: string | null;
   legacyMetadata: LegacyMetadata;
 };
-export type SavedView = EntityRef & { projectId: string | null; name: string; viewType: string; filters: Json[]; legacyMetadata: LegacyMetadata };
+export type SavedView = VersionedEntity & { projectId: string | null; name: string; viewType: string; filters: Json[]; legacyMetadata: LegacyMetadata };
 export type ActivityEntry = EntityRef & {
   projectId: string | null;
   taskId: string | null;

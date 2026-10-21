@@ -221,6 +221,10 @@ export function taskDragId(value: string, scope: string): string | null {
 /** Shared drawer/context-menu preparation; intervention is an explicit human action. */
 export function prepareTaskAction(task: Task, operation: string, input: Record<string, Json> = {}, expectedVersion = task.version): BatchCommand {
   if (operation === 'intervene_task') return { operation, input: { ...input, id: task.id }, expectedVersion };
+  if (operation === 'duplicate_task') {
+    operation = 'duplicate_task_graph';
+    input = { projectId: task.projectId, mode: 'task', title: task.title + ' (copy)' };
+  }
   const commands = bulkCommands([{ ...task, version: expectedVersion }], operation, input);
   if (commands.length !== 1) throw new RepositoryError('validation_error');
   return commands[0];

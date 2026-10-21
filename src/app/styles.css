@@ -3,6 +3,7 @@
 @import './shell/workspace.css';
 @import './tasks/task-views.css';
 @import './schedules/schedules.css';
+@import './projects/projects.css';
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--text);

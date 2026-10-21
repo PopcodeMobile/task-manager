@@ -52,6 +52,7 @@ export type TaskViewsProps = {
   execute: Execute;
   projectId?: string;
   viewKey?: string;
+  hideLayoutSwitch?: boolean;
   initialView?: unknown;
   onViewChange?: (view: TaskView) => void;
   extraTaskMenuActions?: ExtraTaskMenuAction[];
@@ -304,29 +305,31 @@ export function TaskViews(props: TaskViewsProps) {
   return (
     <>
       <div className="work-toolbar">
-        <div className="view-tabs">
-          {[
-            ['list', t('Lista', 'List'), List],
-            ['board', t('Quadro', 'Board'), Columns3],
-            ['table', t('Tabela', 'Table'), Table2],
-          ].map(([id, name, Icon]) => {
-            const I = Icon as typeof List;
-            return (
-              <a
-                key={String(id)}
-                href={props.href({ view: String(id) })}
-                aria-current={mode === id ? 'page' : undefined}
-                onClick={e => {
-                  e.preventDefault();
-                  props.view(e.currentTarget.href);
-                }}
-              >
-                <I size={15} />
-                {String(name)}
-              </a>
-            );
-          })}
-        </div>
+        {!props.hideLayoutSwitch && (
+          <div className="view-tabs">
+            {[
+              ['list', t('Lista', 'List'), List],
+              ['board', t('Quadro', 'Board'), Columns3],
+              ['table', t('Tabela', 'Table'), Table2],
+            ].map(([id, name, Icon]) => {
+              const I = Icon as typeof List;
+              return (
+                <a
+                  key={String(id)}
+                  href={props.href({ view: String(id) })}
+                  aria-current={mode === id ? 'page' : undefined}
+                  onClick={e => {
+                    e.preventDefault();
+                    props.view(e.currentTarget.href);
+                  }}
+                >
+                  <I size={15} />
+                  {String(name)}
+                </a>
+              );
+            })}
+          </div>
+        )}
         <span>
           {visible.length} / {tasks.length} {t('tarefas', 'tasks')}
         </span>
