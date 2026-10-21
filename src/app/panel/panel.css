@@ -2369,3 +2369,92 @@
   gap: var(--s-2);
   align-items: center;
 }
+
+.work-shell .agent-tokens {
+  padding-bottom: var(--s-6);
+  margin-bottom: var(--s-6);
+  border-bottom: 1px solid var(--divider);
+}
+.work-shell .agent-token-form {
+  max-width: var(--auth-max);
+}
+.work-shell .agent-token-form fieldset {
+  display: grid;
+  gap: var(--s-3);
+  border: 0;
+  padding: 0;
+  margin: var(--s-4) 0;
+  min-width: 0;
+}
+.work-shell .agent-token-form .form-field {
+  display: grid;
+  gap: var(--s-1-5);
+}
+.work-shell .agent-token-form button {
+  justify-self: start;
+}
+.work-shell .agent-token-secret {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  margin: var(--s-4) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.work-shell .agent-token-secret .form-field {
+  display: grid;
+  gap: var(--s-1-5);
+}
+.work-shell .agent-token-secret textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--mono);
+}
+.work-shell .agent-token-secret .button-row,
+.work-shell .agent-token-row .button-row {
+  flex-wrap: wrap;
+}
+.work-shell .agent-token-config {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  margin: 0;
+}
+.work-shell .agent-token-details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--s-1) var(--s-3);
+  margin: var(--s-3) 0;
+  font-size: var(--fs-xs);
+}
+.work-shell .agent-token-details dt {
+  color: var(--text-3);
+}
+.work-shell .agent-token-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.work-shell .agent-comment-avatar {
+  background: none;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-2);
+}
+.work-shell .agent-token-row .connection-heading strong {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.work-shell .agent-token-row .connection-heading > span {
+  flex-shrink: 0;
+}
+.work-shell .agent-token-row > p {
+  overflow-wrap: anywhere;
+}

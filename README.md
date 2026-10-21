@@ -32,7 +32,7 @@ At `/`, sign in when cloud is configured or select **Continue on this device** f
 - `src/components/ui/`: shadcn/Radix primitives; native labels, focus behavior and semantic token classes.
 - `src/domain/`: typed operation contracts. `src/workspace/normalized.ts` sends human JWT RPCs with CAS/idempotency; `local-panel-repository.ts` exposes the same panel contract over device persistence.
 - `src/styles/tokens.css`, `src/core/design-tokens.js`: public token definitions and tooling inventory. Shared calendar, seed, local mutations and locale modules remain live; the old HTML renderer, global store, delegated actions and cloud snapshot writer are retired.
-- `supabase/functions/`, `supabase/migrations/`: shared authorization/operations, API, MCP and webhook worker; additive normalized migrations through `202610210010`.
+- `supabase/functions/`, `supabase/migrations/`: shared authorization/operations, API, MCP and webhook worker; additive normalized migrations through `202610210011`.
 - `tests/fixtures/legacy-workspace-*`: historical compatibility fixtures only. They are outside the frontend import closure and are not the current React lifecycle proof.
 
 Use React escaping for literal user content and DOMPurify only for explicitly supported rich content. Keep operations scoped to workspace, use authoritative versions, preserve drafts on failures and follow every cursor. Project privacy, task attachment byte uploads and actual invitations require separate contracts.
@@ -40,6 +40,8 @@ Use React escaping for literal user content and DOMPurify only for explicitly su
 Appearance supports custom HEX accents, saved per identity on this device with readable theme variants. Organization owners/admins can upload PNG/JPG/WebP logos up to 2 MB, preview, then save or remove them. Cloud logos are normalized to WebP thumbnails in the private `organization-logos` Storage bucket. Members read images with their current authenticated session; the workspace stores only a scoped `logoPath`. Local demonstrations instead persist a bounded WebP `logoDataUrl` command, which the cloud API rejects. See [branding verification](docs/verification/agent-platform/branding-2026-10-21.md).
 
 The [design-system guide](docs/design-system.md) describes token policy. `check:tokens` audits authored CSS plus JS/TS/JSX/TSX styles and static `cn`/`cva` utility sources; semantic aliases must resolve to declared foundation variables. Dynamic geometry and validated domain colors remain runtime data. No component directory is exempt.
+
+Organization owners/admins can issue single-organization agent tokens in **Help & resources → Integrations**. Tokens support read or read/write access, a default expiry of 90 days (30/90/365 or explicit no expiry), one-time secret display, rotation and revocation. They authenticate the existing 12 MCP tools and equivalent REST task routes without a browser login on the agent machine. See [token setup](docs/organization-agent-tokens.md). OAuth user connections remain available.
 
 ## Deploy and status
 

@@ -1,12 +1,12 @@
 # Tokens de agentes por organização
 
-Status: proposta concreta para revisão, sem alteração de autenticação ou produto. Base inspecionada: `84b67e7`, React/TypeScript em `src/app`, Supabase Auth/PostgreSQL/Edge e MCP remoto existentes.
+Status: aprovado por Hugo em 2026-10-21 ("pode seguir"), incluindo validade padrão de90dias com opção sem expiração. Base inspecionada: `84b67e7`, React/TypeScript em `src/app`, Supabase Auth/PostgreSQL/Edge e MCP remoto existentes.
 
 ## Pedido e resultado
 
 Hugo quer gerar pelo painel uma credencial para agentes sem navegador, como o Hermes numa VPS. Somente administradores da organização podem gerar esse acesso. O agente precisa ler e criar tarefas em uma organização determinada sem login interativo no servidor.
 
-A proposta acrescenta tokens organizacionais ao MCP existente. OAuth dos Claudes pessoais continua disponível. O token representa um executor da organização, não a sessão pessoal do administrador criador, e não recebe acesso a outras organizações ou administração de contas. As escolhas abaixo de validade, formato, tela e implementação são propostas do implementador, ainda não decisões confirmadas pelo usuário.
+A proposta acrescenta tokens organizacionais ao MCP existente. OAuth dos Claudes pessoais continua disponível. O token representa um executor da organização, não a sessão pessoal do administrador criador, e não recebe acesso a outras organizações ou administração de contas. O usuário aprovou executar este modelo após a apresentação do desenho; os detalhes técnicos abaixo orientam a implementação.
 
 ## Experiência no painel
 

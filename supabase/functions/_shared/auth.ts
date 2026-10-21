@@ -1,5 +1,6 @@
 import type { Actor } from '../../../src/domain/contracts.ts';
 import { PublicError } from './errors.ts';
+import { resolveOrganizationToken } from './organization-tokens.ts';
 type Credential = { token: string; url: string; apiKey: string };
 const credentials = new WeakMap<Actor, Credential>();
 export function actorCredential(actor: Actor): Credential {
@@ -29,6 +30,12 @@ export async function authenticate(request: Request): Promise<Actor> {
   const header = request.headers.get('authorization');
   if (!header?.match(/^Bearer [A-Za-z0-9._-]+$/i)) throw new PublicError('unauthorized');
   const token = header.slice(7);
+  if (token.startsWith('krs_')) {
+    const config = backendConfig();
+    const actor = await resolveOrganizationToken(config, token);
+    credentials.set(actor, { token, url: config.url, apiKey: config.apiKey });
+    return actor;
+  }
   const parts = token.split('.');
   if (parts.length !== 3 || !parts[2] || !['HS256', 'RS256', 'ES256'].includes(String(decode(parts[0]).alg))) {
     throw new PublicError('unauthorized');

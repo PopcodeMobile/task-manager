@@ -290,3 +290,71 @@ test('010 nested context predecessor remains required and unambiguous', () => {
   objects.push({ ...objects.find(object => object.name === 'read_operation_before_context') });
   assert.throws(() => audit(objects), /predecessor/);
 });
+
+const tokensMigration = migration('202610210011_organization_agent_tokens');
+function tokenCatalog() {
+  const objects = brandingCatalog();
+  objects.push(
+    ...[
+      'organization_agent_actor',
+      'organization_agent_admin',
+      'organization_agent_metadata',
+      'organization_agent_issue',
+      'organization_agent_verify',
+      'organization_agent_attribution',
+    ].map(name => definition(tokensMigration, name)),
+  );
+  objects.push(
+    ...[
+      'create_organization_agent_token',
+      'list_organization_agent_tokens',
+      'rotate_organization_agent_token',
+      'revoke_organization_agent_token',
+      'authenticate_organization_agent_token',
+      'read_organization_agent_operation',
+      'execute_organization_agent_operation',
+    ].map(name =>
+      definition(tokensMigration, name, {
+        authenticated: true,
+        anon: name.startsWith('authenticate_') || name.startsWith('read_organization') || name.startsWith('execute_organization'),
+      }),
+    ),
+  );
+  return objects;
+}
+test('011 exact narrow token entrypoints and private helpers remain reachable and audited', () => {
+  const names = audit(tokenCatalog()).map(o => o.name);
+  assert.ok(names.includes('organization_agent_verify'));
+  assert.ok(names.includes('organization_agent_actor'));
+});
+for (const name of ['organization_agent_actor', 'organization_agent_metadata', 'organization_agent_issue', 'organization_agent_verify']) {
+  for (const flag of ['anon', 'authenticated', 'definer'])
+    test(`011 ${name} rejects ${flag} elevation`, () => {
+      assert.throws(() => audit(change(tokenCatalog(), name, { [flag]: true })), /private|invoker|never an RPC/);
+    });
+}
+for (const name of ['authenticate_organization_agent_token', 'read_organization_agent_operation', 'execute_organization_agent_operation']) {
+  test(`011 ${name} requires secret verification`, () => {
+    assert.throws(
+      () => audit(change(tokenCatalog(), name, o => ({ source: o.source.replace('public.organization_agent_verify(p_token)', 'null') }))),
+      /secret verification/,
+    );
+  });
+  test(`011 ${name} still rejects dynamic SQL`, () => {
+    assert.throws(() => audit(change(tokenCatalog(), name, o => ({ source: o.source + "; execute 'select 1';" }))), /unreviewed dynamic SQL/);
+  });
+  for (const schema of ['net', 'vault', 'pgmq', 'cron'])
+    test(`011 ${name} cannot bridge ${schema}`, () => {
+      const objects = change(tokenCatalog(), name, o => ({ source: o.source + ';perform public.token_hidden_bridge();' }));
+      objects.push({
+        name: 'token_hidden_bridge',
+        schema: 'public',
+        kind: 'function',
+        source: `select ${schema}.secret;`,
+        definer: false,
+        anon: false,
+        authenticated: false,
+      });
+      assert.throws(() => audit(objects), /sensitive API bridge/);
+    });
+}

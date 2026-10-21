@@ -156,6 +156,75 @@ export function auditWebhookApiSurface({ sql, exposedSchemas, extraSearchPath })
     ) {
       assert.equal(object.definer || object.anon || object.authenticated, false, 'batch capability helpers must remain private invokers');
     }
+    const tokenInvokers = [
+      'organization_agent_actor',
+      'organization_agent_metadata',
+      'organization_agent_issue',
+      'organization_agent_verify',
+      'organization_agent_attribution',
+    ];
+    if (tokenInvokers.includes(object.name)) {
+      assert.equal(object.definer || object.anon || object.authenticated, false, 'organization token helpers remain private invokers, never an RPC');
+    }
+    if (['organization_agent_admin', 'operation_authorize_before_organization_tokens'].includes(object.name)) {
+      assert.equal(object.anon || object.authenticated, false, 'organization authority helpers remain private, never an RPC');
+      assert.equal(object.definer, true, 'organization authority retains its definer boundary');
+    }
+    if (object.name === 'organization_agent_actor') {
+      assert.match(
+        source,
+        /from public\.organization_agent_context where backend_pid=pg_backend_pid\(\) and transaction_id=txid_current\(\)/,
+        'context must be bound to a private transaction row',
+      );
+      assert.doesNotMatch(source, /current_setting|set_config/, 'caller settings cannot authorize a token');
+    }
+    if (object.name === 'organization_agent_verify') {
+      assert.match(source, /p_token !~ '\^krs_/, 'token verifier requires the credential format');
+      assert.match(source, /for update of x/, 'token verifier locks the stable connection before effects');
+      assert.match(source, /k\.secret_hash<>sha256\(convert_to\(substr\(p_token,38\),'utf8'\)\)/, 'token verifier requires secret hash validation');
+      assert.match(source, /c\.revoked_at is not null/, 'token verifier must reject revoked connections');
+      assert.match(source, /k\.revoked_at is not null or k\.expires_at<=clock_timestamp\(\)/, 'token verifier checks current credential authority');
+    }
+    if (['authenticate_organization_agent_token', 'read_organization_agent_operation', 'execute_organization_agent_operation'].includes(object.name)) {
+      assert.equal(object.definer, true, 'token RPC retains its definer boundary');
+      assert.match(source, /public\.organization_agent_verify\(p_token\)/, 'token RPC requires secret verification on every call');
+      if (object.name !== 'authenticate_organization_agent_token') {
+        assert.match(source, /p_workspace_id is distinct from \(a->>'workspaceid'\)::uuid/, 'token RPC requires exact organization scope');
+        assert.match(
+          source,
+          /insert into public\.organization_agent_context values\(pg_backend_pid\(\),txid_current\(\),a\)/,
+          'token context can only be installed after validation',
+        );
+        assert.match(
+          source,
+          /delete from public\.organization_agent_context where backend_pid=pg_backend_pid\(\) and transaction_id=txid_current\(\)/,
+          'token context cannot persist beyond the operation',
+        );
+      }
+      if (object.name === 'read_organization_agent_operation')
+        assert.match(
+          source,
+          /p_operation not in \('list_workspaces','list_projects','list_tasks','get_task','list_task_activity'\)/,
+          'token read allowlist must remain narrow',
+        );
+      if (object.name === 'execute_organization_agent_operation') {
+        assert.match(
+          source,
+          /p_operation not in \('create_task','claim_task','renew_task_claim','release_task_claim','update_task','add_task_comment','complete_task'\)/,
+          'token write allowlist must remain narrow',
+        );
+        assert.match(source, /a->>'capability'<>'write'/, 'read credentials cannot execute writes');
+      }
+    }
+    if (
+      ['create_organization_agent_token', 'list_organization_agent_tokens', 'rotate_organization_agent_token', 'revoke_organization_agent_token'].includes(
+        object.name,
+      )
+    ) {
+      assert.equal(object.anon, false, 'token management is never anonymous');
+      assert.equal(object.definer, true, 'token management retains its definer boundary');
+      assert.match(source, /public\.organization_agent_admin\(p_workspace_id\)/, 'token management requires current human administrator');
+    }
     if (/\bexecute\s+/.test(source)) {
       // These reviewed domain dispatchers interpolate only fixed allowlisted entity tables/columns.
       assert.ok(
@@ -209,12 +278,18 @@ export async function verifyWebhookApiBoundary({ base, signToken, productionSurf
     assert.ok(schema.data?.__schema, 'native GraphQL introspection must be enabled in isolated fixture');
     const names = schema.data.__schema.types.flatMap(type => [type.name, ...(type.fields ?? []).map(field => field.name)]);
     const sensitiveNames = names.filter(name =>
-      /^(httprequestqueue|httpresponse|decryptedsecrets|webhooksubscriptions|webhookdeliveries|webhookdeliveryattempts|webhookmanualreplays|webhookdeliverysecret|configurewebhookscheduler|provisionwebhooksubscription)/.test(
+      /^(httprequestqueue|httpresponse|decryptedsecrets|webhooksubscriptions|webhookdeliveries|webhookdeliveryattempts|webhookmanualreplays|webhookdeliverysecret|organizationagentcredentials|organizationagentconnections|organizationagentcontext|organizationagentaudit|configurewebhookscheduler|provisionwebhooksubscription)/.test(
         name.toLowerCase().replaceAll('_', ''),
       ),
     );
     assert.deepEqual(sensitiveNames, [], 'safe list RPCs may exist, sensitive table/types/worker RPCs must not');
-    for (const field of ['httpRequestQueueCollection', 'decryptedSecretsCollection', 'webhookSubscriptionsCollection']) {
+    for (const field of [
+      'httpRequestQueueCollection',
+      'decryptedSecretsCollection',
+      'webhookSubscriptionsCollection',
+      'organizationAgentCredentialsCollection',
+      'organizationAgentContextCollection',
+    ]) {
       const result = await graphql(`{ ${field} { edges { node { id } } } }`);
       assert.ok(result.errors?.length && !result.data, 'GraphQL must reject sensitive fields, never return rows');
     }
@@ -228,6 +303,17 @@ export async function verifyWebhookApiBoundary({ base, signToken, productionSurf
     }
     for (const alias of ['http_post', 'http_get', 'http_collect_response', 'create_secret', 'read', 'schedule']) {
       await denied(`/rpc/${alias}`, headers, {}, 'PGRST202');
+    }
+    if (productionSurface.some(object => object.name === 'organization_agent_verify')) {
+      for (const relation of ['organization_agent_credentials', 'organization_agent_connections', 'organization_agent_context', 'organization_agent_audit'])
+        await denied(`/${relation}?select=*`, headers);
+      for (const [name, body] of [
+        ['organization_agent_actor', {}],
+        ['organization_agent_verify', { p_token: 'krs_invalid' }],
+        ['organization_agent_issue', { p_connection_id: '00000000-0000-0000-0000-000000000000', p_expires_in_days: 90 }],
+        ['organization_agent_admin', { p_workspace_id: '00000000-0000-0000-0000-000000000000' }],
+      ])
+        await denied(`/rpc/${name}`, headers, body);
     }
     for (const [name, body] of [
       ['operation_validate', { p_operation: 'duplicate_file', p_input: { id: 'source' } }],

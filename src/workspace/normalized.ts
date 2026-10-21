@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Command, CommandResult, Page, Workspace, UserPreferences } from '../domain/contracts';
-export type Agent = { id: string; name: string; authUserId: string | null; clientId: string | null };
+export type Agent = { id: string; name: string; authUserId: string | null; clientId: string | null; connectionSource?: 'oauth' | 'organization_token' };
 export type Member = {
   user_id: string;
   name: string;
@@ -17,7 +17,7 @@ export type DomainEvent = {
   id: string;
   operation: string;
   entityId: string | null;
-  actorUserId: string;
+  actorUserId: string | null;
   actorAgentId: string | null;
   createdAt: string;
   payload: { taskId?: string; projectId?: string };

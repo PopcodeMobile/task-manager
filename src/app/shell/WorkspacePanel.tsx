@@ -953,7 +953,7 @@ export function WorkspacePanel({
                     {t('OAuth, agentes e webhooks exigem uma organização na nuvem.', 'OAuth, agents and webhooks require a cloud workspace.')}
                   </p>
                 ) : (
-                  <IntegrationsPanel repo={repo} t={t} admin={admin} />
+                  <IntegrationsPanel repo={repo} t={t} admin={admin} members={shown.members} />
                 )
               ) : ['projects', 'project'].includes(route) ? null : remainingRoutes.includes(route) ? (
                 <RemainingRoutes

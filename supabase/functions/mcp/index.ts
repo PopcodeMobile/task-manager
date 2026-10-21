@@ -4,6 +4,20 @@ import { authenticate, backendConfig } from '../_shared/auth.ts';
 import { errorResponse, PublicError } from '../_shared/errors.ts';
 import { executeQuery } from '../_shared/operations.ts';
 import { taskServer } from './tools.ts';
+import type { Actor } from '../../../src/domain/contracts.ts';
+
+async function handleAuthenticatedMcp(request: Request, actor: Actor): Promise<Response> {
+  if (actor.kind !== 'organization_token' && !actor.clientId) throw new PublicError('forbidden');
+  // This live domain lookup also protects initialize and tools/list after invalidation.
+  const workspaces = (await executeQuery(actor, 'list_workspaces', null)) as { items: unknown[] };
+  if (!workspaces.items.length) throw new PublicError('forbidden');
+  const handler = createMcpHandler(() => taskServer(actor), { maxRequestBodySize: 270000 });
+  try {
+    return await handler.fetch(request);
+  } finally {
+    await handler.close();
+  }
+}
 
 /** Public discovery wraps, but never bypasses, verified Supabase user authentication. */
 export async function handleMcpRequest(request: Request): Promise<Response> {
@@ -22,6 +36,10 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
     async (req: Request) => {
       try {
         if (!req.headers.has('authorization')) throw new PublicError('unauthorized');
+        // Opaque organization credentials cannot pass through the JWT-only Supabase wrapper.
+        if (/^Bearer krs_/i.test(req.headers.get('authorization') ?? '')) {
+          return await handleAuthenticatedMcp(req, await authenticate(req));
+        }
         const config = backendConfig();
         const authenticated = withSupabase(
           {
@@ -39,16 +57,7 @@ export async function handleMcpRequest(request: Request): Promise<Response> {
           },
           async () => {
             const actor = await authenticate(req);
-            if (!actor.clientId) throw new PublicError('forbidden');
-            // Even tools/list and initialize require a live connection, not merely a signed token.
-            const workspaces = (await executeQuery(actor, 'list_workspaces', null)) as { items: unknown[] };
-            if (!workspaces.items.length) throw new PublicError('forbidden');
-            const handler = createMcpHandler(() => taskServer(actor), { maxRequestBodySize: 270000 });
-            try {
-              return await handler.fetch(req);
-            } finally {
-              await handler.close();
-            }
+            return await handleAuthenticatedMcp(req, actor);
           },
         );
         const response = await authenticated(req);

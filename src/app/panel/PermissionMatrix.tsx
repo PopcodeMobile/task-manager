@@ -11,6 +11,7 @@ export function PermissionMatrix({ t, repo }: Pick<PanelProps, 't' | 'repo'>) {
     [t('Convidar membros', 'Invite members'), local ? [true, true, true, false] : null],
     [t('Gerenciar papéis', 'Manage roles'), local ? [true, true, true, false] : null],
     [t('Configurações do espaço', 'Workspace settings'), [true, true, false, false]],
+    [t('Gerenciar tokens de agentes', 'Manage agent tokens'), local ? null : [true, true, false, false]],
     [t('Cobrança', 'Billing'), null],
     [t('Excluir espaço', 'Delete workspace'), null],
   ];

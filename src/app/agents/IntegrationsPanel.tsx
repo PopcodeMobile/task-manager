@@ -1,3 +1,5 @@
+import { AgentTokensPanel } from './AgentTokensPanel';
+import type { Member } from '../../workspace/normalized';
 import type { WorkspaceRepository } from '../../workspace/repository';
 import { useEffect, useState } from 'react';
 import { Button } from '../../components/ui/button';
@@ -15,7 +17,7 @@ type Subscription = {
   active: boolean;
 };
 type Delivery = { id: string; state: string; attempt: number; lastCategory: string; lastStatus: number | null; createdAt: string };
-export function IntegrationsPanel({ repo, t, admin }: { repo: WorkspaceRepository; t: Translate; admin: boolean }) {
+export function IntegrationsPanel({ repo, t, admin, members }: { repo: WorkspaceRepository; t: Translate; admin: boolean; members?: Member[] }) {
   const [connections, setConnections] = useState<Connection[]>([]),
     [subscriptions, setSubscriptions] = useState<Subscription[]>([]),
     [deliveries, setDeliveries] = useState<Delivery[]>([]),
@@ -61,6 +63,7 @@ export function IntegrationsPanel({ repo, t, admin }: { repo: WorkspaceRepositor
   }
   return (
     <>
+      <AgentTokensPanel repo={repo} t={t} admin={admin} members={members} />
       {error && (
         <p role="alert" className="error-message">
           {error}

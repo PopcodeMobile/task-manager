@@ -4,7 +4,18 @@ export type LegacyMetadata = { [key: string]: Json };
 export type EntityRef = { workspaceId: string; id: string };
 export type Command<T> = { workspaceId: string; idempotencyKey: string; expectedVersion?: number; input: T };
 /** Produced by validated authentication, never deserialized from command input. */
-export type Actor = { userId: string; clientId: string | null; connectionId: string | null };
+export type HumanActor = { kind?: 'user'; userId: string; clientId: string | null; connectionId: string | null };
+export type OrganizationTokenActor = {
+  kind: 'organization_token';
+  principalId: string;
+  connectionId: string;
+  agentId: string;
+  workspaceId: string;
+  capability: 'read' | 'write';
+  userId: null;
+  clientId: null;
+};
+export type Actor = HumanActor | OrganizationTokenActor;
 export type CommandResult<T> = { data: T; eventId: string; requestId: string };
 export type Page<T> = { items: T[]; nextCursor: string | null };
 export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'guest';
@@ -67,7 +78,14 @@ export type TaskDependency = { workspaceId: string; taskId: string; dependsOnTas
 export type TaskLabel = { workspaceId: string; taskId: string; labelId: string };
 export type TaskAttachment = { workspaceId: string; taskId: string; fileId: string; sortOrder?: number };
 export type Label = VersionedEntity & { name: string; legacyMetadata: LegacyMetadata };
-export type Comment = VersionedEntity & { taskId: string; authorUserId: string | null; body: string; createdAt: string; legacyMetadata: LegacyMetadata };
+export type Comment = VersionedEntity & {
+  taskId: string;
+  authorUserId: string | null;
+  authorAgentId?: string | null;
+  body: string;
+  createdAt: string;
+  legacyMetadata: LegacyMetadata;
+};
 export type CommentReaction = { workspaceId: string; commentId: string; reaction: string; legacyUserId: string; userId: string | null };
 export type TeamMembershipBaseline = { userId: string; teamIds: string[] };
 export type Team = VersionedEntity & { name: string; description: string };

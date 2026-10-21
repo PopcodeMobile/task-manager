@@ -1,3 +1,4 @@
+import { Bot } from 'lucide-react';
 import { MemberAvatar } from '../projects/ProjectVisual';
 import { preferredDate } from '../panel/panel-model';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -122,10 +123,20 @@ export function TaskDiscussionSection({
         <div role="tabpanel">
           {comments.map(item => (
             <article className="comment cmt" key={item.id}>
-              <MemberAvatar member={members.find(m => m.user_id === item.authorUserId)} size="md" />
+              {item.authorAgentId ? (
+                <span className="av md agent-comment-avatar" aria-label={t('Agente', 'Agent')}>
+                  <Bot size={16} />
+                </span>
+              ) : (
+                <MemberAvatar member={members.find(m => m.user_id === item.authorUserId)} size="md" />
+              )}
               <div className="comment-body">
                 <div className="comment-heading">
-                  <strong>{members.find(m => m.user_id === item.authorUserId)?.name ?? t('Autor histórico', 'Historical author')}</strong>
+                  <strong>
+                    {item.authorAgentId
+                      ? (agents.find(agent => agent.id === item.authorAgentId)?.name ?? t('Agente', 'Agent'))
+                      : (members.find(m => m.user_id === item.authorUserId)?.name ?? t('Autor histórico', 'Historical author'))}
+                  </strong>
                   <time dateTime={item.createdAt}>{preferredDate(item.createdAt, {}, t('pt-BR', 'en'))}</time>
                 </div>
                 <div className="rich-content" dangerouslySetInnerHTML={{ __html: safeRichText(item.body) }} />

@@ -5,6 +5,7 @@ import type { Comment, ActivityEntry } from '../../domain/contracts';
 import type { DomainEvent } from '../../workspace/normalized';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
+  Bot,
   Plus,
   Search,
   MailOpen,
@@ -774,11 +775,21 @@ function SearchPage(p: PanelProps) {
                   task = s.tasks.find(task => task.id === comment.taskId);
                 return (
                   <div className="mini panel-row search-comment" key={result.id}>
-                    <PersonAvatar member={s.members.find(member => member.user_id === comment.authorUserId)} />
+                    {comment.authorAgentId ? (
+                      <span className="av sm agent-comment-avatar" aria-label={t('Agente', 'Agent')}>
+                        <Bot size={16} />
+                      </span>
+                    ) : (
+                      <PersonAvatar member={s.members.find(member => member.user_id === comment.authorUserId)} />
+                    )}
                     <button className="tt" onClick={open}>
                       <span className="search-comment-context">
-                        <b>{s.members.find(member => member.user_id === comment.authorUserId)?.name}</b> {t('em', 'on')} {task?.title} ·{' '}
-                        {relativeTime(comment.createdAt, p)}
+                        <b>
+                          {comment.authorAgentId
+                            ? (s.agents.find(agent => agent.id === comment.authorAgentId)?.name ?? t('Agente', 'Agent'))
+                            : s.members.find(member => member.user_id === comment.authorUserId)?.name}
+                        </b>{' '}
+                        {t('em', 'on')} {task?.title} · {relativeTime(comment.createdAt, p)}
                       </span>
                       <span>{highlight(result.text)}</span>
                     </button>

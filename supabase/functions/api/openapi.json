@@ -3,7 +3,7 @@
   "info": {
     "title": "Task Manager transactional API",
     "version": "1.0.0",
-    "description": "All writes require a unique idempotencyKey; updates require expectedVersion. Identity comes exclusively from the validated Supabase JWT. Claim tokens are private credentials returned only to their executor. A direct human must use intervene_task to complete, move, reassign or delete claimed work. Generic commands and REST aliases share the same SQL authorization."
+    "description": "All writes require a unique idempotencyKey; updates require expectedVersion. Identity comes exclusively from a validated Supabase JWT or an organization agent token sent in the Authorization Bearer header. Organization tokens permit only list_workspaces (their organization only), list_projects, list_tasks, get_task, list_task_activity, create_task, claim_task, renew_task_claim, release_task_claim, update_task, add_task_comment and complete_task. Read-only organization tokens deny every write; organization tokens cannot administer workspaces, projects, members, credentials or integrations. Expired, revoked or rotated credentials fail on every request and replay. Claim tokens are private credentials returned only to their executor. A direct human must use intervene_task to complete, move, reassign or delete claimed work. Generic commands and REST aliases share the same SQL authorization."
   },
   "servers": [
     {
@@ -4779,7 +4779,7 @@
           {
             "name": "context",
             "in": "query",
-            "description": "Current task context; cursor is bound to workspace, task and kind. Deleted comments are absent; authorUserId may be null.",
+            "description": "Current task context; cursor is bound to workspace, task and kind. Deleted comments are absent; authorUserId may be null. Organization token comments have authorUserId null and authorAgentId set to the real organization agent.",
             "schema": {
               "type": "string",
               "enum": ["comments", "subtasks", "dependencies", "files", "attachments"]
@@ -5501,7 +5501,8 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT"
+        "bearerFormat": "JWT or organization agent token",
+        "description": "Send Authorization: Bearer <SUPABASE_ACCESS_TOKEN> for human/OAuth access or Authorization: Bearer <ORGANIZATION_AGENT_TOKEN> for headless agents. Organization tokens are scoped to one organization and the existing 12 task tools. Store the issued secret in an environment variable; never put it in URLs or request data. The server validates it on every request, including MCP initialize and tools/list."
       }
     },
     "schemas": {
