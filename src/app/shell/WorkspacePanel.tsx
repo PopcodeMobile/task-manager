@@ -97,12 +97,7 @@ export function WorkspacePanel({
   const creationAttempt = useRef<{ name: string; key: string; slug: string } | null>(null);
   const current = workspaces.find(w => w.id === workspaceId);
   const repo = useMemo(() => repositoryFactory(workspaceId || null), [repositoryFactory, workspaceId]);
-  const { snapshot, snapshotScope, loading, error, setError, revision, search, setSearch, refresh, execute } = useWorkspaceData(
-    repo,
-    current?.id,
-    workspaceId,
-    t,
-  );
+  const { snapshot, snapshotScope, loading, error, setError, revision, refresh, execute } = useWorkspaceData(repo, current?.id, workspaceId, t);
   useEffect(() => {
     if (current && repo.savePersonal) void repo.savePersonal({ activeWorkspace: current.id }).catch(err => setError(errorMessage(err, t)));
   }, [repo, current?.id, t]);
@@ -134,10 +129,7 @@ export function WorkspacePanel({
   useEffect(() => {
     document.title = `${activeNav?.label ?? 'Gr8r Studio'} | Gr8r Studio`;
   }, [activeNav?.label]);
-  const taskList = shown.tasks.filter(
-      task =>
-        !task.archived && (!projectId || task.projectId === projectId) && (!search || task.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())),
-    ),
+  const taskList = shown.tasks.filter(task => !task.archived && (!projectId || task.projectId === projectId)),
     projects = shown.projects.filter(p => !p.archived);
   return (
     <div className="work-shell">
@@ -342,12 +334,6 @@ export function WorkspacePanel({
                       <CheckCheck size={16} />
                       {shown.tasks.filter(task => task.status === 'done').length} {t('concluídas', 'completed')}
                     </span>
-                    <Input
-                      aria-label={t('Buscar tarefas', 'Search tasks')}
-                      placeholder={t('Buscar tarefas...', 'Search tasks...')}
-                      value={search}
-                      onChange={e => setSearch(e.target.value)}
-                    />
                   </div>
                   <TaskList
                     tasks={taskList}
@@ -355,6 +341,10 @@ export function WorkspacePanel({
                     members={shown.members}
                     agents={shown.agents}
                     board={url.searchParams.get('view') === 'board'}
+                    table={url.searchParams.get('view') === 'table'}
+                    repo={repo}
+                    execute={execute}
+                    projectId={projectId}
                     href={taskHref}
                     view={navigate}
                     open={openTask}

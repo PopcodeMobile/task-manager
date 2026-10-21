@@ -1,9 +1,10 @@
+import { TaskCoreActions } from './TaskCoreActions';
 import { TaskExecutionSection } from './TaskExecutionSection';
 import type { WorkspaceRepository } from '../../workspace/repository';
 import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 import { MessageSquare, Plus, Unlink } from 'lucide-react';
-import type { Task, Project, Comment, Subtask, TaskDependency, TaskStatus, TaskPriority } from '../../domain/contracts';
+import type { Task, Project, Comment, Subtask, TaskDependency, TaskStatus, TaskPriority, Recurrence } from '../../domain/contracts';
 import { type Agent, type Member } from '../../workspace/normalized';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import {
@@ -64,6 +65,9 @@ export function TaskDrawer({
     [status, setStatus] = useState<TaskStatus>(initial?.status ?? 'todo'),
     [priority, setPriority] = useState<TaskPriority>(initial?.priority ?? 'none'),
     [due, setDue] = useState(initial?.dueDate ?? ''),
+    [start, setStart] = useState(initial?.startDate ?? ''),
+    [recurrence, setRecurrence] = useState<Recurrence | ''>(initial?.recurrence ?? ''),
+    [estimate, setEstimate] = useState(String(initial?.legacyMetadata.estimate ?? '')),
     [assignee, setAssignee] = useState(initial?.assigneeUserId ?? ''),
     [agent, setAgent] = useState(initial?.executorAgentId ?? ''),
     [comments, setComments] = useState<Comment[]>([]),
@@ -82,7 +86,8 @@ export function TaskDrawer({
     active = !!current?.reservation?.active && Date.parse(current.reservation.expiresAt) > Date.now();
   const version = current?.version;
   const [editVersion, setEditVersion] = useState(initial?.version);
-  const fingerprint = JSON.stringify([title, description, project, status, priority, due, assignee]);
+  const saveButton = useRef<HTMLButtonElement>(null);
+  const fingerprint = JSON.stringify([title, description, project, status, priority, due, assignee, start, recurrence, estimate]);
   const savedFingerprint = useRef(fingerprint);
   const dirty = fingerprint !== savedFingerprint.current;
   async function save() {
@@ -103,6 +108,9 @@ export function TaskDrawer({
           priority,
           assigneeUserId: assignee || null,
           dueDate: due || null,
+          startDate: start || null,
+          recurrence: recurrence || null,
+          ...(estimate === String(current?.legacyMetadata.estimate ?? '') ? {} : { attributes: { estimate } }),
           ...(status === current?.status ? {} : { status }),
         },
         current ? editVersion : undefined,
@@ -145,6 +153,9 @@ export function TaskDrawer({
     setStatus(current.status);
     setPriority(current.priority);
     setDue(current.dueDate ?? '');
+    setStart(current.startDate ?? '');
+    setRecurrence(current.recurrence ?? '');
+    setEstimate(String(current.legacyMetadata.estimate ?? ''));
     setAssignee(current.assigneeUserId ?? '');
     setEditVersion(current.version);
     savedFingerprint.current = JSON.stringify([
@@ -155,6 +166,9 @@ export function TaskDrawer({
       current.priority,
       current.dueDate ?? '',
       current.assigneeUserId ?? '',
+      current.startDate ?? '',
+      current.recurrence ?? '',
+      String(current.legacyMetadata.estimate ?? ''),
     ]);
   }, [current?.version, busy, dirty]);
   useEffect(() => {
@@ -194,6 +208,26 @@ export function TaskDrawer({
     } finally {
       setBusy(false);
     }
+  }
+  function requireSaved() {
+    if (!dirty && !conflict) return true;
+    setError(t('Salve as alterações antes desta ação. O rascunho foi mantido.', 'Save changes before this action. Your draft was kept.'));
+    saveButton.current?.focus();
+    return false;
+  }
+  function taskAction(operation: string, input: Record<string, unknown> = {}, after?: 'open' | 'close') {
+    if (!current || !requireSaved()) return;
+    void action(async () => {
+      const result = await execute<Task>(operation, { id: current.id, ...input }, editVersion);
+      if (after === 'open') {
+        registerDraft(null);
+        created(result.id);
+      }
+      if (after === 'close') {
+        registerDraft(null);
+        close();
+      }
+    });
   }
   return (
     <Sheet
@@ -266,6 +300,37 @@ export function TaskDrawer({
               {t('Prazo', 'Due date')}
               <Input type="date" value={due} onChange={e => setDue(e.target.value)} disabled={readOnly || busy} />
             </label>
+            <label className="form-field">
+              {t('Início', 'Start date')}
+              <Input type="date" value={start} onChange={e => setStart(e.target.value)} disabled={readOnly || busy} />
+            </label>
+            <label className="form-field">
+              {t('Recorrência', 'Recurrence')}
+              <select
+                aria-label={t('Recorrência', 'Recurrence')}
+                value={recurrence}
+                onChange={e => setRecurrence(e.target.value as Recurrence | '')}
+                disabled={readOnly || busy}
+              >
+                <option value="">{t('Nenhuma', 'None')}</option>
+                {(['Daily', 'Weekly', 'Every 2 weeks', 'Monthly'] as const).map(r => (
+                  <option key={r} value={r}>
+                    {
+                      {
+                        Daily: t('Diária', 'Daily'),
+                        Weekly: t('Semanal', 'Weekly'),
+                        'Every 2 weeks': t('A cada 2 semanas', 'Every 2 weeks'),
+                        Monthly: t('Mensal', 'Monthly'),
+                      }[r]
+                    }
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              {t('Estimativa', 'Estimate')}
+              <Input value={estimate} maxLength={120} onChange={e => setEstimate(e.target.value)} disabled={readOnly || busy} />
+            </label>
           </div>
           <label className="form-field">
             {t('Descrição', 'Description')}
@@ -274,7 +339,7 @@ export function TaskDrawer({
           {description && (
             <div className="rich-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(description, { USE_PROFILES: { html: true } }) }} />
           )}
-          <Button type="submit" disabled={busy || readOnly || conflict || !project}>
+          <Button ref={saveButton} type="submit" disabled={busy || readOnly || conflict || !project}>
             {current ? t('Salvar alterações', 'Save changes') : t('Criar tarefa', 'Create task')}
           </Button>
         </form>
@@ -295,6 +360,9 @@ export function TaskDrawer({
                 setStatus(latest.data.status);
                 setPriority(latest.data.priority);
                 setDue(latest.data.dueDate ?? '');
+                setStart(latest.data.startDate ?? '');
+                setRecurrence(latest.data.recurrence ?? '');
+                setEstimate(String(latest.data.legacyMetadata.estimate ?? ''));
                 setAssignee(latest.data.assigneeUserId ?? '');
                 setEditVersion(latest.data.version);
                 savedFingerprint.current = JSON.stringify([
@@ -305,6 +373,9 @@ export function TaskDrawer({
                   latest.data.priority,
                   latest.data.dueDate ?? '',
                   latest.data.assigneeUserId ?? '',
+                  latest.data.startDate ?? '',
+                  latest.data.recurrence ?? '',
+                  String(latest.data.legacyMetadata.estimate ?? ''),
                 ]);
                 await refresh();
                 setConflict(false);
@@ -325,10 +396,13 @@ export function TaskDrawer({
               readOnly={readOnly}
               busy={busy}
               t={t}
-              onAssign={() => void action(() => execute('intervene_task', { id: current.id, action: 'reassign', executorAgentId: agent }, version))}
-              onResume={() => setConfirm(true)}
-              onComplete={() => void action(() => execute('complete_task', { id: current.id }, version))}
+              onAssign={() => taskAction('intervene_task', { action: 'reassign', executorAgentId: agent })}
+              onResume={() => {
+                if (requireSaved()) setConfirm(true);
+              }}
+              onComplete={() => taskAction('complete_task')}
             />
+            <TaskCoreActions task={current} projects={projects} t={t} disabled={busy || readOnly || active} run={taskAction} />
             <section className="drawer-section">
               <h3>{t('Subtarefas', 'Subtasks')}</h3>
               {subtasks.map(item => (
@@ -467,7 +541,13 @@ export function TaskDrawer({
               </form>
             </section>
             <section className="drawer-section">
-              <Button variant="destructive" disabled={busy || readOnly || active} onClick={() => setDeleteConfirm(true)}>
+              <Button
+                variant="destructive"
+                disabled={busy || readOnly || active}
+                onClick={() => {
+                  if (requireSaved()) setDeleteConfirm(true);
+                }}
+              >
                 {t('Excluir tarefa', 'Delete task')}
               </Button>
               <p className="permission-note">
@@ -530,7 +610,8 @@ export function TaskDrawer({
                     <Button
                       onClick={() =>
                         void action(async () => {
-                          await execute('intervene_task', { id: current.id, action: 'release' }, version);
+                          if (!requireSaved()) return;
+                          await execute('intervene_task', { id: current.id, action: 'release' }, editVersion);
                           setAgent('');
                         })
                       }

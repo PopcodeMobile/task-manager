@@ -216,8 +216,8 @@ test('login, workspace, create, edit, board, drawer, comment and agent supervisi
   const f = await fixture(page);
   await login(page);
   await expect(page.getByText('Revisar navegação', { exact: true })).toBeVisible();
-  await expect(page.getByRole('table', { name: 'Tarefas' }).getByRole('columnheader')).toHaveCount(5);
-  await expect(page.getByRole('table', { name: 'Tarefas' }).getByRole('cell')).toHaveCount(5);
+  await expect(page.getByRole('table', { name: 'A fazer', exact: true }).getByRole('columnheader')).toHaveCount(10);
+  await expect(page.getByRole('table', { name: 'A fazer', exact: true }).getByRole('cell')).toHaveCount(10);
   await page.getByRole('button', { name: 'Nova tarefa', exact: true }).click();
   await page.getByLabel('Título', { exact: true }).fill('Publicar pesquisa');
   await page.getByRole('button', { name: 'Criar tarefa', exact: true }).click();
@@ -778,4 +778,148 @@ test('actual OAuth MCP agent write reaches already-open task and agent activity 
     if (cleanupErrors.length && failed) test.info().annotations.push({ type: 'fixture-cleanup', description: cleanupErrors.join(', ') });
   }
   if (cleanupErrors.length) throw new Error('Fixture cleanup failed: ' + cleanupErrors.join(', '));
+});
+test('actual cloud task views follow cursors, keep atomic CAS/claim guards and require saving dirty actions', async ({ page }) => {
+  test.skip(!process.env.TEST_SUPABASE_URL || !process.env.TEST_SUPABASE_SERVICE_ROLE_KEY, 'Requires dedicated local Supabase');
+  test.setTimeout(90000);
+  const { createClient } = await import('@supabase/supabase-js');
+  const base = process.env.TEST_SUPABASE_URL!,
+    key = process.env.TEST_SUPABASE_ANON_KEY!;
+  const service = createClient(base, process.env.TEST_SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } }),
+    human = createClient(base, key, { auth: { persistSession: false, autoRefreshToken: false } }),
+    executor = createClient(base, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const suffix = crypto.randomUUID(),
+    email = `task6b1-${suffix}@example.test`,
+    agentEmail = `task6b1-executor-${suffix}@example.test`,
+    password = `Task6b1-${crypto.randomUUID()}!`,
+    users: string[] = [];
+  let ws = '';
+  const cleanupErrors: string[] = [];
+  try {
+    for (const address of [email, agentEmail]) {
+      const result = await service.auth.admin.createUser({ email: address, password, email_confirm: true });
+      expect(!!result.error).toBe(false);
+      users.push(result.data.user!.id);
+    }
+    expect(!!(await human.auth.signInWithPassword({ email, password })).error).toBe(false);
+    expect(!!(await executor.auth.signInWithPassword({ email: agentEmail, password })).error).toBe(false);
+    const made = await human.rpc('create_workspace_v2', { p_name: 'Task views actual', p_slug: `task6b1-${suffix}`, p_idempotency_key: suffix });
+    expect(!!made.error).toBe(false);
+    ws = made.data.data.id;
+    expect(!!(await service.from('workspace_memberships').insert({ workspace_id: ws, user_id: users[1], role: 'member' })).error).toBe(false);
+    expect(!!(await service.from('agents').insert({ workspace_id: ws, id: 'views-agent', name: 'Views executor', auth_user_id: users[1] })).error).toBe(false);
+    const command = async (operation: string, input: Record<string, unknown>, version?: number, client = human) => {
+      const result = await client.rpc('execute_operation', {
+        p_workspace_id: ws,
+        p_operation: operation,
+        p_command: input,
+        p_expected_version: version ?? null,
+        p_idempotency_key: crypto.randomUUID(),
+      });
+      expect(!!result.error).toBe(false);
+      return result.data.data;
+    };
+    const readTask = async (id: string) => {
+      const result = await human.rpc('read_operation', { p_workspace_id: ws, p_operation: 'get_task', p_query: { id } });
+      expect(!!result.error).toBe(false);
+      return result.data.data;
+    };
+    const project = await command('create_project', { name: 'Task views project' }),
+      second = await command('create_project', { name: 'Destination project' });
+    const commands = Array.from({ length: 102 }, (_, i) => ({
+      operation: 'create_task',
+      input: { id: `views-task-${i}`, projectId: project.id, title: `Cloud task ${String(i).padStart(3, '0')}` },
+    }));
+    await command('batch', { commands: commands.slice(0, 100) });
+    await command('batch', { commands: commands.slice(100) });
+    await page.goto(`/app/w/${ws}/tasks`);
+    await page.getByLabel('E-mail').fill(email);
+    await page.getByLabel('Senha', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await expect(page.getByRole('button', { name: 'Cloud task 101' })).toBeVisible();
+    await page.getByRole('link', { name: 'Table', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Search tasks', exact: true }).fill('Cloud task 10');
+    await page.getByRole('checkbox', { name: 'Select all visible tasks', exact: true }).check();
+    await page.getByRole('combobox', { name: 'Bulk priority', exact: true }).selectOption('high');
+    await expect(page.getByRole('combobox', { name: /Priority:.*$/, exact: false }).first()).toHaveValue('high');
+    let a = await readTask('views-task-100'),
+      b = await readTask('views-task-101');
+    expect(a.priority).toBe('high');
+    expect(b.priority).toBe('high');
+    await command('update_task', { id: a.id, priority: 'low' }, a.version);
+    await page.getByRole('checkbox', { name: 'Select all visible tasks', exact: true }).check();
+    await page.getByRole('combobox', { name: 'Bulk priority', exact: true }).selectOption('urgent');
+    await expect(page.getByRole('alert')).toContainText('Your draft was kept');
+    expect((await readTask(b.id)).priority).toBe('high');
+    await page.getByRole('button', { name: 'Refresh data', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: 'Priority: ' + a.key, exact: true })).toHaveValue('low');
+    await expect(page.getByRole('combobox', { name: 'Bulk priority', exact: true })).toBeEnabled();
+    await page.getByRole('combobox', { name: 'Bulk priority', exact: true }).selectOption('urgent');
+    await expect(page.getByRole('combobox', { name: 'Bulk priority', exact: true })).toHaveCount(0);
+    a = await readTask(a.id);
+    b = await readTask(b.id);
+    expect(a.priority).toBe('urgent');
+    expect(b.priority).toBe('urgent');
+    const lease = await command('claim_task', { id: b.id }, b.version, executor);
+    await page.getByRole('button', { name: 'Refresh data', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: 'Priority: ' + b.key, exact: true })).toBeDisabled();
+    await expect(page.getByText('Views executor', { exact: true })).toBeVisible();
+    await page.getByRole('checkbox', { name: 'Select all visible tasks', exact: true }).check();
+    await page.getByRole('button', { name: 'Archive selected', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('explicitly resume human control');
+    expect((await readTask(a.id)).archived).toBe(false);
+    expect(await page.locator('body').textContent()).not.toContain(lease.claimToken);
+    await page.getByRole('button', { name: 'Cloud task 101' }).click();
+    await page.getByRole('textbox', { name: 'Description', exact: true }).fill('<p>Saved cloud draft</p><img src=x onerror=alert(1)>');
+    await page.getByRole('button', { name: 'Resume human control', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Save changes before this action');
+    await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeFocused();
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Resume human control', exact: true }).click();
+    await page.getByRole('button', { name: 'Confirm resume', exact: true }).click();
+    await expect(page.getByText('No executor agent', { exact: true })).toBeVisible();
+    await page.getByLabel('Due date', { exact: true }).fill('2026-11-20');
+    await page.getByRole('combobox', { name: 'Recurrence', exact: true }).selectOption('Weekly');
+    await page.getByRole('button', { name: 'Complete task', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Save changes before this action');
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Complete task', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
+    await page.reload();
+    await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
+    await expect(page.getByLabel('Due date', { exact: true })).toHaveValue('2026-11-20');
+    await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue('<p>Saved cloud draft</p><img src=x onerror=alert(1)>');
+    await expect(page.locator('.rich-content [onerror]')).toHaveCount(0);
+    await page.getByRole('combobox', { name: 'Destination project', exact: true }).selectOption(second.id);
+    await page.getByRole('button', { name: 'Move task', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: 'Destination project', exact: true })).toHaveValue(second.id);
+    await page.getByRole('button', { name: 'Duplicate task', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('todo');
+    await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue('<p>Saved cloud draft</p><img src=x onerror=alert(1)>');
+    const cloneURL = page.url(),
+      cloneId = new URL(cloneURL).searchParams.get('task')!;
+    await page.getByRole('button', { name: 'Archive task', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toHaveCount(0);
+    expect((await readTask(cloneId)).archived).toBe(true);
+    await page.goto(cloneURL);
+    await page.getByRole('button', { name: 'Restore task', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toHaveCount(0);
+    expect((await readTask(cloneId)).archived).toBe(false);
+    await page.reload();
+    await page.screenshot({ path: '/tmp/task6b1-cloud-table.png', fullPage: true });
+  } finally {
+    if (ws) {
+      const result = await service.from('workspaces').delete().eq('id', ws);
+      if (result.error) cleanupErrors.push('workspace');
+    }
+    for (const id of users) {
+      if ((await service.auth.admin.deleteUser(id)).error) cleanupErrors.push('user');
+    }
+    await human.auth.signOut();
+    await executor.auth.signOut();
+  }
+  if (cleanupErrors.length) throw Error('Fixture cleanup failed: ' + cleanupErrors.join(', '));
 });
