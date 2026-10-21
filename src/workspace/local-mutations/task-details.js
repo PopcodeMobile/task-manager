@@ -1,10 +1,29 @@
 import { RepositoryError } from '../normalized.ts';
-import { patchLocal } from '../local-dto.js';
+import { patchLocal, localFiles } from '../local-dto.js';
 const fail = code => {
   throw new RepositoryError(code);
 };
+/** A duplicate is authored by the validated legacy member, including receipt replay. */
+export function assertFileDuplicationActor(data, operation, result) {
+  if (operation !== 'duplicate_file') return;
+  if (!data.members?.some(member => member.id === data.me) || (result && result.authorUserId !== data.me)) fail('forbidden');
+}
 /** Labels and file metadata share record CAS; their task links use parent CAS. */
 export function mutateTaskDetails({ data, find, cas, bump, dto, initialize }, operation, input) {
+  if (operation === 'duplicate_file') {
+    assertFileDuplicationActor(data, operation);
+    const source = find('file', input.id);
+    cas('file', source);
+    const id = input.newId ?? crypto.randomUUID();
+    if (localFiles(data).some(file => file.id === id)) fail('validation_error');
+    const at = Date.now();
+    const row = { ...structuredClone(source), id, name: input.name ?? source.name.replace(/(\.[^.]+)$/, ' copy$1'), by: data.me, at };
+    for (const alias of ['authorUserId', 'author_user_id']) if (Object.hasOwn(row, alias)) row[alias] = data.me;
+    for (const alias of ['createdAt', 'created_at']) if (Object.hasOwn(row, alias)) row[alias] = new Date(at).toISOString();
+    initialize('file', row);
+    (data.files ??= []).push(row);
+    return dto('file', row);
+  }
   if (/^(set|remove)_task_(label|attachment)$/.test(operation)) {
     const task = find('task', input.id);
     cas('task', task);

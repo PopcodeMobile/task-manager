@@ -1,4 +1,4 @@
--- Current001–005 on real pgmq/Vault; commands run as authenticated, migrations as NOSUPERUSER postgres.
+-- Current001–006 on real pgmq/Vault; commands run as authenticated, migrations as NOSUPERUSER postgres.
 create function pg_temp.ui_assert(ok boolean,message text) returns void language plpgsql as $$begin if ok is distinct from true then raise exception 'TEST005: %',message;end if;end$$;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
 create temp table ui_fixture(w uuid,c uuid,s uuid,a text);
@@ -21,15 +21,23 @@ select pg_temp.ui_assert((public.read_operation(w,'list_tasks')->'items') @> '[{
 select pg_temp.ui_assert((public.read_operation(w,'list_subtasks')->'items') @> '[{"done":false,"legacyMetadata":{"assignee":"unmapped","due":"2026-12-01","note":"keep"}}]','recurrence retains details') from ui_fixture;
 reset role;
 select pg_temp.ui_assert((select count(*) from pgmq.q_webhook_delivery)>0,'fixture must enqueue real pgmq events');
+-- 006 uses the same real transaction, outbox and private invoker boundary.
+insert into public.files(workspace_id,id,project_id,task_id,name,file_type,size_label,legacy_metadata)
+ select w,'source','p1','t1','proof.pdf','pdf','2KB','{"id":"source","name":"proof.pdf","by":"historical","at":1,"custom":{"kept":true}}' from ui_fixture;
+set role authenticated;
+select pg_temp.ui_assert((public.execute_operation(w,'duplicate_file','{"id":"source","newId":"copy"}','ui-file-copy',1)->'data') @> '{"id":"copy","name":"proof copy.pdf","taskId":"t1","projectId":"p1","authorUserId":"00000000-0000-0000-0000-000000000001","legacyMetadata":{"custom":{"kept":true},"by":"00000000-0000-0000-0000-000000000001"}}','006 faithful duplicate') from ui_fixture;
+reset role;
+select pg_temp.ui_assert(not exists(select 1 from public.task_attachments where workspace_id=(select w from ui_fixture) and file_id='copy'),'006 no copied joins');
 -- Snapshot all transactional effects, then force a conflict after a queue-producing child.
 create temp table ui_before as select jsonb_build_object('events',(select count(*) from public.domain_events),'queue',(select count(*) from pgmq.q_webhook_delivery),'deliveries',(select count(*) from public.webhook_deliveries),'keys',(select count(*) from public.idempotency_requests),'limits',(select jsonb_agg(to_jsonb(x) order by actor_user_id,client_id,window_start) from public.operation_rate_limits x),'sequences',(select jsonb_agg(to_jsonb(x) order by workspace_id,project_id) from public.project_task_sequences x)) state;
 set role authenticated;
 do $$begin begin
- perform public.execute_operation((select w from ui_fixture),'batch','{"commands":[{"operation":"create_task","input":{"id":"rollback","projectId":"p1","title":"Rollback"}},{"operation":"update_task","input":{"id":"t1","title":"Conflict"},"expectedVersion":1}]}','ui-rollback');
+ perform public.execute_operation((select w from ui_fixture),'batch','{"commands":[{"operation":"duplicate_file","input":{"id":"source","newId":"rollback-file"},"expectedVersion":1},{"operation":"create_task","input":{"id":"rollback","projectId":"p1","title":"Rollback"}},{"operation":"update_task","input":{"id":"t1","title":"Conflict"},"expectedVersion":1}]}','ui-rollback');
  raise exception 'unexpected commit';exception when sqlstate 'PT409' then null;end;end$$;
 reset role;
 select pg_temp.ui_assert((select state from ui_before)=jsonb_build_object('events',(select count(*) from public.domain_events),'queue',(select count(*) from pgmq.q_webhook_delivery),'deliveries',(select count(*) from public.webhook_deliveries),'keys',(select count(*) from public.idempotency_requests),'limits',(select jsonb_agg(to_jsonb(x) order by actor_user_id,client_id,window_start) from public.operation_rate_limits x),'sequences',(select jsonb_agg(to_jsonb(x) order by workspace_id,project_id) from public.project_task_sequences x)),'batch conflict rolls back events, logged pgmq, ledger, keys, rate counters and numbering');
 select pg_temp.ui_assert(not exists(select 1 from public.tasks where id='rollback'),'batch task rollback');
+select pg_temp.ui_assert(not exists(select 1 from public.files where id='rollback-file'),'006 file rolled back with real outbox batch');
 -- Success and cached replay enqueue once. Server child keys cannot collide with client batch:index keys.
 set role authenticated;
 select public.execute_operation(w,'batch','{"commands":[{"operation":"update_task","input":{"id":"t1","title":"Batch"},"expectedVersion":4},{"operation":"create_task","input":{"id":"promoted","projectId":"p1","title":"Promotion"}},{"operation":"delete_subtask","input":{"id":"s1","taskId":"t1"},"expectedVersion":5}]}','ui-batch') from ui_fixture;
@@ -51,4 +59,4 @@ delete from public.workspaces where id=(select w from ui_fixture);
 delete from public.integration_connections where id=(select c from ui_fixture);
 delete from auth.oauth_consents where client_id=(select c from ui_fixture);
 delete from auth.oauth_clients where id=(select c from ui_fixture);
-select 'PASS005 real authenticated contracts, recurrence, promotion batch, transactional queue rollback/replay';
+select 'PASS005/006 real authenticated contracts, recurrence, promotion batch, transactional queue rollback/replay';

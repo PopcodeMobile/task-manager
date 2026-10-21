@@ -56,6 +56,7 @@ export const commandRules: Record<string, Rule> = {
   update_calendar_event: rule('id projectId taskId title eventDate eventTime', 'id', true),
   delete_calendar_event: rule('id', 'id', true),
   create_file: rule('id projectId taskId name fileType sizeLabel', 'name'),
+  duplicate_file: rule('id newId name', 'id', true),
   update_file: rule('id projectId taskId name fileType sizeLabel', 'id', true),
   delete_file: rule('id', 'id', true),
   set_preferences: rule('preferences', 'preferences'),

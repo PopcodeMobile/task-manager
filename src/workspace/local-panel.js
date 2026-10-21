@@ -6,7 +6,7 @@ import { mutateTask } from './local-mutations/tasks.js';
 import { mutateProject } from './local-mutations/projects.js';
 import { mutateComment, assertCommentReplay } from './local-mutations/comments.js';
 import { mutateSubtask } from './local-mutations/subtasks.js';
-import { mutateTaskDetails } from './local-mutations/task-details.js';
+import { mutateTaskDetails, assertFileDuplicationActor } from './local-mutations/task-details.js';
 import { mutateDependency } from './local-mutations/dependencies.js';
 /** @param {string} code @returns {never} */
 const fail = code => {
@@ -266,8 +266,14 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
               if (previous.signature !== signature) fail('idempotency_conflict');
               if (operation === 'batch' && Array.isArray(command.input.commands)) {
                 const cached = /** @type {{results?: {data: unknown}[]}} */ (previous.result.data);
-                command.input.commands.forEach((child, index) => assertCommentReplay(data, child.operation, cached.results?.[index]?.data));
-              } else assertCommentReplay(data, operation, previous.result.data);
+                command.input.commands.forEach((child, index) => {
+                  assertCommentReplay(data, child.operation, cached.results?.[index]?.data);
+                  assertFileDuplicationActor(data, child.operation, cached.results?.[index]?.data);
+                });
+              } else {
+                assertCommentReplay(data, operation, previous.result.data);
+                assertFileDuplicationActor(data, operation, previous.result.data);
+              }
               return { changed: false, value: previous.result };
             }
             if (!command.idempotencyKey) fail('validation_error');
@@ -306,7 +312,7 @@ function appendEvent(data, operation, input, result) {
   events.push({
     id,
     operation,
-    entityId: input.id ?? input.taskId ?? null,
+    entityId: operation === 'duplicate_file' ? result.id : (input.id ?? input.taskId ?? null),
     actorUserId: data.me,
     actorAgentId: null,
     createdAt,
@@ -375,7 +381,7 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
   if (['add_task_comment', 'delete_comment', 'add_reaction', 'remove_reaction'].includes(operation)) return mutateComment(context, operation, input);
   if (['create_subtask', 'update_subtask', 'delete_subtask'].includes(operation)) return mutateSubtask(context, operation, input);
   if (operation === 'set_task_dependency' || operation === 'remove_task_dependency') return mutateDependency(context, operation, input);
-  if (/^(set|remove)_task_(label|attachment)$/.test(operation) || /^(create|update|delete)_(label|file)$/.test(operation))
+  if (operation === 'duplicate_file' || /^(set|remove)_task_(label|attachment)$/.test(operation) || /^(create|update|delete)_(label|file)$/.test(operation))
     return mutateTaskDetails(context, operation, input);
   fail('validation_error');
 }
@@ -445,7 +451,7 @@ function validateLocalInput(data, operation, input) {
       continue;
     }
     if (
-      ['id', 'projectId', 'taskId', 'dependsOnTaskId', 'teamId', 'labelId', 'fileId', 'commentId'].includes(key) &&
+      ['id', 'newId', 'projectId', 'taskId', 'dependsOnTaskId', 'teamId', 'labelId', 'fileId', 'commentId'].includes(key) &&
       (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value))
     )
       fail('validation_error');

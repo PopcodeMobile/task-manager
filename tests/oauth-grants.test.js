@@ -20,6 +20,7 @@ async function setup() {
   assert.ok(migration, 'OAuth grants migration must exist');
   await db.exec(migration);
   await db.exec(await readFile('supabase/migrations/202610200005_ui_contracts.sql', 'utf8'));
+  await db.exec(await readFile('supabase/migrations/202610200006_file_duplication.sql', 'utf8'));
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [uid]);
   const w = (
     await db.query(
@@ -257,6 +258,38 @@ test('duplicate workspace selection returns a safe direct RPC validation error b
       e => e.code === 'PT422' && e.message === 'validation_error' && !e.detail,
     );
     assert.equal((await db.query('select count(*) n from public.integration_connections')).rows[0].n, 0);
+  } finally {
+    await db.close();
+  }
+});
+
+test('006 OAuth file duplication retains write-grant/agent ownership gates and revocation before replay', async () => {
+  const { db, w } = await setup();
+  try {
+    await db.query(
+      "insert into public.files(workspace_id,id,project_id,task_id,name) values($1,'owned','p1','t1','owned.pdf'),($1,'free','p1',null,'free.pdf')",
+      [w],
+    );
+    const c = await prepare(db, w, 'write');
+    await activate(db);
+    await delegated(db);
+    await db.exec('set role authenticated');
+    await denied(db.query("select public.execute_operation($1,'duplicate_file','{\"id\":\"owned\"}','owned-copy',1)", [w]));
+    const result = (await db.query("select public.execute_operation($1,'duplicate_file','{\"id\":\"free\"}','free-copy',1) data", [w])).rows[0].data;
+    assert.equal(result.data.authorUserId, uid);
+    await db.exec('reset role');
+    assert.equal(
+      (await db.query('select actor_connection_id from public.domain_events where id=$1', [result.eventId])).rows[0].actor_connection_id,
+      c.connectionId,
+    );
+    await db.query("update public.integration_grants set capability='read' where connection_id=$1", [c.connectionId]);
+    await db.exec('set role authenticated');
+    await denied(db.query("select public.execute_operation($1,'duplicate_file','{\"id\":\"free\"}','free-copy',1)", [w]));
+    await db.exec('reset role');
+    await db.query("update public.integration_grants set capability='write' where connection_id=$1", [c.connectionId]);
+    await db.query("update public.integration_connections set status='revoked' where id=$1", [c.connectionId]);
+    await db.exec('set role authenticated');
+    await denied(db.query("select public.execute_operation($1,'duplicate_file','{\"id\":\"free\"}','free-copy',1)", [w]));
   } finally {
     await db.close();
   }

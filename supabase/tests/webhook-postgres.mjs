@@ -84,6 +84,7 @@ try {
   const webhookMigration = await readFile('supabase/migrations/202610200004_webhook_delivery.sql', 'utf8');
   sql(webhookMigration, 'postgres');
   sql(await readFile('supabase/migrations/202610200005_ui_contracts.sql', 'utf8'), 'postgres');
+  sql(await readFile('supabase/migrations/202610200006_file_duplication.sql', 'utf8'), 'postgres');
   assert.equal(sql(vendorAclQuery).trim(), vendorAcl, 'application migration must preserve all vendor Vault function owners and ACLs');
   console.log(sql(await readFile('supabase/tests/webhook-acl.sql', 'utf8')));
   const { auditWebhookApiSurface, verifyWebhookApiBoundary } = await import('./webhook-api-boundary.mjs');

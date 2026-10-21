@@ -65,6 +65,7 @@ export type FileMetadata = VersionedEntity & {
   name: string;
   fileType: string;
   sizeLabel: string | null;
+  createdAt: string;
   authorUserId: string | null;
   legacyMetadata: LegacyMetadata;
 };

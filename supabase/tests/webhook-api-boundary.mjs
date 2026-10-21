@@ -48,12 +48,24 @@ export function auditWebhookApiSurface({ sql, exposedSchemas, extraSearchPath })
       );
       assert.match(source, /c.workspace_id=\(p_row->>'workspace_id'\)::uuid and c.task_id=p_row->>'id'/);
     }
-    if (['operation_capability', 'operation_batch_allowed'].includes(object.name)) {
+    if (
+      [
+        'operation_capability',
+        'operation_batch_allowed',
+        'operation_validate',
+        'operation_validate_before_file_duplication',
+        'operation_graph',
+        'operation_graph_before_file_duplication',
+      ].includes(object.name)
+    ) {
       assert.equal(object.definer || object.anon || object.authenticated, false, 'batch capability helpers must remain private invokers');
     }
     if (/\bexecute\s+/.test(source)) {
       // These reviewed domain dispatchers interpolate only fixed allowlisted entity tables/columns.
-      assert.ok(['operation_graph', 'read_operation'].includes(object.name), `unreviewed dynamic SQL: ${object.name}`);
+      assert.ok(
+        ['operation_graph', 'operation_graph_before_file_duplication', 'read_operation'].includes(object.name),
+        `unreviewed dynamic SQL: ${object.name}`,
+      );
     }
     for (const child of objects) {
       const reference = new RegExp(`\\b(?:public\\.)?${child.name}\\s*\\(|\\b(?:from|join)\\s+(?:public\\.)?${child.name}\\b`);
@@ -122,6 +134,18 @@ export async function verifyWebhookApiBoundary({ base, signToken, productionSurf
       await denied(`/rpc/${alias}`, headers, {}, 'PGRST202');
     }
     for (const [name, body] of [
+      ['operation_validate', { p_operation: 'duplicate_file', p_input: { id: 'source' } }],
+      ['operation_validate_before_file_duplication', { p_operation: 'create_file', p_input: { name: 'forged' } }],
+      ...['operation_graph', 'operation_graph_before_file_duplication'].map(name => [
+        name,
+        {
+          p_workspace: '00000000-0000-0000-0000-000000000000',
+          p_operation: 'duplicate_file',
+          p_input: { id: 'source' },
+          p_expected: 1,
+          p_actor: { userId: '00000000-0000-0000-0000-000000000001' },
+        },
+      ]),
       ['claim_webhook_batch', {}],
       ['webhook_delivery_secret', { p_delivery_id: '00000000-0000-0000-0000-000000000000', p_lease_token: '00000000-0000-0000-0000-000000000000' }],
       [

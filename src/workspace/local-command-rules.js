@@ -29,6 +29,7 @@ export const localCommandRules = {
   update_label: rule('id name', 'id'),
   delete_label: rule('id', 'id'),
   create_file: rule('id projectId taskId name fileType sizeLabel', 'name'),
+  duplicate_file: rule('id newId name', 'id'),
   update_file: rule('id projectId taskId name fileType sizeLabel', 'id'),
   delete_file: rule('id', 'id'),
   create_project: rule(`id ${projectFields}`, 'name'),

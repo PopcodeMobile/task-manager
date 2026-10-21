@@ -16,6 +16,7 @@ async function setup() {
     await db.exec(await readFile(file, 'utf8'));
   await db.exec(migration);
   await db.exec(await readFile('supabase/migrations/202610200005_ui_contracts.sql', 'utf8'));
+  await db.exec(await readFile('supabase/migrations/202610200006_file_duplication.sql', 'utf8'));
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [owner]);
   const ws = (
     await db.query(

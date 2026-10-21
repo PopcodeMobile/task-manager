@@ -49,6 +49,7 @@ export function localDTO(data, workspaceId, kind, row) {
       name: row.name,
       fileType: row.type,
       sizeLabel: row.size ?? null,
+      createdAt: iso(row.at) ?? '',
       authorUserId: row.by ?? null,
     };
   if (kind === 'calendar_event')
