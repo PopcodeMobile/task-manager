@@ -1,0 +1,6 @@
+Check supabase/functions/tests/webhook-transport.test.ts
+running 2 tests from ./supabase/functions/tests/webhook-transport.test.ts
+pinned standard transport: fragmented/chunked/interim, redirect, invalid TLS and bounded parser ... ok (258ms)
+whole operation timeout stops slow DNS before socket creation ... ok (54ms)
+
+ok | 2 passed | 0 failed (316ms)

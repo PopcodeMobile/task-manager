@@ -18,16 +18,5 @@
     },
     "allowJs": true
   },
-  "include": [
-    "src/app",
-    "src/components",
-    "src/domain",
-    "playwright.oauth.config.ts",
-    "tests/browser/oauth-consent.spec.ts",
-    "src/workspace/normalized.ts",
-    "playwright.agent.config.ts",
-    "tests/browser/agent-panel.spec.ts",
-    "playwright.local.config.ts",
-    "tests/browser/local-panel.spec.ts"
-  ]
+  "include": ["src/app", "src/components", "src/domain", "src/workspace/**/*.ts", "playwright.*.config.ts", "tests/browser/**/*.ts"]
 }

@@ -1,0 +1,15 @@
+Equivalent AST: supabase/functions/tests/team-membership-baselines.test.ts
+Equivalent AST: scripts/setup-webhooks.ts
+Equivalent AST: supabase/functions/_shared/webhook-delivery.ts
+Equivalent AST: supabase/functions/_shared/webhook-signing.ts
+Equivalent AST: supabase/functions/_shared/webhook-targets.ts
+Equivalent AST: supabase/functions/deno.json
+Equivalent AST: supabase/functions/mcp/index.ts
+Equivalent AST: supabase/functions/mcp/tools.ts
+Equivalent AST: supabase/functions/tests/oauth.test.ts
+Equivalent AST: supabase/functions/tests/webhook-delivery.test.ts
+Equivalent AST: supabase/functions/tests/webhook-transport.test.ts
+Equivalent AST: supabase/functions/webhook-dispatch/index.ts
+Equivalent AST: supabase/tests/webhook-dispatch-live.ts
+Equivalent AST: supabase/tests/webhook-edge/main.ts
+Equivalent AST: supabase/tests/webhook-edge/probe.ts

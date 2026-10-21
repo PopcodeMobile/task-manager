@@ -1,50 +1,69 @@
 import { test, expect } from '@playwright/test';
-import fs from 'node:fs';
+import { createClient } from '@supabase/supabase-js';
 
-test('cloud session authenticates, edits its tenant, persists and signs out without cached workspace data', async ({ page }) => {
-  test.skip(!process.env.SUPABASE_E2E_USER_FILE, 'Requires the separately started local Supabase stack and test account.');
-  const user = JSON.parse(fs.readFileSync(process.env.SUPABASE_E2E_USER_FILE, 'utf8'));
-  const failures = [];
-  page.on('pageerror', error => failures.push(error.message));
-  await page.goto(process.env.SUPABASE_E2E_APP_URL || 'http://127.0.0.1:5174');
-  await page.locator('#l-email').fill(user.email);
-  await page.locator('#l-pw').fill(user.password);
-  await page.locator('form[data-submit="doLogin"] button[type="submit"]').click();
-  await expect(page.locator('.shell')).toBeVisible();
-  await expect(page.locator('.workspace-status')).toContainText('nuvem');
-  await page.locator('[data-pop="ws"]').click();
-  await page.locator('[data-a="newWorkspace"]').click();
-  await page.locator('#workspace-name').fill('Árvore de teste ' + Date.now());
-  await page.locator('form[data-submit="createWorkspace"] button[type="submit"]').click();
-  await expect(page.locator('.shell')).toBeVisible();
-  expect(await page.evaluate(() => window.__gr8r.D().tasks.length)).toBe(0);
-  await page.locator('[data-a="newProject"]').first().click();
-  await page.locator('#p-name').fill('Cloud project');
-  await page.locator('[data-a="submitProject"]').click();
-  await expect.poll(() => page.evaluate(() => window.__gr8r.S.sync.status)).toBe('saved');
-  await page.locator('.tab[data-tab="board"]').click();
-  await page.locator('[data-a="newTask"]').first().click();
-  await page.locator('#f-title').fill('Cloud browser task');
-  await page.locator('[data-a="submitTask"]').click();
-  await expect.poll(() => page.evaluate(() => window.__gr8r.S.sync.status)).toBe('saved');
-  await page.reload();
-  await expect(page.locator('.shell')).toBeVisible();
-  expect(await page.evaluate(() => window.__gr8r.D().tasks.some(task => task.title === 'Cloud browser task'))).toBe(true);
-  await page.locator('[data-pop="ws"]').click();
-  await page.locator('[data-a="signOut"]').click();
-  await expect(page.locator('#l-email')).toBeVisible();
-  expect(await page.evaluate(() => window.__gr8r.D().tasks.length)).toBe(0);
-  await page.reload();
-  await expect(page.locator('#l-email')).toBeVisible();
-  expect(failures).toEqual([]);
-});
-
-test('cloud login remembers the chosen language before authentication', async ({ page }) => {
-  test.skip(!process.env.SUPABASE_E2E_USER_FILE, 'Requires the separately started local Supabase stack.');
-  await page.goto(process.env.SUPABASE_E2E_APP_URL || 'http://127.0.0.1:5174');
-  await page.locator('#auth-language').selectOption('en');
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await page.reload();
-  await expect(page.locator('#l-email')).toBeVisible();
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+test.describe('final-entry live cloud lifecycle', () => {
+  test.skip(!process.env.TEST_SUPABASE_SERVICE_ROLE_KEY, 'Requires private dedicated local Auth/DB credentials.');
+  let service, userId, email, password;
+  const workspaces = [];
+  test.beforeAll(async () => {
+    service = createClient(process.env.TEST_SUPABASE_URL, process.env.TEST_SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    email = `cutover-${crypto.randomUUID()}@example.test`;
+    password = crypto.randomUUID() + 'Aa1!';
+    const result = await service.auth.admin.createUser({ email, password, email_confirm: true });
+    expect(result.error).toBeNull();
+    userId = result.data.user.id;
+  });
+  test.afterAll(async () => {
+    // Capture only workspaces owned by this unique fixture, including partial failed flows.
+    if (userId) {
+      const owned = await service.from('workspace_memberships').select('workspace_id').eq('user_id', userId).eq('role', 'owner');
+      expect(owned.error).toBeNull();
+      for (const row of owned.data) workspaces.push(row.workspace_id);
+      for (const id of new Set(workspaces)) expect((await service.from('workspaces').delete().eq('id', id)).error).toBeNull();
+      expect((await service.auth.admin.deleteUser(userId)).error).toBeNull();
+    }
+  });
+  test('root login creates isolated tenant project and task then logout clears rendered tenant', async ({ page }) => {
+    const failures = [];
+    page.on('pageerror', error => failures.push(error.message));
+    await page.goto('/');
+    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await page.getByLabel('Email', { exact: true }).fill(email);
+    await page.getByLabel('Password', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await page.getByLabel('Workspace name').fill('Árvore de teste');
+    await page.getByRole('button', { name: 'Create workspace', exact: true }).click();
+    await expect(page.locator('.work-status')).toContainText(/Cloud|Saved/);
+    await page.getByRole('link', { name: 'Tasks', exact: true }).click();
+    await expect(page.getByText('No tasks here yet')).toBeVisible();
+    await page.getByRole('link', { name: 'Projects', exact: true }).click();
+    await page.getByRole('button', { name: 'New project', exact: true }).click();
+    await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Cloud project');
+    await page.getByRole('button', { name: 'Save project', exact: true }).click();
+    await page.locator('.project-tabs').getByRole('link', { name: 'Board', exact: true }).click();
+    await page.getByRole('button', { name: 'New task', exact: true }).click();
+    await page.getByLabel('Title', { exact: true }).fill('Cloud browser task');
+    await page.getByRole('button', { name: 'Create task', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Cloud browser task');
+    await page.reload();
+    await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Cloud browser task');
+    await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+    await expect(page.getByText('Cloud browser task', { exact: true })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+    await expect(page.getByText('Cloud browser task', { exact: true })).toHaveCount(0);
+    expect(failures).toEqual([]);
+  });
+  test('pre-auth language survives root document reload', async ({ page }) => {
+    await page.goto('/');
+    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
+  });
 });

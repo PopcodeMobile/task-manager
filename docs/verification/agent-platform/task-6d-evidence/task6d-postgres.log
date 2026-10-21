@@ -1,0 +1,496 @@
+CREATE ROLE
+CREATE ROLE
+CREATE SCHEMA
+CREATE TABLE
+CREATE FUNCTION
+GRANT
+GRANT
+INSERT 0 3
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE POLICY
+CREATE POLICY
+CREATE POLICY
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000001
+(1 row)
+
+SET
+              set_config
+--------------------------------------
+ f04a8cf7-af69-472c-8b70-4c1923c1f897
+(1 row)
+
+DO
+ save_workspace_snapshot
+-------------------------
+                       1
+(1 row)
+
+DO
+RESET
+INSERT 0 1
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000002
+(1 row)
+
+SET
+DO
+RESET
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000003
+(1 row)
+
+SET
+DO
+RESET
+SET
+DO
+RESET
+                                   result
+----------------------------------------------------------------------------
+ RLS, guest permissions, role protection and CAS passed on PostgreSQL 17.11
+(1 row)
+
+ALTER TABLE
+CREATE FUNCTION
+ALTER TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+ALTER FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TABLE
+ALTER TABLE
+REVOKE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+ALTER TABLE
+REVOKE
+GRANT
+CREATE POLICY
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE TRIGGER
+ALTER FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+INSERT 0 2
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000001
+(1 row)
+
+SET
+              set_config
+--------------------------------------
+ edfa7b55-69ce-40d9-aeb9-a2a0281300f6
+(1 row)
+
+RESET
+INSERT 0 3
+INSERT 0 1
+SET
+                                                                                                                                    migrate_workspace
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"counts": {"files": 0, "tasks": 1, "teams": 0, "events": 0, "notifs": 1, "activity": 0, "comments": 0, "projects": 1, "savedViews": 0}, "personalState": "snapshot_retained", "sourceRevision": 0, "unresolvedUsers": [], "personalStateOwner": "00000000-0000-0000-0000-000000000001"}
+(1 row)
+
+                                                                                                                                    migrate_workspace
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"counts": {"files": 0, "tasks": 1, "teams": 0, "events": 0, "notifs": 1, "activity": 0, "comments": 0, "projects": 1, "savedViews": 0}, "personalState": "snapshot_retained", "sourceRevision": 0, "unresolvedUsers": [], "personalStateOwner": "00000000-0000-0000-0000-000000000001"}
+(1 row)
+
+DO
+            set_config
+----------------------------------
+ {"client_id":"ungranted-client"}
+(1 row)
+
+DO
+ set_config
+------------
+ {}
+(1 row)
+
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000002
+(1 row)
+
+DO
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000004
+(1 row)
+
+DO
+RESET
+DELETE 1
+SET
+DO
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000003
+(1 row)
+
+              set_config
+--------------------------------------
+ 178b0131-fe2b-4d2f-805a-74a5dd537990
+(1 row)
+
+                                                                                                                   migrate_workspace
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"counts": {"files": 0, "tasks": 1, "teams": 0, "events": 0, "notifs": 0, "activity": 0, "comments": 0, "projects": 2, "savedViews": 0}, "personalState": "snapshot_retained", "sourceRevision": 0, "unresolvedUsers": [], "personalStateOwner": null}
+(1 row)
+
+DO
+RESET
+DO
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000001
+(1 row)
+
+SET
+              set_config
+--------------------------------------
+ 35714df3-45d7-4eb7-a447-28c6e3087df9
+(1 row)
+
+DO
+RESET
+INSERT 0 1
+UPDATE 1
+DELETE 1
+DO
+SET
+DO
+RESET
+SET
+DO
+RESET
+                                                                   result
+--------------------------------------------------------------------------------------------------------------------------------------------
+ Normalized migration, ownership, membership, guest, outsider, revocation, OAuth fail-closed, FKs and frozen CAS passed on PostgreSQL 17.11
+(1 row)
+
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+CREATE FUNCTION
+REVOKE
+ALTER FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+ALTER FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+ALTER FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+ALTER FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000001
+(1 row)
+
+CREATE TABLE
+INSERT 0 1
+                                                                                                                   migrate_workspace
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"counts": {"files": 0, "tasks": 1, "teams": 0, "events": 0, "notifs": 0, "activity": 0, "comments": 0, "projects": 1, "savedViews": 0}, "personalState": "snapshot_retained", "sourceRevision": 0, "unresolvedUsers": [], "personalStateOwner": null}
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+GRANT
+CREATE FUNCTION
+SET
+ test_operation_denied
+-----------------------
+
+(1 row)
+
+ test_operation_denied
+-----------------------
+
+(1 row)
+
+ test_operation_denied
+-----------------------
+
+(1 row)
+
+ test_operation_denied
+-----------------------
+
+(1 row)
+
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000002
+(1 row)
+
+ test_operation_denied
+-----------------------
+
+(1 row)
+
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000001
+(1 row)
+
+        set_config
+---------------------------
+ {"client_id":"ungranted"}
+(1 row)
+
+ test_operation_denied
+-----------------------
+
+(1 row)
+
+ set_config
+------------
+ {}
+(1 row)
+
+RESET
+BEGIN
+SELECT 1
+                                                                                                                   migrate_workspace
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"counts": {"files": 0, "tasks": 2, "teams": 0, "events": 0, "notifs": 0, "activity": 0, "comments": 0, "projects": 2, "savedViews": 0}, "personalState": "snapshot_retained", "sourceRevision": 0, "unresolvedUsers": [], "personalStateOwner": null}
+(1 row)
+
+GRANT
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+SET
+DO
+RESET
+SELECT 1
+UPDATE 1
+SET
+DO
+RESET
+DO
+ROLLBACK
+DO
+Agent authorization, real concurrent claims, idempotency and project sequences passed on PostgreSQL.

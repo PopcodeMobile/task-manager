@@ -1,13 +1,10 @@
 /** Real PostgREST -> real pgmq/Vault -> dispatcher -> HTTP receiver, isolated database only. */
 import { assert, assertEquals, assertRejects } from '@std/assert';
-import {
-  databaseDeliveryStore,
-  type DeliveryStore,
-  dispatchWebhookBatch,
-} from '../functions/_shared/webhook-delivery.ts';
+import { databaseDeliveryStore, type DeliveryStore, dispatchWebhookBatch } from '../functions/_shared/webhook-delivery.ts';
 import { createWebhookHandler } from '../functions/webhook-dispatch/index.ts';
 import { signHermesWebhook } from '../functions/_shared/webhook-signing.ts';
-const url = Deno.env.get('TEST_WEBHOOK_RPC_URL')!, token = Deno.env.get('TEST_WEBHOOK_SERVICE_TOKEN')!;
+const url = Deno.env.get('TEST_WEBHOOK_RPC_URL')!,
+  token = Deno.env.get('TEST_WEBHOOK_SERVICE_TOKEN')!;
 async function rpc(name: string, parameters: Record<string, unknown> = {}) {
   const response = await fetch(`${url}/rpc/${name}`, {
     method: 'POST',
@@ -17,13 +14,12 @@ async function rpc(name: string, parameters: Record<string, unknown> = {}) {
   assert(response.ok, `fixture RPC ${name} failed (${response.status})`);
   return response.status === 204 ? null : response.json();
 }
-const proxy = Deno.serve(
-  { hostname: '127.0.0.1', port: 0, onListen() {} },
-  (request) => fetch(new Request(url + new URL(request.url).pathname.replace(/^\/rest\/v1/, ''), request)),
+const proxy = Deno.serve({ hostname: '127.0.0.1', port: 0, onListen() {} }, request =>
+  fetch(new Request(url + new URL(request.url).pathname.replace(/^\/rest\/v1/, ''), request)),
 );
 const deliveries: { eventId: string; body: string; signature: string | null; timestamp: string | null }[] = [];
 let effects = 0;
-const receiver = Deno.serve({ hostname: '127.0.0.1', port: 0, onListen() {} }, async (request) => {
+const receiver = Deno.serve({ hostname: '127.0.0.1', port: 0, onListen() {} }, async request => {
   const body = await request.text(),
     timestamp = request.headers.get('X-Webhook-Timestamp'),
     signature = request.headers.get('X-Webhook-Signature-V2'),
@@ -82,10 +78,13 @@ try {
   await rpc('test_advance_webhook');
   now += 60000;
   await assertRejects(() =>
-    dispatchWebhookBatch({
-      ...store,
-      complete: () => Promise.reject(new Error('simulated crash after HTTP200 before acknowledgement')),
-    }, options)
+    dispatchWebhookBatch(
+      {
+        ...store,
+        complete: () => Promise.reject(new Error('simulated crash after HTTP200 before acknowledgement')),
+      },
+      options,
+    ),
   );
   assertEquals((await store.claim()).length, 0, 'lost acknowledgement leaves durable live lease');
   await rpc('test_advance_webhook');
@@ -101,9 +100,8 @@ try {
   assertEquals(effects, 1);
   let calls = 0;
   const handler = createWebhookHandler({ workerSecret: 'scheduler-fixture-'.repeat(3), store: () => store });
-  const worker = Deno.serve(
-    { hostname: '0.0.0.0', port: 0, onListen() {} },
-    (request) => ++calls === 1 ? new Response('fixture wakeup loss', { status: 503 }) : handler(request),
+  const worker = Deno.serve({ hostname: '0.0.0.0', port: 0, onListen() {} }, request =>
+    ++calls === 1 ? new Response('fixture wakeup loss', { status: 503 }) : handler(request),
   );
   try {
     await rpc('test_prepare_scheduler', {
@@ -113,12 +111,9 @@ try {
     for (let i = 0; i < 100; i++) {
       proof = await rpc('test_scheduler_result');
       if (proof?.missed && proof.recovered && proof.failedTarget && proof.runs >= 2) break;
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
-    assert(
-      proof?.missed && proof.recovered && proof.failedTarget && proof.runs >= 2,
-      'actual Cron/pg_net authenticated wakeup did not recover',
-    );
+    assert(proof?.missed && proof.recovered && proof.failedTarget && proof.runs >= 2, 'actual Cron/pg_net authenticated wakeup did not recover');
     console.log(
       'PASS actual Cron -> pg_net -> dedicated-secret production handler -> service RPC queue claim; first wakeup503, later200; private target fails closed.',
     );

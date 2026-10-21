@@ -1,0 +1,51 @@
+Check supabase/functions/tests/api.test.ts
+Check supabase/functions/tests/file-duplication.test.ts
+Check supabase/functions/tests/integration.test.ts
+Check supabase/functions/tests/mcp.test.ts
+Check supabase/functions/tests/oauth.test.ts
+Check supabase/functions/tests/operations.test.ts
+Check supabase/functions/tests/task-graph-copy.test.ts
+Check supabase/functions/tests/team-membership-baselines.test.ts
+Check supabase/functions/tests/webhook-delivery.test.ts
+Check supabase/functions/tests/webhook-transport.test.ts
+running 5 tests from ./supabase/functions/tests/api.test.ts
+API rejects missing tokens with safe request-correlated errors ... ok (7ms)
+API rejects unrecognized operations and spoofed identity before dispatch ... ok (428µs)
+input schemas reject unsafe shapes, missing CAS and unbounded lists ... ok (426µs)
+preflight grants CORS only to explicitly configured origins ... ok (338µs)
+005 panel command schemas accept clearable details and bounded atomic batches ... ok (1ms)
+running 2 tests from ./supabase/functions/tests/file-duplication.test.ts
+strict shared duplicate command permits only source/new ID/name and requires source CAS, including batch ... ok (1ms)
+duplicate IDs accept punctuation and preserve UTF-16/nonblank boundaries for source, target and batch ... ok (1ms)
+running 1 test from ./supabase/functions/tests/integration.test.ts
+real local Auth and PostgREST exercise HTTP commands, CAS, replay, tampered JWT and membership revocation ... ok (365ms)
+running 2 tests from ./supabase/functions/tests/mcp.test.ts
+MCP discovery is public while tool transport requires delegated OAuth ... ok (129ms)
+Edge discovery advertises the public forwarded origin, never Docker-internal URLs ... ok (402µs)
+running 1 test from ./supabase/functions/tests/oauth.test.ts
+real local OAuth PKCE isolates two users, grants, MCP transport, refresh and immediate revocation ... ok (932ms)
+running 5 tests from ./supabase/functions/tests/operations.test.ts
+authentication never accepts unsigned decoded identity ... ok (4ms)
+commands cannot be executed using a constructed Actor ... ok (934µs)
+SQL/internal errors are mapped to stable safe errors ... ok (214µs)
+authentication rejects malformed Bearer credentials before contacting Auth ... ok (525µs)
+public error responses never leak underlying details ... ok (1ms)
+running 1 test from ./supabase/functions/tests/task-graph-copy.test.ts
+task graph command is strict, versioned, bounded, exact-ID and batch eligible ... ok (2ms)
+running 1 test from ./supabase/functions/tests/team-membership-baselines.test.ts
+team baseline shared validation accepts exact sets, enforces shape and preserves bounded batch ... ok (1ms)
+running 9 tests from ./supabase/functions/tests/webhook-delivery.test.ts
+Generic V2 signs exact timestamp dot raw bytes with SHA256 hex ... ok (922µs)
+targets reject special addresses, metadata, mixed DNS and URL tricks ... ok (1ms)
+bounded retries honor Retry-After integers and HTTP dates without trusting response text ... ok (256µs)
+HTTP receiver validates HMAC, stable IDs, renewed signature, 503 then 200 ... ok (6ms)
+timeout after receiver acceptance replays one consumer effect and missing secret fails safely ... ok (24ms)
+redirect and blocked target never succeed, eighth failure is terminal ... ok (341µs)
+worker rejects public keys, user JWTs, missing/wrong secrets before store access ... ok (716µs)
+DNS timeout or empty answers persist retry classification while prohibited answers remain terminal ... ok (335µs)
+default A/AAAA resolver preserves transient failures and prioritizes proven prohibited addresses ... ok (407µs)
+running 2 tests from ./supabase/functions/tests/webhook-transport.test.ts
+pinned standard transport: fragmented/chunked/interim, redirect, invalid TLS and bounded parser ... ignored (0ms)
+whole operation timeout stops slow DNS before socket creation ... ok (57ms)
+
+ok | 28 passed | 0 failed | 1 ignored (2s)

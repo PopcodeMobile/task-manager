@@ -1,0 +1,269 @@
+
+> gr8r-studio@1.0.0 check
+> npm run lint && npm run typecheck && npm run format:check && npm test && npm run check:tokens && npm run build
+
+
+> gr8r-studio@1.0.0 lint
+> eslint .
+
+
+> gr8r-studio@1.0.0 typecheck
+> tsc --noEmit
+
+
+> gr8r-studio@1.0.0 format:check
+> prettier --check .
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> gr8r-studio@1.0.0 test
+> node --test tests/*.test.js tests/*.test.mjs
+
+✔ claims fence edits, takeover, stale completion and human intervention with CAS (3287.644167ms)
+✔ idempotency authenticates before replay, binds payload and retains immutable audit (1048.205625ms)
+✔ versioning, project sequences, recurrence, graph references and direct RPC authorization (893.127375ms)
+✔ read APIs omit legacy workspace data, isolate preferences and enforce bounded pages (1031.096542ms)
+✔ graph commands mutate typed entities with CAS and preserve whitelisted ancillary fields (879.955042ms)
+✔ event failure rolls back mutation, generated recurrence and idempotency atomically (676.301ms)
+✔ SQL limits successful activity persistently and keeps claim tokens private (655.542417ms)
+✔ human workspace discovery includes safe legacy candidates and OAuth remains closed (636.652583ms)
+✔ attachments and labels cannot let an agent alter unrelated reserved tasks (676.962791ms)
+✔ direct RPCs validate personal-state schemas and paginate immutable workspace activity (612.926291ms)
+✔ authenticated project deletion succeeds for empty/internal graphs and rejects an active descendant claim (641.981667ms)
+✔ authenticated task/intervention/project deletion cannot cascade into another executor task (632.562583ms)
+✔ shared files and labels require explicit parent-CAS unlink before cascading deletion (614.131459ms)
+✔ local duplication preserves canonical ownership/unknown metadata and reload (false/false) (15.288209ms)
+✔ local duplication preserves canonical ownership/unknown metadata and reload (true/false) (5.434375ms)
+✔ local duplication preserves canonical ownership/unknown metadata and reload (true/true) (22.116958ms)
+✔ local duplicate conflicts, batches, generated IDs and actor validation are atomic (11.695208ms)
+✔ SQL duplicate preserves source/joins and trusted metadata, replay/CAS/ID conflicts, atomic batch and private ACLs (3343.933917ms)
+✔ SQL duplicate keeps tenant, current membership and bound-agent ownership/attachment restrictions (1085.465208ms)
+✔ extensionless, dotfile and trailing-dot names follow legacy default exactly on local and SQL (869.452625ms)
+✔ local historical files without a date read honestly without materializing storage (3.384334ms)
+✔ duplicate id accepts cloud-compatible strings and rejects matching boundaries locally/SQL (1013.211125ms)
+✔ duplicate newId accepts cloud-compatible strings and rejects matching boundaries locally/SQL (862.072208ms)
+✔ punctuated duplicate IDs compose atomically in local/SQL batches without normalizing strings (708.50375ms)
+✔ SQL duplicate ID validator matches UTF-16 length and ECMAScript whitespace boundaries (669.21175ms)
+✔ explicit file deletion atomically unlinks every surviving consumer using parent CAS (1.035792ms)
+✔ file filtering keeps literal metadata, project scope and historical dates honest (5.458292ms)
+✔ every explicit UI translation has a Portuguese and English catalog entry (131.233375ms)
+✔ translated display labels never replace canonical domain IDs (87.273667ms)
+✔ translated messages retain all interpolation fields (1.1335ms)
+✔ i18n exists and defaults to Brazilian Portuguese (20.250959ms)
+✔ locale normalization migrates English preferences and rejects unsupported locales (0.579ms)
+✔ switching language updates labels and preserves interpolated content (0.443792ms)
+✔ counts select grammatical forms in both locales (4.457083ms)
+✔ dates, relative time and numeric values follow the active locale (21.728833ms)
+✔ legacy inspection inventories nested records without silently dropping unknown fields (45.395666ms)
+✔ legacy inspection reports duplicate identities, orphan relations and invalid enums (0.245875ms)
+✔ legacy inspection keeps fictitious people unresolved and rejects malformed nested containers (0.170583ms)
+✔ legacy inspection validates team mappings, nested relations, project states and reaction containers (0.167959ms)
+✔ legacy inspection requires the same root arrays as the SQL migrator (5.244834ms)
+✔ maps existing graph with text IDs and metadata, preserves original bytes and reload edits (16.262208ms)
+✔ atomic ordered batch rolls back writes, history and idempotency on stale child CAS (12.220125ms)
+✔ two adapters serialize CAS and persist deduplication across reload without losing unrelated writes (41.31925ms)
+✔ completion recurrence and protected relations are atomic and retry safe (16.957541ms)
+✔ existing workspace records and personal preferences retain unknown fields and isolate identities/views (3.280625ms)
+✔ corrupt/unavailable storage fails without resets, and disposed in-flight work never rehydrates (15.374709ms)
+✔ pre-auth language and account appearance preserve unknown keys without crossing identities (0.702083ms)
+✔ rejects invalid new values, missing local references and private executor fields without changing bytes (2.810292ms)
+✔ existing v1 records with unknown envelope metadata survive commands and storage failure (3.028208ms)
+✔ adapter bookkeeping stays outside graph and a legacy writer cannot bypass React CAS (5.508916ms)
+✔ workspace creation retries return one blank workspace (2.920209ms)
+✔ scalar/null and malformed persisted envelopes never seed or reset existing bytes (0.248959ms)
+✔ a disposed queued command cannot commit into a reactivated repository (7.988667ms)
+✔ attributes cannot change identities and dependency cycles roll back without touching the graph (2.410208ms)
+✔ an older writer replacing the record envelope preserves command deduplication and forces stale CAS recovery (3.90275ms)
+✔ deleting a task or project requires unlinking files referenced by surviving tasks (1.75825ms)
+✔ an existing identity language takes precedence over the shared pre-auth fallback (0.106541ms)
+✔ fresh first entry into a secondary workspace imports legacy views only under the original workspace (2.939292ms)
+✔ newly created task returns a stable version usable by the next CAS command (8.7355ms)
+✔ newly created project returns a stable version usable by the next CAS command (5.140208ms)
+✔ newly created comment returns a stable version usable by the next CAS command (46.438875ms)
+✔ generated tasks from duplicate_task start with stable versions and support immediate CAS (17.054375ms)
+✔ generated tasks from complete_task start with stable versions and support immediate CAS (5.474042ms)
+✔ a genuinely external legacy creation retains conservative revision-derived CAS initialization (4.24375ms)
+✔ combined completion uses effective fields for rescheduled weekly task and retries only once (3.437042ms)
+✔ combined completion uses effective fields for changed recurrence and retries only once (3.197709ms)
+✔ combined completion uses effective fields for removed recurrence and retries only once (42.459042ms)
+✔ combined completion uses effective fields for removed due date and retries only once (3.305083ms)
+✔ combined completion uses effective fields for newly enabled recurrence and retries only once (10.177959ms)
+✔ combined recurring completion rolls back its generated graph when a later batch child conflicts (5.466583ms)
+✔ a delayed first-import preference read cannot overwrite a concurrently saved selection or workspace views (1.79825ms)
+✔ an overlapping bootstrap preference write preserves both legacy migration and canonical current choices (1.4045ms)
+✔ the actual local adapter exposes concrete public result structures (5939.452959ms)
+ℹ command: (operation: string, command: Omit<Command<Record<string, unknown>>, "workspaceId">) => Promise<CommandResult<unknown>>
+ℹ workspaces: (fresh?: boolean | undefined) => Promise<Workspace[]>
+ℹ personal: () => Promise<PersonalState>
+ℹ list: (operation: string, query?: Record<string, string | number> | undefined) => Promise<unknown[]>
+ℹ preferences: () => Promise<{ favoriteProjectIds: string[]; favoriteTaskIds: string[]; notificationReadStates: Record<string, boolean>; }>
+✔ TypeScript rejects a numeric event ID produced by the actual local command (2959.437708ms)
+ℹ Argument of type '(data: any, revision: number, record: any) => { changed: false; value: CommandResult<unknown>; } | { changed: true; value: { data: any; eventId: number; requestId: string; }; }' is not assignable to parameter of type '(data: any, revision: number, record: any) => { changed: boolean; value: CommandResult<unknown>; }'.   Type '{ changed: false; value: CommandResult<unknown>; } | { changed: true; value: { data: any; eventId: number; requestId: string; }; }' is not assignable to type '{ changed: boolean; value: CommandResult<unknown>; }'.     Type '{ changed: true; value: { data: any; eventId: number; requestId: string; }; }' is not assignable to type '{ changed: boolean; value: CommandResult<unknown>; }'.       The types of 'value.eventId' are incompatible between these types.         Type 'number' is not assignable to type 'string'.
+✔ TypeScript rejects removing the actual local adapter lifecycle method (2638.357709ms)
+ℹ Type '{ mode: "local"; userId: string; workspaceId: string | null; readonly controller: AbortController; activate(): void; personal: () => Promise<{ prefs: Record<string, unknown>; views: Record<...>; preferences: { ...; } | { ...; }; collapsed?: boolean | undefined; activeWorkspace?: string | undefined; }>; ... 6 more .....' is not assignable to type 'LocalPanelTransport'.   Property 'dispose' is missing in type '{ mode: "local"; userId: string; workspaceId: string | null; readonly controller: AbortController; activate(): void; personal: () => Promise<{ prefs: Record<string, unknown>; views: Record<...>; preferences: { ...; } | { ...; }; collapsed?: boolean | undefined; activeWorkspace?: string | undefined; }>; ... 6 more .....' but required in type 'Omit<WorkspaceRepository, "list" | "command" | "query" | "personal" | "rpc" | "savePersonal">'.
+✔ normalized repository follows cursor pages, caches queries and isolates identities (0.658ms)
+✔ disposed requests cannot hydrate a reactivated session repository (0.419042ms)
+✔ archived preferences never become personal preferences and shared rows remain intact (0.300459ms)
+✔ safe repository exposes CAS failures without backend details and forbids executor credentials (0.162416ms)
+✔ migration preserves identities, all legacy fields and relations, is idempotent and freezes old writes (3083.105167ms)
+✔ invalid references, enums and duplicate entities abort the entire cutover (1123.313166ms)
+✔ personal legacy values migrate only with admin recorded snapshot provenance and remain user scoped (850.903125ms)
+✔ ungranted OAuth cannot read legacy recovery surfaces or invoke any workspace RPC (928.230958ms)
+✔ revoking the attested owner clears live identity links without deleting agents, tasks or history (926.527917ms)
+✔ consent resolves Auth request, stages inactive grants, and readonly creates no executor (2578.47275ms)
+✔ write connection binds executor and revocation/membership defeats direct RPC and replay (1547.58675ms)
+✔ denied/cancelled authorization never activates and Auth revocation is immediate (894.304375ms)
+✔ reconsent write to read disables the existing executor and another request cannot activate it (911.604541ms)
+✔ failed activation rolls back executor creation and guest grants never widen membership (991.1785ms)
+✔ an incompatible Auth beta schema fails closed with a safe service error (721.506459ms)
+✔ same Auth request cannot replace another tab selection or activate it under either completion order (1335.242833ms)
+✔ stale activation and cleanup are fenced from a newer request and explicit revoke stays final (657.8355ms)
+✔ duplicate workspace selection returns a safe direct RPC validation error before storage (609.425667ms)
+✔ 006 OAuth file duplication retains write-grant/agent ownership gates and revocation before replay (643.45175ms)
+✔ graph copy requires current write grant, source lease, and rechecks cached batch access after downgrade/revocation (642.738375ms)
+✔ local membership uses actual members, project CAS, idempotency and persisted removal (22.074791ms)
+✔ saved view JSON and version survive reload, stale rename/delete and cross-workspace IDs fail (5.258458ms)
+✔ project sortOrder changes the persistent order authority including archived positions (2.704625ms)
+✔ explicit device sharing demo persists permissions/access/invited state without cloud claims (3.552792ms)
+✔ project plans preflight atomic bounds, exact defaults, source graph commands and preserved favorites mapping (15.706875ms)
+✔ shared individual copy action selects full task graph and literal suffix (6.303917ms)
+✔ legacy absent teams project read is pure; first relevant mutation materializes once and respects CAS (6.2845ms)
+✔ teams project canonical member.team without mutating graph and stale legacy relation saves fail (12.117042ms)
+✔ team replacement atomic plan includes cross-team removal, preserves unknown fields and deletion unlinks (13.681083ms)
+✔ local profile and workspace edits persist graph, reject unknown fields and preserve scope (6.161916ms)
+✔ notification projection and initial local read map preserve unknown IDs across read updates (5.312209ms)
+✔ date preferences preserve Saturday and short date behavior without inventing launch/default effects (0.238ms)
+✔ reset is workspace-scoped and keeps monotonic versions and idempotency receipts (7.866167ms)
+✔ team replacement stale relationship snapshots and oversize batches leave entire storage unchanged (17.23425ms)
+✔ personal local favorites project actual fav values and retain them when changing read states (6.2ms)
+✔ reset invalidates implicit seeded teams and workspace discovery returns effective drift version (17.324375ms)
+✔ password verification closes only temporary session before update; failures and disposed identities cannot update (1.099666ms)
+✔ aggregate routes never expose inaccessible private project children or archived private entities (0.215625ms)
+✔ reset invalidates all canonical CAS families including materialized and embedded files and retains replay receipts (15.600875ms)
+✔ team plans guard complete original membership sets of selected and removed users including absence (7.760709ms)
+✔ calendar uses local dates, preferred week start and month boundary navigation (3.637916ms)
+✔ rescheduling preserves duration across DST and captured CAS; missing start stays null (2.039958ms)
+✔ drag payload cannot cross workspace/session/controller lifetime or silently adopt newer version (0.182833ms)
+✔ milestones preserve literal names and group only valid dates for accessible project scope (0.131708ms)
+✔ captured schedule command rejects a later local version without changing duration or metadata (50.398ms)
+✔ detail relations preserve metadata, initialize versions, CAS and roll back batch (18.189792ms)
+✔ reactions affect only current local actor and replay survives old writer (8.492208ms)
+✔ local task activity returns canonical events for only the requested task (5.87725ms)
+✔ inline subtask command preserves subtask ID and checks the parent reservation/CAS (7.209209ms)
+✔ comment deletion retry rechecks the current author after local actor changes (6.773459ms)
+✔ subtask details validate dates, retain unknown fields and increment row/parent versions (12.731125ms)
+✔ personal preferences merge current envelope, isolate identities/workspaces and report storage failure (1.737208ms)
+✔ embedded-only file metadata survives read, unlink, reattach and update without duplicate IDs or unknown-field loss (39.971958ms)
+✔ legacy label IDs remain available without a stored label collection or read-time normalization (1.592875ms)
+✔ embedded metadata preserves explicit ownership and replay rejects a removed current member (4.533375ms)
+✔ virtual legacy labels support explicit mutations and embedded file CAS survives old writers (50.118917ms)
+✔ unlinking an embedded shared attachment preserves its canonical owner and protects surviving relations (7.436ms)
+✔ deleting a task that only links another task file does not transfer ownership or delete metadata (3.293083ms)
+✔ linking embedded metadata to an earlier task preserves canonical parent ownership and receipts (22.192334ms)
+✔ linking embedded metadata to an earlier task preserves canonical null ownership and receipts (10.565084ms)
+✔ local: task copy preserves complete graph and source, fresh identity and temporal semantics (16.005458ms)
+✔ local: project copy preserves complete graph and source, fresh identity and temporal semantics (5.579959ms)
+✔ local: strict input, CAS, atomic create-project batch rollback/retry and stable IDs (8.390542ms)
+✔ sql: task copy preserves complete graph and source, fresh identity and temporal semantics (3272.390042ms)
+✔ sql: project copy preserves complete graph and source, fresh identity and temporal semantics (958.894209ms)
+✔ sql: strict input, CAS, atomic create-project batch rollback/retry and stable IDs (985.548459ms)
+✔ local: explicit-null file ownership and all task statuses survive copy semantics (16.140167ms)
+✔ local: exact graph IDs preserve punctuation and enforce Unicode boundaries (69.416542ms)
+✔ sql: explicit-null file ownership and all task statuses survive copy semantics (1029.553833ms)
+✔ sql: exact graph IDs preserve punctuation and enforce Unicode boundaries (1048.045416ms)
+✔ local replay checks current member/actor, including graph children in cached batches (3.205667ms)
+✔ SQL source CAS, valid/expired/intervened leases, current authorization and private ACLs (685.016ms)
+✔ local: 100 graph children are atomic and 101 rejected without any write (10.583584ms)
+✔ sql: 100 graph children are atomic and 101 rejected without any write (809.704583ms)
+✔ local global file authority wins and source attachment metadata remains separate (2.640083ms)
+✔ removing a task removes its dependent records without touching another project (0.782125ms)
+✔ removing a project cleans archived tasks, views, calendar entries and relations (0.161042ms)
+✔ file operations use identity, preserving a different attachment with the same name (0.124792ms)
+✔ multi-value AND filters, negation, literal query, dates and sorting preserve input (4.172791ms)
+✔ 100-child bound, reservation guard and exact ordered CAS never partially select (0.399ms)
+✔ manual move uses target group and midpoint with ordered move then edit CAS (1.930875ms)
+✔ personal view writes merge unknown fields, workspace/view and identity isolation (0.564667ms)
+✔ drag to done composes sort edit then completion with ordered CAS and counts actual children (0.835209ms)
+✔ manual ties rebalance atomically with CAS instead of silently retaining the old order (0.156708ms)
+✔ drag payload is fenced to its repository lifetime, including identical IDs in another workspace (0.08175ms)
+✔ core task action preparation shares reservation and CAS guards while explicit intervention remains intentional (0.186417ms)
+✔ due groups use the local calendar at 22:30 in Maceio and across daylight-saving changes (2.316042ms)
+✔ due filters overlap today and next seven days, exclude completed overdue, and negate the full predicate (13.395417ms)
+✔ legacy calendar helper exports share the pure implementation without changing the existing API (43.032958ms)
+✔ local: serialized disjoint replacement rejects stale empty baseline and rolls back whole batch (24.584042ms)
+✔ local: newly created team phantom and selected-member drift conflict before any writes (2.003125ms)
+✔ local: strict guard shape, duplicates, exact IDs and whole-request limits are atomic (12.452ms)
+✔ sql: serialized disjoint replacement rejects stale empty baseline and rolls back whole batch (3160.004875ms)
+✔ sql: newly created team phantom and selected-member drift conflict before any writes (859.116834ms)
+✔ sql: strict guard shape, duplicates, exact IDs and whole-request limits are atomic (882.660583ms)
+✔ SQL: unguarded multi-team compatibility, set order, UUID case and current authorization/replay (945.398333ms)
+✔ local: exact historical member IDs, seeded missing-vs-empty teams and authorized device replay (4.357084ms)
+✔ local: exact Unicode and numeric-string team IDs, stale deleted team/member, and 100-child bound (17.942209ms)
+✔ sql: exact Unicode and numeric-string team IDs, stale deleted team/member, and 100-child bound (992.359958ms)
+✔ OpenAPI exposes optional team guards only on create/update, including bounded batch references (2.611125ms)
+✔ the complete token inventory and CSS consumers pass the guard (341.198709ms)
+✔ unknown references, hardcoded CSS and inline regressions fail the guard (120.630541ms)
+✔ runtime geometry and user-owned color values are permitted (1.499375ms)
+✔ foundation overrides reach the supported React button, drawer and sidebar styles (4.785209ms)
+✔ template migration is idempotent and preserves runtime geometry and data (0.807458ms)
+✔ catalogue demonstrations never call entity writers (2.244666ms)
+✔ source discovery includes the final React TS and TSX consumers (5.088708ms)
+✔ React controlled styles follow constants, spreads, assertions and conditional branches (1.020792ms)
+✔ static cn and cva utilities reject framework scales and modified arbitrary literals (0.75425ms)
+✔ semantic aliases require authored theme declarations; token utilities and runtime geometry stay valid (1.048458ms)
+✔ 005 reads whitelist live/expired reservation independently from assignment (3169.183375ms)
+✔ 005 clear descriptions and edit subtask details with parent CAS and lease (1084.060125ms)
+✔ 005 explicit comment author/admin deletion has CAS and replay after row deletion (855.473958ms)
+✔ 005 batches atomically compose IDs, isolate internal keys, rollback, replay and recheck capabilities (1020.658583ms)
+✔ 005 recurrence requires due date, Monthly adds30 days and copies subtask details (775.865709ms)
+✔ real pgmq Vault Cron SQL: atomic fanout, lease fencing, retries, admin and OAuth boundaries (24337.871625ms)
+✔ real normalized SDK Auth joins tenant CAS metadata and authoritative roles (1079.523ms)
+✔ real SDK explicit legacy cutover preserves snapshot and denies every old writer after new writes (482.106667ms)
+✔ PostgreSQL RLS and CAS protect workspace snapshots and authoritative roles (3028.910917ms)
+✔ legacy data migrates only to first workspace; other workspaces start empty (9.761959ms)
+✔ local revision conflict preserves the winning tab data (3.41775ms)
+✔ pending save flushes original tenant before switching and stale scopes are refused (2.040041ms)
+✔ failed persistence blocks switch and retains unsaved data for retry (0.950583ms)
+✔ clearing identity during an in-flight save cannot restore old state (0.600042ms)
+✔ explicit cloud configuration rejects partial config and privileged keys (1.0875ms)
+✔ scope from a previous signed-in controller never matches a new session (0.334083ms)
+✔ local save reaches storage before the next navigation event without debounce (6.77425ms)
+✔ edits made while another workspace loads are flushed to the original tenant (4.848417ms)
+✔ logout while a workspace loads cannot rehydrate its private data (2.401958ms)
+✔ delayed reload cannot resurrect workspace data after logout (4.261125ms)
+✔ workspace normalization rejects executable structural fields while retaining user text (3.800458ms)
+✔ auth locale survives identity changes without leaking profile data; saved identity preferences take precedence (70.743208ms)
+✔ workspace slug generation handles Portuguese names and keeps migrated URLs intact (0.862042ms)
+ℹ tests 208
+ℹ suites 0
+ℹ pass 208
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 24660.59675
+
+> gr8r-studio@1.0.0 check:tokens
+> node scripts/check-tokens.mjs
+
+Token audit passed: 234 public tokens, 97 source files checked.
+
+> gr8r-studio@1.0.0 build
+> vite build
+
+vite v6.4.4 building for production...
+
+(!) outDir /tmp/task6d-check-build is not inside project root and will not be emptied.
+Use --emptyOutDir to override.
+
+transforming...
+✓ 1759 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../../../../tmp/task6d-check-build/index.html                     0.90 kB │ gzip:   0.45 kB
+../../../../../../tmp/task6d-check-build/assets/index-TAf0iY7z.css     61.28 kB │ gzip:  12.95 kB
+../../../../../../tmp/task6d-check-build/assets/supabase-De9GV7Vy.js    0.77 kB │ gzip:   0.41 kB
+../../../../../../tmp/task6d-check-build/assets/react-ui-DktNO-Lp.js  236.62 kB │ gzip:  74.64 kB
+../../../../../../tmp/task6d-check-build/assets/index-CqsysrJa.js     476.65 kB │ gzip: 147.36 kB
+✓ built in 2.03s

@@ -13,7 +13,8 @@ Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
   fn: async () => {
-    const base = url!, key = anon!;
+    const base = url!,
+      key = anon!;
     Deno.env.set('SUPABASE_URL', base);
     Deno.env.set('SUPABASE_ANON_KEY', key);
     Deno.env.set('AUTH_ISSUER', `${base}/auth/v1`);
@@ -31,9 +32,8 @@ Deno.test({
     const service = createClient(base, admin!, { auth: { persistSession: false, autoRefreshToken: false } });
     const users: { id: string; token: string; workspace: string; client: SupabaseClient }[] = [];
     let clientId = '';
-    const native = Deno.serve(
-      { hostname: '127.0.0.1', port: 0, onListen: () => {} },
-      (req) => new URL(req.url).pathname.startsWith('/api') ? handleRequest(req) : handleMcpRequest(req),
+    const native = Deno.serve({ hostname: '127.0.0.1', port: 0, onListen: () => {} }, req =>
+      new URL(req.url).pathname.startsWith('/api') ? handleRequest(req) : handleMcpRequest(req),
     );
     const endpoint = Deno.env.get('TEST_MCP_URL') ?? `http://127.0.0.1:${native.addr.port}/functions/v1/mcp`;
     Deno.env.set('MCP_RESOURCE_URL', endpoint);
@@ -48,7 +48,8 @@ Deno.test({
     };
     try {
       for (let i = 0; i < 2; i++) {
-        const email = `oauth-${crypto.randomUUID()}@example.test`, password = `Task3-${crypto.randomUUID()}!`;
+        const email = `oauth-${crypto.randomUUID()}@example.test`,
+          password = `Task3-${crypto.randomUUID()}!`;
         const created = await service.auth.admin.createUser({ email, password, email_confirm: true });
         assert(!created.error);
         const client = createClient(base, key, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -80,25 +81,26 @@ Deno.test({
       });
       assertEquals(registration.status, 201);
       clientId = registration.data.client_id;
-      const start = async (user: typeof users[number]) => {
+      const start = async (user: (typeof users)[number]) => {
         const verifier = crypto.randomUUID() + crypto.randomUUID();
         const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-        const challenge = btoa(String.fromCharCode(...new Uint8Array(hash))).replaceAll('+', '-').replaceAll('/', '_')
+        const challenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
+          .replaceAll('+', '-')
+          .replaceAll('/', '_')
           .replaceAll('=', '');
         const state = crypto.randomUUID();
         const auth = new URL(`${base}/auth/v1/oauth/authorize`);
-        for (
-          const [k, v] of Object.entries({
-            client_id: clientId,
-            response_type: 'code',
-            redirect_uri: 'http://127.0.0.1:5180/callback',
-            scope: 'openid',
-            state,
-            code_challenge: challenge,
-            code_challenge_method: 'S256',
-            prompt: 'consent',
-          })
-        ) auth.searchParams.set(k, v);
+        for (const [k, v] of Object.entries({
+          client_id: clientId,
+          response_type: 'code',
+          redirect_uri: 'http://127.0.0.1:5180/callback',
+          scope: 'openid',
+          state,
+          code_challenge: challenge,
+          code_challenge_method: 'S256',
+          prompt: 'consent',
+        }))
+          auth.searchParams.set(k, v);
         const response = await fetch(auth, { redirect: 'manual' });
         assertEquals(response.status, 302);
         await response.body?.cancel();
@@ -110,7 +112,7 @@ Deno.test({
         assertEquals(details.data.user.id, user.id);
         return { authorizationId, verifier, state };
       };
-      const authorize = async (user: typeof users[number], capability: 'read' | 'write') => {
+      const authorize = async (user: (typeof users)[number], capability: 'read' | 'write') => {
         const flow = await start(user);
         const prepared = await rpc(user.token, 'prepare_integration_consent', {
           p_authorization_id: flow.authorizationId,
@@ -119,7 +121,10 @@ Deno.test({
         assertEquals(prepared.status, 200);
         const duplicate = await rpc(user.token, 'prepare_integration_consent', {
           p_authorization_id: flow.authorizationId,
-          p_grants: [{ workspaceId: user.workspace, capability }, { workspaceId: user.workspace, capability }],
+          p_grants: [
+            { workspaceId: user.workspace, capability },
+            { workspaceId: user.workspace, capability },
+          ],
         });
         assertEquals(duplicate.status, 422);
         assertEquals(duplicate.data.code, 'PT422');
@@ -138,28 +143,26 @@ Deno.test({
         });
         assertEquals(retry.status, 200);
         assertEquals(retry.data.attemptId, prepared.data.attemptId);
-        assertEquals(
-          (await rpc(user.token, 'activate_integration_consent', { p_authorization_id: flow.authorizationId })).status,
-          404,
-        );
-        assertEquals(
-          (await rpc(user.token, 'cancel_integration_consent', { p_authorization_id: flow.authorizationId })).status,
-          404,
-        );
+        assertEquals((await rpc(user.token, 'activate_integration_consent', { p_authorization_id: flow.authorizationId })).status, 404);
+        assertEquals((await rpc(user.token, 'cancel_integration_consent', { p_authorization_id: flow.authorizationId })).status, 404);
 
         // Other principal cannot activate this request or substitute its own identity.
         assertEquals(
-          (await rpc(users.find((x) => x !== user)!.token, 'activate_integration_consent', {
-            p_authorization_id: flow.authorizationId,
-            p_attempt_id: prepared.data.attemptId,
-          })).status,
+          (
+            await rpc(users.find(x => x !== user)!.token, 'activate_integration_consent', {
+              p_authorization_id: flow.authorizationId,
+              p_attempt_id: prepared.data.attemptId,
+            })
+          ).status,
           403,
         );
         assertEquals(
-          (await rpc(user.token, 'activate_integration_consent', {
-            p_authorization_id: flow.authorizationId,
-            p_attempt_id: prepared.data.attemptId,
-          })).status,
+          (
+            await rpc(user.token, 'activate_integration_consent', {
+              p_authorization_id: flow.authorizationId,
+              p_attempt_id: prepared.data.attemptId,
+            })
+          ).status,
           403,
         );
         const approved = await user.client.auth.oauth.approveAuthorization(flow.authorizationId, {
@@ -169,10 +172,12 @@ Deno.test({
         const callback = new URL(approved.data.redirect_url);
         assertEquals(callback.searchParams.get('state'), flow.state);
         assertEquals(
-          (await rpc(user.token, 'activate_integration_consent', {
-            p_authorization_id: flow.authorizationId,
-            p_attempt_id: prepared.data.attemptId,
-          })).status,
+          (
+            await rpc(user.token, 'activate_integration_consent', {
+              p_authorization_id: flow.authorizationId,
+              p_attempt_id: prepared.data.attemptId,
+            })
+          ).status,
           200,
         );
         const response = await fetch(`${base}/auth/v1/oauth/token`, {
@@ -191,19 +196,23 @@ Deno.test({
         assert(tokens.access_token && tokens.refresh_token);
         return { ...tokens, connectionId: prepared.data.connectionId };
       };
-      const first = await authorize(users[0], 'write'), second = await authorize(users[1], 'read');
+      const first = await authorize(users[0], 'write'),
+        second = await authorize(users[1], 'read');
       // Negative fixtures are deliberately re-signed with a disposable local key, never called OAuth exchanges.
       const signingKeys = Deno.env.get('TEST_OAUTH_SIGNING_KEYS');
       if (signingKeys) {
         const jwk = (JSON.parse(signingKeys) as JWK[])[0];
         const signingKey = await importJWK({ ...jwk, key_ops: ['sign'] }, 'ES256');
-        for (
-          const changed of [{ exp: Math.floor(Date.now() / 1000) - 10 }, {
+        for (const changed of [
+          { exp: Math.floor(Date.now() / 1000) - 10 },
+          {
             iss: 'https://wrong-issuer.example.test/auth/v1',
-          }, { aud: 'wrong-audience' }]
-        ) {
+          },
+          { aud: 'wrong-audience' },
+        ]) {
           const invalid = await new SignJWT({ ...decodeJwt<Record<string, unknown>>(first.access_token), ...changed })
-            .setProtectedHeader({ alg: 'ES256', kid: jwk.kid }).sign(signingKey);
+            .setProtectedHeader({ alg: 'ES256', kid: jwk.kid })
+            .sign(signingKey);
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -225,13 +234,15 @@ Deno.test({
       });
       assertEquals(humanTask.status, 200);
       assertEquals(
-        (await rpc(second.access_token, 'execute_operation', {
-          p_workspace_id: users[1].workspace,
-          p_operation: 'claim_task',
-          p_command: { id: humanTask.data.data.id },
-          p_expected_version: 1,
-          p_idempotency_key: crypto.randomUUID(),
-        })).status,
+        (
+          await rpc(second.access_token, 'execute_operation', {
+            p_workspace_id: users[1].workspace,
+            p_operation: 'claim_task',
+            p_command: { id: humanTask.data.data.id },
+            p_expected_version: 1,
+            p_idempotency_key: crypto.randomUUID(),
+          })
+        ).status,
         403,
       );
       const readonly = await mcp(second.access_token);
@@ -250,10 +261,7 @@ Deno.test({
         await readonly.close();
       }
       // Legacy snapshots/base/archive surfaces stay fenced even with an active normalized grant.
-      const snapshots = await api(
-        `/rest/v1/workspace_snapshots?workspace_id=eq.${users[0].workspace}`,
-        first.access_token,
-      );
+      const snapshots = await api(`/rest/v1/workspace_snapshots?workspace_id=eq.${users[0].workspace}`, first.access_token);
       assert(snapshots.status === 200 && snapshots.data.length === 0);
       const baseRows = await api(`/rest/v1/workspaces?id=eq.${users[0].workspace}`, first.access_token);
       assert(baseRows.status === 200 && baseRows.data.length === 0);
@@ -266,7 +274,10 @@ Deno.test({
           const own = await client.callTool({ name: 'list_workspaces', arguments: {} });
           assert(!own.isError);
           const items = (own.structuredContent as { items: { id: string }[] }).items;
-          assertEquals(items.map((x) => x.id), [users[i].workspace]);
+          assertEquals(
+            items.map(x => x.id),
+            [users[i].workspace],
+          );
           const other = await client.callTool({
             name: 'list_tasks',
             arguments: { workspace_id: users[1 - i].workspace },
@@ -282,12 +293,14 @@ Deno.test({
         }
       }
       assertEquals(
-        (await rpc(second.access_token, 'execute_operation', {
-          p_workspace_id: users[1].workspace,
-          p_operation: 'create_task',
-          p_command: { projectId: 'p1', title: 'Denied' },
-          p_idempotency_key: crypto.randomUUID(),
-        })).status,
+        (
+          await rpc(second.access_token, 'execute_operation', {
+            p_workspace_id: users[1].workspace,
+            p_operation: 'create_task',
+            p_command: { projectId: 'p1', title: 'Denied' },
+            p_idempotency_key: crypto.randomUUID(),
+          })
+        ).status,
         403,
       );
       const agents = await rpc(users[1].token, 'read_operation', {
@@ -323,8 +336,7 @@ Deno.test({
           },
         });
         assert(!claim.isError);
-        const claimed =
-          (claim.structuredContent as { data: { task: { executorAgentId: string }; claimToken: string } }).data;
+        const claimed = (claim.structuredContent as { data: { task: { executorAgentId: string }; claimToken: string } }).data;
         assert(claimed.task.executorAgentId && claimed.claimToken);
         const command = async (name: string, input: Record<string, unknown>, expected_version?: number) => {
           const result = await writer.callTool({
@@ -340,11 +352,7 @@ Deno.test({
           return result;
         };
         await command('renew_task_claim', { id: task.id, claimToken: claimed.claimToken }, 2);
-        await command(
-          'update_task',
-          { id: task.id, claimToken: claimed.claimToken, title: 'Updated through real MCP' },
-          3,
-        );
+        await command('update_task', { id: task.id, claimToken: claimed.claimToken, title: 'Updated through real MCP' }, 3);
         await command('add_task_comment', { taskId: task.id, body: 'OAuth transport verified' });
         const activity = await writer.callTool({
           name: 'list_task_activity',
@@ -362,21 +370,19 @@ Deno.test({
         const completed = await command('complete_task', { id: task.id, claimToken: completionToken }, 6);
         assertEquals((completed.structuredContent as { data: { status: string } }).data.status, 'done');
 
+        assertEquals((await rpc(users[0].token, 'revoke_integration_connection', { p_connection_id: first.connectionId })).status, 204);
         assertEquals(
-          (await rpc(users[0].token, 'revoke_integration_connection', { p_connection_id: first.connectionId })).status,
-          204,
-        );
-        assertEquals(
-          (await rpc(first.access_token, 'read_operation', {
-            p_workspace_id: users[0].workspace,
-            p_operation: 'list_tasks',
-          })).status,
+          (
+            await rpc(first.access_token, 'read_operation', {
+              p_workspace_id: users[0].workspace,
+              p_operation: 'list_tasks',
+            })
+          ).status,
           403,
         );
-        const denied = await fetch(
-          `http://127.0.0.1:${native.addr.port}/api/v1/workspaces/${users[0].workspace}/tasks`,
-          { headers: { authorization: `Bearer ${first.access_token}` } },
-        );
+        const denied = await fetch(`http://127.0.0.1:${native.addr.port}/api/v1/workspaces/${users[0].workspace}/tasks`, {
+          headers: { authorization: `Bearer ${first.access_token}` },
+        });
         assertEquals(denied.status, 403);
         await denied.body?.cancel();
         await assertRejects(() => writer.listTools());
@@ -384,16 +390,15 @@ Deno.test({
         await writer.close();
       }
       // Membership removal defeats a still-valid readonly OAuth token at every domain boundary.
-      const removed = await service.from('workspace_memberships').delete().eq('workspace_id', users[1].workspace).eq(
-        'user_id',
-        users[1].id,
-      );
+      const removed = await service.from('workspace_memberships').delete().eq('workspace_id', users[1].workspace).eq('user_id', users[1].id);
       assert(!removed.error, removed.error?.code + ':' + removed.error?.message);
       assertEquals(
-        (await rpc(second.access_token, 'read_operation', {
-          p_workspace_id: users[1].workspace,
-          p_operation: 'list_tasks',
-        })).status,
+        (
+          await rpc(second.access_token, 'read_operation', {
+            p_workspace_id: users[1].workspace,
+            p_operation: 'list_tasks',
+          })
+        ).status,
         403,
       );
       const denied = await fetch(`http://127.0.0.1:${native.addr.port}/api/v1/workspaces/${users[1].workspace}/tasks`, {
@@ -415,10 +420,12 @@ Deno.test({
       assertEquals(refresh.status, 200);
       assert(refreshed.access_token);
       assertEquals(
-        (await rpc(refreshed.access_token, 'read_operation', {
-          p_workspace_id: users[0].workspace,
-          p_operation: 'list_tasks',
-        })).status,
+        (
+          await rpc(refreshed.access_token, 'read_operation', {
+            p_workspace_id: users[0].workspace,
+            p_operation: 'list_tasks',
+          })
+        ).status,
         403,
       );
       await assertRejects(() => mcp(users[0].token));
@@ -427,22 +434,26 @@ Deno.test({
       assert(!revokeBeforeReconsent.error);
       const downgraded = await authorize(users[0], 'read');
       assertEquals(
-        (await rpc(downgraded.access_token, 'execute_operation', {
-          p_workspace_id: users[0].workspace,
-          p_operation: 'claim_task',
-          p_command: { id: task!.id },
-          p_expected_version: 2,
-          p_idempotency_key: crypto.randomUUID(),
-        })).status,
+        (
+          await rpc(downgraded.access_token, 'execute_operation', {
+            p_workspace_id: users[0].workspace,
+            p_operation: 'claim_task',
+            p_command: { id: task!.id },
+            p_expected_version: 2,
+            p_idempotency_key: crypto.randomUUID(),
+          })
+        ).status,
         403,
       );
       const revokedAuth = await users[0].client.auth.oauth.revokeGrant({ clientId });
       assert(!revokedAuth.error);
       assertEquals(
-        (await rpc(downgraded.access_token, 'read_operation', {
-          p_workspace_id: users[0].workspace,
-          p_operation: 'list_tasks',
-        })).status,
+        (
+          await rpc(downgraded.access_token, 'read_operation', {
+            p_workspace_id: users[0].workspace,
+            p_operation: 'list_tasks',
+          })
+        ).status,
         403,
       );
       await assertRejects(() => mcp(downgraded.access_token));

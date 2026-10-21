@@ -1,0 +1,8 @@
+{"exitCode":0,"output":"/tmp/task6d-local-dev-YPU5B2"}
+
+Running 2 tests using 1 worker
+
+  ✓  1 tests/browser/team-security.spec.js:17:1 › team markup stays literal through editor reload duplicate validation and project team picker (2.6s)
+  ✓  2 tests/browser/team-security.spec.js:64:1 › local profile and attachment metadata remain literal after persistence and preview (1.6s)
+
+  2 passed (5.1s)

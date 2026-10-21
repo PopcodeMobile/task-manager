@@ -1,99 +1,46 @@
 # Gr8r Studio
 
-A calm, structured project management workspace: home dashboard, inbox, my tasks, projects with
-board / list / table / calendar / timeline / files views, members, teams, activity and settings.
+Project and task coordination for people and external agents. React + TypeScript + Vite render the panel; shadcn/Radix controls, Lucide React, Tailwind and the existing 234 public CSS tokens provide the interface. Supabase Auth, PostgreSQL/RLS and Edge Functions provide cloud operations, OAuth, remote MCP and durable webhook delivery. Hermes and Claude execute outside this product.
 
-Built with plain JavaScript ES modules and CSS, bundled by [Vite](https://vite.dev).
-Supabase provides optional cloud authentication and persistence; DOMPurify sanitizes rich text.
-The interface supports Portuguese (default) and English, with isolated workspaces and a shared token system.
+Portuguese and English are supported. The panel retains 21 named routes plus 404, eight project tabs and saved views; global Files and agent supervision are approved additions. File actions store metadata. Local invitation, profile, security and billing demonstrations do not provision remote services.
 
-![Gr8r Studio home dashboard](docs/preview.png)
+## Run
 
-## Getting started
+Node.js 22+ (`.nvmrc`), npm and Docker for database verification:
 
-Requires Node.js 22 or newer (`.nvmrc` pins 22).
-
-```bash
-npm install
-npm run dev       # http://localhost:5173 with hot reload
-npm run build     # production build in dist/
-npm run preview   # serve the production build locally
-npm run lint      # ESLint
-npm run format    # Prettier
-npm run check     # lint, formatting, unit/database tests, tokens, production build
-npm run test:e2e  # browser flows; first install: npx playwright install chromium
+```sh
+npm ci
+npm run dev            # http://localhost:5180, strict port
+npm run build          # dist/index.html plus assets
+npm run preview
+npm run typecheck      # frontend TypeScript and browser TS; shared JS is not universally checkJs-checked
+npm run check          # lint, types, formatting, Node/database tests, tokens, build
+npx playwright install chromium
+npm run test:e2e       # isolated no-cloud browser suite, strict 5180
+npm run test:agent:ui  # cloud-mode fixtures and opt-in real local Auth/DB, strict 5181
+npm run test:oauth:ui  # consent, strict 5180; private real Auth fixture env required
 ```
 
-Without environment configuration, data stays in this browser. Each workspace has its own
-snapshot; the legacy local data migrates into one workspace. Cloud mode starts with real
-accounts and empty workspaces. Follow [Supabase setup](docs/supabase-setup.md) to activate it.
+The default browser suite explicitly clears cloud variables and never reuses an existing listener. The dedicated cloud suites need the local stack and private fixture environment for their live tests. Missing credentials are reported as skipped, not cloud proof. See [verification](docs/verification.md) for actual commands and boundaries.
 
-## Project structure
+At `/`, sign in when cloud is configured or select **Continue on this device** for the local demonstration. Local graphs remain in `gr8r.workspaces.v1`, with the original `gr8r.v2` retained during recovery. Cloud organizations start empty; there is no automatic local-to-cloud import. See [Supabase setup](docs/supabase-setup.md).
 
-```
-index.html              HTML entry; loads src/main.js
-public/favicon.svg      brand mark
-vite.config.js          Vite config, including the Lucide icon-subset plugin
-eslint.config.js        lint rules (ESLint flat config); formatting by Prettier (.prettierrc.json)
-.github/workflows/      CI: lint, format, tests, token audit, build, browser flows
-docs/preview.png        README screenshot
-src/
-  main.js               entry: imports styles and modules, then boots the app
-  styles/
-    index.css           imports every stylesheet in cascade order
-    tokens.css          colours, spacing, type, radius, the shared --gutter
-    base.css  components.css  shell.css  panels.css  overlays.css  states.css  motion.css  responsive.css
-    views/              list, board, table, calendar, timeline, projects & files
-    pages/              settings, auth & onboarding
-  core/                 utilities, constants, icons, store (state + lookups), theme
-  data/seed.js          demo workspace data
-  data/workspace.js     workspace defaults and normalization
-  workspace/           local/Supabase repositories, auth and save/switch lifecycle
-  locales/             Portuguese and English catalogs
-  ui/                   shared render helpers, toasts, the select dropdown
-  shell/                render loop and router, sidebar/topbar layout, skeletons, view engine
-  components/           task list renderer
-  pages/                one module per route
-  views/                project views: board, table, calendar, timeline, files, overview
-  overlays/             task drawer, modals, popovers, context menu, command palette
-  features/             teams, subtasks, archive (rendering)
-  actions/              user actions, event wiring, keyboard shortcuts, drag and drop
-```
+## Structure and contracts
 
-### Layers
+- `index.html` → `src/app/main.tsx`: single React SPA, including `/auth/callback`, `/oauth/consent`, `/app/...` and `/app-local/...`. Vite dev/preview and Vercel use this same entry.
+- `src/app/`: Auth, shell/navigation, task views/details, projects, schedules, files, remaining routes and integrations. Draft guards own navigation/recovery; UI does not authorize database access.
+- `src/components/ui/`: shadcn/Radix primitives; native labels, focus behavior and semantic token classes.
+- `src/domain/`: typed operation contracts. `src/workspace/normalized.ts` sends human JWT RPCs with CAS/idempotency; `local-panel-repository.ts` exposes the same panel contract over device persistence.
+- `src/styles/tokens.css`, `src/core/design-tokens.js`: public token definitions and tooling inventory. Shared calendar, seed, local mutations and locale modules remain live; the old HTML renderer, global store, delegated actions and cloud snapshot writer are retired.
+- `supabase/functions/`, `supabase/migrations/`: shared authorization/operations, API, MCP and webhook worker; additive normalized migrations through `202610200008`.
+- `tests/fixtures/legacy-workspace-*`: historical compatibility fixtures only. They are outside the frontend import closure and are not the current React lifecycle proof.
 
-`core/store.js` exposes state and lookups while delegating persistence to `workspace/`.
-The controller owns revisions, failed saves and workspace scope. Renderers consume state;
-actions register in `actions/registry.js`, change state and re-render. `main.js` imports the
-handlers explicitly, then initializes the workspace. Pure task operations own related-record
-cleanup. See [architecture decisions](docs/adr/0001-workspace-storage.md) and
-[implemented improvements](docs/architecture-improvements.md).
+Use React escaping for literal user content and DOMPurify only for explicitly supported rich content. Keep operations scoped to workspace, use authoritative versions, preserve drafts on failures and follow every cursor. Project privacy, byte uploads and actual invitations require separate contracts.
 
-## Conventions
+The [design-system guide](docs/design-system.md) describes token policy. `check:tokens` audits authored CSS plus JS/TS/JSX/TSX styles and static `cn`/`cva` utility sources; semantic aliases must resolve to declared foundation variables. Dynamic geometry and validated domain colors remain runtime data. No component directory is exempt.
 
-- **Rendering:** each page or view is a function that returns an HTML string from the store
-  (`S`). `render()` rebuilds the shell and keeps focus and scroll positions.
-- **Interactions:** elements declare `data-a="actionName"`. `actions/events.js` delegates the
-  click to `A.actionName`. Inputs use `data-in`, blur handlers use `data-blur`.
-- **Layout:** every page edge uses `var(--gutter)`, so the breadcrumb, page header, toolbar,
-  list, table and board start on the same line.
-- **Dropdowns:** write a normal `<select class="select">`. `ui/select.js` renders it as the
-  design-system menu and keeps the native element as the source of truth.
-- **Icons:** call `ic('name')` with any [Lucide](https://lucide.dev) icon name. The
-  `virtual:icons` plugin bundles only the icons the source uses.
-- **Language:** call `t()` from `core/i18n.js` for interface copy. Add both catalog entries.
-  Persist canonical domain IDs and preserve user text; use locale-aware formatting.
-- **Safety:** escape user text with `esc()` in HTML strings. Only task descriptions use
-  `safeRichText()`. Workspace payloads are untrusted and validated at repository boundaries.
-- **Design:** use the [design system guide](docs/design-system.md). The in-app catalog lists
-  every public token and renders the same components used by the application.
+## Deploy and status
 
-## Continuous integration
+`vercel.json` builds Vite, serves `dist/` and rewrites SPA routes to `/index.html`. Only public Supabase URL/publishable keys belong in frontend build variables. Private provisioning/worker/consumer secrets stay outside Git and frontend bundles.
 
-Every push and pull request runs lint, formatting, unit/database tests, the token audit,
-a production build and Chromium browser flows
-(`.github/workflows/ci.yml`).
-
-## Deploy
-
-`vercel.json` builds with Vite and serves `dist/`.
+The dedicated hosted backend has separately recorded API/MCP proof. Final frontend publication, production Auth URLs/CORS, real Hermes acceptance and two actual Claude-user connections remain activation gates. Local cloud-mode browser proof uses real local Auth/DB; it is not hosted frontend proof. See [verification](docs/verification.md), [architecture](docs/superpowers/specs/2026-10-20-agent-platform-design.md) and [Hermes setup](docs/hermes-integration.md).

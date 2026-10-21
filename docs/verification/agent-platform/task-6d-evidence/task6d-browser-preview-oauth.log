@@ -1,0 +1,12 @@
+{"exitCode":0,"output":"/tmp/task6d-oauth-preview-jGPRT5"}
+
+Running 6 tests using 1 worker
+
+  ✓  1 tests/browser/oauth-consent.spec.ts:2:1 › direct consent reload opens independent React auth and retains the request (524ms)
+  ✓  2 tests/browser/oauth-consent.spec.ts:88:3 › real OAuth consent › approve selected workspace, exchange actual PKCE code, and revoke connection (811ms)
+  ✓  3 tests/browser/oauth-consent.spec.ts:131:3 › real OAuth consent › deny creates no active grant, invalid callback stays safe, and English/theme work (710ms)
+  ✓  4 tests/browser/oauth-consent.spec.ts:151:3 › real OAuth consent › failure after Auth approval leaves no active connection or executor (704ms)
+  ✓  5 tests/browser/oauth-consent.spec.ts:171:3 › real OAuth consent › two tabs with the same request preserve the first read selection when the write tab fails (1.0s)
+  ✓  6 tests/browser/oauth-consent.spec.ts:241:3 › real OAuth consent › lost activation response cannot cancel committed access and explicit revoke still works (925ms)
+
+  6 passed (5.6s)

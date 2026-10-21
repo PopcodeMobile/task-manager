@@ -222,6 +222,7 @@ async function login(page: Page) {
   await page.getByLabel('E-mail').fill(user.email);
   await page.getByLabel('Senha', { exact: true }).fill('fixture-password');
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+  await page.getByRole('link', { name: 'Tarefas', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Tarefas', exact: true })).toBeVisible();
 }
 test('login, workspace, create, edit, board, drawer, comment and agent supervision', async ({ page }) => {
@@ -294,6 +295,7 @@ test('workspace switch and logout cannot hydrate delayed identity results', asyn
   await f.waitLate();
   await page.getByLabel('Organização', { exact: true }).selectOption(workspace);
   await f.releaseLate();
+  await page.getByRole('link', { name: 'Tarefas', exact: true }).click();
   await expect(page.getByText('Revisar navegação', { exact: true })).toBeVisible();
   await expect(page.getByText('Tarefa do outro espaço', { exact: true })).toHaveCount(0);
   f.late();
@@ -420,6 +422,7 @@ test.describe('real normalized backend', () => {
       await page.getByRole('button', { name: 'Criar organização', exact: true }).click();
       await page.getByLabel('Nome da organização').fill('Segundo espaço real');
       await page.getByRole('button', { name: 'Criar organização', exact: true }).click();
+      await page.getByRole('link', { name: 'Tarefas', exact: true }).click();
       await expect(page.getByText('Nenhuma tarefa por aqui')).toBeVisible();
       const secondWorkspace = new URL(page.url()).pathname.split('/')[3];
       workspaceIds.push(secondWorkspace);
@@ -428,6 +431,7 @@ test.describe('real normalized backend', () => {
       await expect(page.getByText('Nenhuma tarefa por aqui')).toBeVisible();
       await expect(page.getByLabel('Organização', { exact: true })).toHaveValue(secondWorkspace);
       await page.getByLabel('Organização', { exact: true }).selectOption(ws);
+      await page.getByRole('link', { name: 'Tarefas', exact: true }).click();
       await expect(page.getByText('Execução real', { exact: true })).toBeVisible();
       await command(human, 'update_task', { id: task.id, title: 'Atualização externa real' }, read.data.data.version);
       await expect(page.getByText('Atualização externa real', { exact: true })).toBeVisible({ timeout: 18000 });
@@ -469,7 +473,7 @@ test('recovery validates matching passwords and returns to the preserved destina
     if (route.request().method() === 'PUT') updated = true;
     return route.fulfill({ json: user });
   });
-  await page.goto('/app');
+  await page.goto(`/app/w/${workspace}/tasks?view=table`);
   await page.getByRole('button', { name: 'Esqueceu a senha?' }).click();
   await page.getByLabel('E-mail').fill(user.email);
   await page.getByRole('button', { name: 'Enviar link de recuperação' }).click();
@@ -486,6 +490,7 @@ test('recovery validates matching passwords and returns to the preserved destina
   await page.getByLabel('Confirme a senha').fill('new-password-123');
   await page.getByRole('button', { name: 'Atualizar senha' }).click();
   await expect(page.getByRole('heading', { name: 'Tarefas', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/app/w/${workspace}/tasks\\?view=table$`));
   expect(updated).toBeTruthy();
 });
 
@@ -1647,7 +1652,7 @@ test('actual cloud projects compose templates members saved views full graph cop
     await page.getByRole('button', { name: /Source task$/ }).click();
     await expect(page.getByRole('button', { name: 'Remove from favorites', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Close panel', exact: true }).click();
-    await page.getByRole('link', { name: 'Overview', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Project tabs', exact: true }).getByRole('link', { name: 'Overview', exact: true }).click();
     await page.screenshot({ path: '/tmp/task6b4-cloud-overview-en.png', fullPage: true });
     expect(Object.keys(counts).filter(k => k.endsWith(':429'))).toEqual([]);
     test.info().annotations.push({ type: 'actual-cloud-project-counts', description: JSON.stringify(counts) });

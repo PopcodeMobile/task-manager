@@ -18,7 +18,7 @@ Node separado nem TanStack Start nesta migração.
 O aceite da arquitetura não é uma afirmação de que as integrações já existem.
 Este documento transforma essas escolhas no escopo concreto da migração.
 
-## Estado encontrado e preservação
+## Estado encontrado na base histórica e preservação
 
 - Base inspecionada: commit `d0c1557`, branch `main`, árvore limpa.
 - `src/main.js` inicia módulos JavaScript; `src/shell/render.js` substitui HTML.
@@ -30,8 +30,9 @@ Este documento transforma essas escolhas no escopo concreto da migração.
   Projetos, tarefas e relações ficam num JSON com uma revisão por workspace.
 - IDs legados de tarefas/projetos são texto, como `t1` e `p1`. Não converter
   implicitamente esses IDs para UUID nem usar a chave humana como identidade.
-- `docs/adr/0001-workspace-storage.md` continua descrevendo a implementação atual;
-  o modelo deste documento só a substitui após migração e validação.
+- `docs/adr/0001-workspace-storage.md` descreve a implementação histórica dessa base.
+  O corte React e o modelo normalizado agora têm [provas permanentes](../../verification.md);
+  a ativação final permanece condicionada aos gates documentados.
 - A demonstração local e os dados existentes devem continuar acessíveis.
   Dados locais não serão enviados automaticamente para uma conta cloud.
 

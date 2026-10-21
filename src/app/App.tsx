@@ -118,7 +118,11 @@ function AppearanceApp({ identityKey, local }: { identityKey: string; local: boo
   if (
     (local || session) &&
     (local || (!loading && !authError && !recovery)) &&
-    (location.pathname.startsWith('/app') || location.pathname === '/react.html' || location.pathname === '/login' || location.pathname === '/auth/callback')
+    (location.pathname.startsWith('/app') ||
+      location.pathname === '/' ||
+      location.pathname === '/index.html' ||
+      location.pathname === '/login' ||
+      location.pathname === '/auth/callback')
   )
     return (
       <WorkspacePanel

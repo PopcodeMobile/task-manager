@@ -14,11 +14,12 @@
     "test": "node --test tests/*.test.js tests/*.test.mjs",
     "test:e2e": "playwright test",
     "check:tokens": "node scripts/check-tokens.mjs",
-    "check": "npm run lint && npm run format:check && npm test && npm run check:tokens && npm run build",
+    "check": "npm run lint && npm run typecheck && npm run format:check && npm test && npm run check:tokens && npm run build",
     "typecheck": "tsc --noEmit",
     "test:oauth:ui": "playwright test --config playwright.oauth.config.ts",
     "local:oauth:key": "node scripts/setup-local-oauth.mjs",
-    "test:agent:ui": "playwright test --config playwright.agent.config.ts"
+    "test:agent:ui": "playwright test --config playwright.agent.config.ts",
+    "test:local:ui": "playwright test --config playwright.local.config.ts"
   },
   "engines": {
     "node": ">=22"

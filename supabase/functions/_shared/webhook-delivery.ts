@@ -1,14 +1,7 @@
 // deno-lint-ignore no-import-prefix -- Direct pin also resolves in isolated Edge workers without application import maps.
 import { buildConnector, Client } from 'npm:undici@7.30.1';
 import { signHermesWebhook } from './webhook-signing.ts';
-import {
-  DnsResolutionUnavailable,
-  resolvePublicDns,
-  type Resolver,
-  TargetRejected,
-  validateWebhookTarget,
-  type WebhookTarget,
-} from './webhook-targets.ts';
+import { DnsResolutionUnavailable, resolvePublicDns, type Resolver, TargetRejected, validateWebhookTarget, type WebhookTarget } from './webhook-targets.ts';
 export interface Delivery {
   id: string;
   leaseToken: string;
@@ -18,15 +11,7 @@ export interface Delivery {
   rawBody: string;
 }
 export type Category =
-  | 'accepted'
-  | 'http_retry'
-  | 'http_rejected'
-  | 'redirect'
-  | 'timeout'
-  | 'network'
-  | 'dns_unavailable'
-  | 'target_rejected'
-  | 'configuration';
+  'accepted' | 'http_retry' | 'http_rejected' | 'redirect' | 'timeout' | 'network' | 'dns_unavailable' | 'target_rejected' | 'configuration';
 export interface DeliveryResult {
   category: Category;
   status: number | null;
@@ -41,12 +26,7 @@ export interface HttpResult {
   status: number;
   retryAfter: string | null;
 }
-export type Sender = (
-  target: WebhookTarget,
-  body: string,
-  headers: Record<string, string>,
-  signal: AbortSignal,
-) => Promise<HttpResult>;
+export type Sender = (target: WebhookTarget, body: string, headers: Record<string, string>, signal: AbortSignal) => Promise<HttpResult>;
 const waits = [30, 120, 600, 1800, 7200, 21600, 86400];
 export function retryDelaySeconds(attempt: number, retryAfter: string | null, now: number): number {
   const base = waits[Math.max(0, Math.min(6, attempt - 1))];
@@ -95,7 +75,9 @@ export const sendPinnedWebhook: Sender = async (target, body, headers, signal) =
       signal,
     });
     // Bounded body drain verifies framing; no receiver text is stored or logged.
-    for await (const _chunk of response.body) { /* parser/size limits enforced by undici */ }
+    for await (const _chunk of response.body) {
+      /* parser/size limits enforced by undici */
+    }
     const retryAfter = response.headers['retry-after'];
     return { status: response.statusCode, retryAfter: typeof retryAfter === 'string' ? retryAfter : null };
   } finally {
@@ -109,74 +91,73 @@ export async function dispatchWebhookBatch(
 ): Promise<{ claimed: number; completed: number }> {
   const deliveries = await store.claim();
   const now = options.now ?? Date.now;
-  const results = await Promise.all(deliveries.map(async (delivery) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(new DOMException('timeout', 'TimeoutError')),
-      Math.min(10000, options.timeoutMs ?? 10000),
-    );
-    const signal = controller.signal;
-    let result: DeliveryResult;
-    try {
-      const attempt = async (): Promise<HttpResult> => {
-        const secret = await store.secret(delivery);
-        if (!secret) throw new Error('configuration');
-        const target = await validateWebhookTarget(delivery.targetUrl, options.resolve ?? resolvePublicDns);
-        signal.throwIfAborted();
-        const timestamp = Math.floor(now() / 1000).toString();
-        const signature = await signHermesWebhook(secret, timestamp, delivery.rawBody);
-        signal.throwIfAborted();
-        return (options.send ?? sendPinnedWebhook)(target, delivery.rawBody, {
-          'Content-Type': 'application/json',
-          'X-Request-ID': delivery.eventId,
-          'X-Webhook-Timestamp': timestamp,
-          'X-Webhook-Signature-V2': signature,
-        }, signal);
-      };
-      const response = await Promise.race([
-        attempt(),
-        new Promise<never>((_, reject) =>
-          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
-        ),
-      ]);
-      const status = response.status;
-      const category: Category = status >= 200 && status < 300
-        ? 'accepted'
-        : status >= 300 && status < 400
-        ? 'redirect'
-        : status === 408 || status === 429 || status >= 500
-        ? 'http_retry'
-        : 'http_rejected';
-      result = {
-        category,
-        status,
-        retrySeconds: category === 'http_retry' && delivery.attempt < 8
-          ? retryDelaySeconds(delivery.attempt, response.retryAfter, now())
-          : null,
-      };
-    } catch (error) {
-      const category: Category = signal.aborted
-        ? 'timeout'
-        : error instanceof DnsResolutionUnavailable
-        ? 'dns_unavailable'
-        : error instanceof TargetRejected
-        ? 'target_rejected'
-        : error instanceof Error && error.message === 'configuration'
-        ? 'configuration'
-        : 'network';
-      result = {
-        category,
-        status: null,
-        retrySeconds: delivery.attempt < 8 && category !== 'target_rejected'
-          ? retryDelaySeconds(delivery.attempt, null, now())
-          : null,
-      };
-    } finally {
-      clearTimeout(timeout);
-    }
-    // Lost acknowledgement intentionally leaves the lease for durable recovery.
-    return await store.complete(delivery, result);
-  }));
+  const results = await Promise.all(
+    deliveries.map(async delivery => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(new DOMException('timeout', 'TimeoutError')), Math.min(10000, options.timeoutMs ?? 10000));
+      const signal = controller.signal;
+      let result: DeliveryResult;
+      try {
+        const attempt = async (): Promise<HttpResult> => {
+          const secret = await store.secret(delivery);
+          if (!secret) throw new Error('configuration');
+          const target = await validateWebhookTarget(delivery.targetUrl, options.resolve ?? resolvePublicDns);
+          signal.throwIfAborted();
+          const timestamp = Math.floor(now() / 1000).toString();
+          const signature = await signHermesWebhook(secret, timestamp, delivery.rawBody);
+          signal.throwIfAborted();
+          return (options.send ?? sendPinnedWebhook)(
+            target,
+            delivery.rawBody,
+            {
+              'Content-Type': 'application/json',
+              'X-Request-ID': delivery.eventId,
+              'X-Webhook-Timestamp': timestamp,
+              'X-Webhook-Signature-V2': signature,
+            },
+            signal,
+          );
+        };
+        const response = await Promise.race([
+          attempt(),
+          new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })),
+        ]);
+        const status = response.status;
+        const category: Category =
+          status >= 200 && status < 300
+            ? 'accepted'
+            : status >= 300 && status < 400
+              ? 'redirect'
+              : status === 408 || status === 429 || status >= 500
+                ? 'http_retry'
+                : 'http_rejected';
+        result = {
+          category,
+          status,
+          retrySeconds: category === 'http_retry' && delivery.attempt < 8 ? retryDelaySeconds(delivery.attempt, response.retryAfter, now()) : null,
+        };
+      } catch (error) {
+        const category: Category = signal.aborted
+          ? 'timeout'
+          : error instanceof DnsResolutionUnavailable
+            ? 'dns_unavailable'
+            : error instanceof TargetRejected
+              ? 'target_rejected'
+              : error instanceof Error && error.message === 'configuration'
+                ? 'configuration'
+                : 'network';
+        result = {
+          category,
+          status: null,
+          retrySeconds: delivery.attempt < 8 && category !== 'target_rejected' ? retryDelaySeconds(delivery.attempt, null, now()) : null,
+        };
+      } finally {
+        clearTimeout(timeout);
+      }
+      // Lost acknowledgement intentionally leaves the lease for durable recovery.
+      return await store.complete(delivery, result);
+    }),
+  );
   return { claimed: deliveries.length, completed: results.filter(Boolean).length };
 }
 export function databaseDeliveryStore(url: string, key: string): DeliveryStore {
@@ -195,7 +176,7 @@ export function databaseDeliveryStore(url: string, key: string): DeliveryStore {
   }
   return {
     claim: () => rpc<Delivery[]>('claim_webhook_batch', { p_limit: 5 }),
-    secret: (d) => rpc<string | null>('webhook_delivery_secret', { p_delivery_id: d.id, p_lease_token: d.leaseToken }),
+    secret: d => rpc<string | null>('webhook_delivery_secret', { p_delivery_id: d.id, p_lease_token: d.leaseToken }),
     complete: (d, r) =>
       rpc<boolean>('complete_webhook_delivery', {
         p_delivery_id: d.id,

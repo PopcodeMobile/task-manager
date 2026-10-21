@@ -1,0 +1,98 @@
+✔ the complete token inventory and CSS consumers pass the guard (3.985ms)
+✔ unknown references, hardcoded CSS and inline regressions fail the guard (4.401834ms)
+✔ runtime geometry and user-owned color values are permitted (0.313209ms)
+✔ foundation overrides reach the actual button, overlay and sidebar styles (2.81725ms)
+✔ template migration is idempotent and preserves runtime geometry and data (0.635583ms)
+✔ catalog previews cannot dispatch seeded or destructive entity actions (0.437292ms)
+✖ source discovery includes the final React TS and TSX consumers (3.825458ms)
+✖ React controlled styles follow constants, spreads, assertions and conditional branches (0.361125ms)
+✖ static cn and cva utilities reject framework scales and modified arbitrary literals (0.409541ms)
+✖ semantic aliases require authored theme declarations; token utilities and runtime geometry stay valid (0.60175ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 6
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 71.962083
+
+✖ failing tests:
+
+test at tests/tokens.test.mjs:84:1
+✖ source discovery includes the final React TS and TSX consumers (3.825458ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(sources.some(file => file.path === 'src/app/App.tsx'))
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/tokens.test.mjs:85:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/tokens.test.mjs:89:1
+✖ React controlled styles follow constants, spreads, assertions and conditional branches (0.361125ms)
+  AssertionError [ERR_ASSERTION]: Missed padding: src/components/ui/probe.tsx: undefined --missing
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/tokens.test.mjs:100:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/tokens.test.mjs:103:1
+✖ static cn and cva utilities reject framework scales and modified arbitrary literals (0.409541ms)
+  AssertionError [ERR_ASSERTION]: Missed bg-red-500
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/tokens.test.mjs:113:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/tokens.test.mjs:116:1
+✖ semantic aliases require authored theme declarations; token utilities and runtime geometry stay valid (0.60175ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(auditTokenSources([base, component]).some(fault => fault.includes('bg-primary')))
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/tokens.test.mjs:125:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

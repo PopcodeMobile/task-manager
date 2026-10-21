@@ -1,0 +1,737 @@
+{
+  "interpretation": "Latest observed result per named case in each mode; consolidated runs, not a single all-green aggregate execution.",
+  "groups": {
+    "local-dev": {
+      "total": 67,
+      "passed": 67,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "file": "app.spec.js",
+          "title": "final entry reaches every named route and eight project views in both locales",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "app.spec.js",
+          "title": "language persistence retains literal task titles after create and reload",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "app.spec.js",
+          "title": "new workspace is empty, selected after reload and isolated from the original workspace",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "app.spec.js",
+          "title": "visible rich description retains formatting and strips executable markup",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "app.spec.js",
+          "title": "reaction authors remain literal text in the actual task discussion",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "app.spec.js",
+          "title": "foundation token overrides and system theme reach final React controls",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "cutover.spec.ts",
+          "title": "final SPA serves root, auth callback, consent and deep links with query-preserving reload",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "team-security.spec.js",
+          "title": "team markup stays literal through editor reload duplicate validation and project team picker",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "team-security.spec.js",
+          "title": "local profile and attachment metadata remain literal after persistence and preview",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "local entry edits existing browser graph, creates/comments, switches blank workspace and reloads",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "corrupted storage stays intact and shows a recoverable error without seeding over it",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "concurrent local edit keeps the original draft and blocks workspace switch until explicit conflict recovery",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "stored system theme follows media changes and a pre-auth locale survives reload",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "fresh secondary-workspace deep link preserves selection and migrates original legacy views only once",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "dirty completion requires explicit save and preserves effective fields after reload",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "task table filters, inline edits, columns, collapse and workspace/view preferences survive reload",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "board drag preserves manual order and recurring completion, column menus and bulk selection mutate atomically",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "bulk bounds expose all 101 selected and never apply a partial mutation",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "dirty move duplicate archive require save and preserve saved fields",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "multivalue filters and negation persist; list drag changes group and keyboard order; related deletion stays atomic",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "a native task drag cannot mutate an identical ID after changing workspace",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "task context menu supports right click, keyboard focus and guarded core actions",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "task context menu is invalidated across workspaces even when text IDs match",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "failed task view preferences show an explicit retry and retain stored bytes and unknown metadata",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "group composer creates in the hydrated default project and preserves an explicit valid choice",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "task details compose labels, subtask promotion, metadata, discussion and personal actions",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "subtask draft blocks drawer close and relation edits until explicitly saved",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "canonical detail controls reject cycles and keep unsafe literal metadata separate from rich content on mobile",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "detailed table completes subtasks and explicitly links and unlinks canonical dependencies",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "late personal menu failure cannot publish an error in a different workspace",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "remote subtask deletion retains the dirty editor until explicit discard",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "shared calendar and timeline create on date, preserve duration on native drag and reload",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "shared files filter preview rename duplicate unlink delete preserve metadata and scope",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "calendar overflow event details preferences and files beyond cursor stay literal on mobile",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "native schedule drag cannot cross workspace lifetime even with the same task ID",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "local file selection simulates metadata atomically and shared surfaces respect project scope",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "calendar event restores keyboard opener after Escape and close",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "calendar overflow restores keyboard opener after Escape and close",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "calendar overflow event restores keyboard opener after Escape and close",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project workflows templates eight tabs saved views and keyboard persist locally",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project editing members favorites sidebar ordering archive and full graph copies persist",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project and saved view conflicts preserve drafts after external update or deletion",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project saved imported schedules stay scoped and missing project is safe",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project copy atomic limit writes nothing and project deletion keeps live draft",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project overview status navigation activity and personal view keys remain scoped",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project copy personal-save retry retains committed result and prevents a second project",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project saved board view context menu supports keyboard rename delete and focus",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project collection table has aligned labeled cells and persists layout",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project copy replans after definitive source task update with retained draft",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project committed copy recovers favorites after source project update",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project copy replans after definitive source task delete with retained draft",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "project committed copy recovers favorites after source project delete",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "remaining routes teams members profile settings persist and canonical member relation survives reload",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "remaining routes preferences apply full drawer project defaults Saturday theme and mobile catalogue focus",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "remaining routes inbox read reply favorites search archive and 404 visible workflows",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "remaining all registered routes plus fallback eight project tabs auth and mobile PT navigation render",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "remaining home and my tasks create complete filters palette scopes and local demo settings preserve workspace",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "6c fix inbox drafts stay with their task across failed send navigation and mobile Back",
+          "status": "passed",
+          "run": "task6d-local-dev-pXYmPF"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "6c fix project creation requests reopen mounted collection and project with dirty guard",
+          "status": "passed",
+          "run": "task6d-local-dev-ZcIfJ5"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "6c evidence overview workload and milestone links preserve destination",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "6c evidence states controls simulate safely and restore keyboard focus",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "6c evidence project and task favorites star unstar and survive reload",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "6c evidence activity category and actor filters retain historical literals and localize new events",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "6c fix2 deleted team preserves visible draft through polling and explicit discard releases navigation",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "6c fix2 reset refreshes settings baseline and discovery while external workspace edits still reject stale saves",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "local calendar boundary > Today composer uses the actual local day at 22:30 and preserves it after reload",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        },
+        {
+          "file": "local-panel.spec.ts",
+          "title": "6c fix local calendar boundary > overdue metric opens the same tasks at 22:30 local after UTC midnight",
+          "status": "passed",
+          "run": "task6d-local-dev-rXaxms"
+        }
+      ]
+    },
+    "agent-dev": {
+      "total": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "login, workspace, create, edit, board, drawer, comment and agent supervision",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "active reservation blocks completion and explicit human resume is audited",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "version conflict keeps draft, network failure retries, safe rich text and empty personal preferences",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "workspace switch and logout cannot hydrate delayed identity results",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "MCP activity polling invalidates without reload; light dark PT EN mobile visual evidence",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "signup verification and neutral password reset preserve the consent destination",
+          "status": "passed",
+          "run": "task6d-agent-dev-emBqhO"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "failed draft flush retains drawer and prevents navigation until retry succeeds",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "recovery validates matching passwords and returns to the preserved destination",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "explicit task deletion uses current CAS and confirmation",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "browser back keeps an unsaved draft when its flush fails",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "an event committed during initial hydration cannot be skipped by the polling cursor",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "same-session token rotation preserves dirty draft, original CAS and failed-command retry identity",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "actual OAuth MCP agent write reaches already-open task and agent activity by polling",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "actual cloud task views follow cursors, keep atomic CAS/claim guards and require saving dirty actions",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "actual cloud task context menu completes, reopens and respects active reservations",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "actual cloud details persist canonical relations, personal stars, author reactions and protected claims",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "successful relation command refreshes canonical links even when event reading fails",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "actual cloud schedules and files preserve duration, CAS, claims, metadata and cursor reload",
+          "status": "passed",
+          "run": "task6d-agent-dev-emBqhO"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "actual cloud projects compose templates members saved views full graph copies and reload",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "actual cloud remaining teams workspace notifications and unavailable settings use real contracts",
+          "status": "passed",
+          "run": "task6d-agent-dev-emBqhO"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "actual cloud fix team absent membership conflicts replan and ambiguous retry preserve identity",
+          "status": "passed",
+          "run": "task6d-agent-dev-emBqhO"
+        },
+        {
+          "file": "agent-panel.spec.ts",
+          "title": "real normalized backend > validated JWT operations, agent lease, human intervention and safe activity",
+          "status": "passed",
+          "run": "task6d-agent-dev-9BmtFg"
+        },
+        {
+          "file": "cloud.spec.js",
+          "title": "final-entry live cloud lifecycle > root login creates isolated tenant project and task then logout clears rendered tenant",
+          "status": "passed",
+          "run": "task6d-agent-dev-emBqhO"
+        },
+        {
+          "file": "cloud.spec.js",
+          "title": "final-entry live cloud lifecycle > pre-auth language survives root document reload",
+          "status": "passed",
+          "run": "task6d-agent-dev-emBqhO"
+        },
+        {
+          "file": "cutover.spec.ts",
+          "title": "final SPA serves root, auth callback, consent and deep links with query-preserving reload",
+          "status": "passed",
+          "run": "task6d-agent-dev-emBqhO"
+        }
+      ]
+    },
+    "oauth-dev": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "direct consent reload opens independent React auth and retains the request",
+          "status": "passed",
+          "run": "task6d-oauth-dev-5a6w3M"
+        },
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "real OAuth consent > approve selected workspace, exchange actual PKCE code, and revoke connection",
+          "status": "passed",
+          "run": "task6d-oauth-dev-5a6w3M"
+        },
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "real OAuth consent > deny creates no active grant, invalid callback stays safe, and English/theme work",
+          "status": "passed",
+          "run": "task6d-oauth-dev-5a6w3M"
+        },
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "real OAuth consent > failure after Auth approval leaves no active connection or executor",
+          "status": "passed",
+          "run": "task6d-oauth-dev-5a6w3M"
+        },
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "real OAuth consent > two tabs with the same request preserve the first read selection when the write tab fails",
+          "status": "passed",
+          "run": "task6d-oauth-dev-5a6w3M"
+        },
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "real OAuth consent > lost activation response cannot cancel committed access and explicit revoke still works",
+          "status": "passed",
+          "run": "task6d-oauth-dev-5a6w3M"
+        }
+      ]
+    },
+    "local-preview": {
+      "total": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "file": "app.spec.js",
+          "title": "final entry reaches every named route and eight project views in both locales",
+          "status": "passed",
+          "run": "task6d-local-preview-rv8KG4"
+        },
+        {
+          "file": "app.spec.js",
+          "title": "language persistence retains literal task titles after create and reload",
+          "status": "passed",
+          "run": "task6d-local-preview-rv8KG4"
+        },
+        {
+          "file": "app.spec.js",
+          "title": "new workspace is empty, selected after reload and isolated from the original workspace",
+          "status": "passed",
+          "run": "task6d-local-preview-rv8KG4"
+        },
+        {
+          "file": "app.spec.js",
+          "title": "visible rich description retains formatting and strips executable markup",
+          "status": "passed",
+          "run": "task6d-local-preview-rv8KG4"
+        },
+        {
+          "file": "app.spec.js",
+          "title": "reaction authors remain literal text in the actual task discussion",
+          "status": "passed",
+          "run": "task6d-local-preview-rv8KG4"
+        },
+        {
+          "file": "app.spec.js",
+          "title": "foundation token overrides and system theme reach final React controls",
+          "status": "passed",
+          "run": "task6d-local-preview-rv8KG4"
+        },
+        {
+          "file": "cutover.spec.ts",
+          "title": "final SPA serves root, auth callback, consent and deep links with query-preserving reload",
+          "status": "passed",
+          "run": "task6d-local-preview-rv8KG4"
+        }
+      ]
+    },
+    "agent-preview": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "file": "cloud.spec.js",
+          "title": "final-entry live cloud lifecycle > root login creates isolated tenant project and task then logout clears rendered tenant",
+          "status": "passed",
+          "run": "task6d-agent-preview-vIZTtz"
+        },
+        {
+          "file": "cloud.spec.js",
+          "title": "final-entry live cloud lifecycle > pre-auth language survives root document reload",
+          "status": "passed",
+          "run": "task6d-agent-preview-vIZTtz"
+        },
+        {
+          "file": "cutover.spec.ts",
+          "title": "final SPA serves root, auth callback, consent and deep links with query-preserving reload",
+          "status": "passed",
+          "run": "task6d-agent-preview-vIZTtz"
+        }
+      ]
+    },
+    "oauth-preview": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "direct consent reload opens independent React auth and retains the request",
+          "status": "passed",
+          "run": "task6d-oauth-preview-jGPRT5"
+        },
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "real OAuth consent > approve selected workspace, exchange actual PKCE code, and revoke connection",
+          "status": "passed",
+          "run": "task6d-oauth-preview-jGPRT5"
+        },
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "real OAuth consent > deny creates no active grant, invalid callback stays safe, and English/theme work",
+          "status": "passed",
+          "run": "task6d-oauth-preview-jGPRT5"
+        },
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "real OAuth consent > failure after Auth approval leaves no active connection or executor",
+          "status": "passed",
+          "run": "task6d-oauth-preview-jGPRT5"
+        },
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "real OAuth consent > two tabs with the same request preserve the first read selection when the write tab fails",
+          "status": "passed",
+          "run": "task6d-oauth-preview-jGPRT5"
+        },
+        {
+          "file": "oauth-consent.spec.ts",
+          "title": "real OAuth consent > lost activation response cannot cancel committed access and explicit revoke still works",
+          "status": "passed",
+          "run": "task6d-oauth-preview-jGPRT5"
+        }
+      ]
+    }
+  }
+}

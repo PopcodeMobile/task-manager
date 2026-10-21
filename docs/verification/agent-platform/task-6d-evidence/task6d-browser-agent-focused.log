@@ -1,0 +1,25 @@
+{"exitCode":0,"output":"/tmp/task6d-agent-dev-9BmtFg"}
+
+Running 18 tests using 1 worker
+
+  ✓   1 tests/browser/agent-panel.spec.ts:228:1 › login, workspace, create, edit, board, drawer, comment and agent supervision (1.9s)
+  ✓   2 tests/browser/agent-panel.spec.ts:255:1 › active reservation blocks completion and explicit human resume is audited (832ms)
+  ✓   3 tests/browser/agent-panel.spec.ts:269:1 › version conflict keeps draft, network failure retries, safe rich text and empty personal preferences (940ms)
+  ✓   4 tests/browser/agent-panel.spec.ts:290:1 › workspace switch and logout cannot hydrate delayed identity results (757ms)
+  ✓   5 tests/browser/agent-panel.spec.ts:309:1 › MCP activity polling invalidates without reload; light dark PT EN mobile visual evidence (10.9s)
+  ✓   6 tests/browser/agent-panel.spec.ts:353:3 › real normalized backend › validated JWT operations, agent lease, human intervention and safe activity (12.9s)
+  ✓   7 tests/browser/agent-panel.spec.ts:448:1 › failed draft flush retains drawer and prevents navigation until retry succeeds (789ms)
+  ✓   8 tests/browser/agent-panel.spec.ts:464:1 › recovery validates matching passwords and returns to the preserved destination (785ms)
+  ✓   9 tests/browser/agent-panel.spec.ts:497:1 › explicit task deletion uses current CAS and confirmation (769ms)
+  ✓  10 tests/browser/agent-panel.spec.ts:508:1 › browser back keeps an unsaved draft when its flush fails (671ms)
+  ✓  11 tests/browser/agent-panel.spec.ts:520:1 › an event committed during initial hydration cannot be skipped by the polling cursor (566ms)
+  ✓  12 tests/browser/agent-panel.spec.ts:546:1 › same-session token rotation preserves dirty draft, original CAS and failed-command retry identity (921ms)
+  ✓  13 tests/browser/agent-panel.spec.ts:600:1 › actual OAuth MCP agent write reaches already-open task and agent activity by polling (21.4s)
+  ✓  14 tests/browser/agent-panel.spec.ts:812:1 › actual cloud task views follow cursors, keep atomic CAS/claim guards and require saving dirty actions (4.7s)
+  ✓  15 tests/browser/agent-panel.spec.ts:965:1 › actual cloud task context menu completes, reopens and respects active reservations (1.7s)
+Task 6b2 browser RPC counts: {"read_operation:200":122,"list_workspace_members:200":3,"execute_operation:200":9}
+  ✓  16 tests/browser/agent-panel.spec.ts:1060:1 › actual cloud details persist canonical relations, personal stars, author reactions and protected claims (3.1s)
+  ✓  17 tests/browser/agent-panel.spec.ts:1180:1 › successful relation command refreshes canonical links even when event reading fails (846ms)
+  ✓  18 tests/browser/agent-panel.spec.ts:1417:1 › actual cloud projects compose templates members saved views full graph copies and reload (4.4s)
+
+  18 passed (1.2m)

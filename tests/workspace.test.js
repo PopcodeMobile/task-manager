@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const modules = await Promise.allSettled([import('../src/workspace/local.js'), import('../src/workspace/controller.js')]);
+const modules = await Promise.allSettled([import('../src/workspace/local.js'), import('./fixtures/legacy-workspace-controller.js')]);
 const storage = () => {
   const values = new Map();
   return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
@@ -116,7 +116,7 @@ test('clearing identity during an in-flight save cannot restore old state', asyn
 });
 
 test('explicit cloud configuration rejects partial config and privileged keys', async () => {
-  const { workspaceConfig } = await import('../src/workspace/config.js');
+  const { workspaceConfig } = await import('./fixtures/legacy-workspace-config.js');
   assert.deepEqual(workspaceConfig({}), { mode: 'local' });
   assert.throws(() => workspaceConfig({ VITE_DATA_MODE: 'supabase', VITE_SUPABASE_URL: 'https://test.supabase.co' }), { code: 'configuration' });
   assert.throws(
@@ -237,28 +237,17 @@ test('workspace normalization rejects executable structural fields while retaini
   assert.equal(normalizeWorkspace({ ...blank(), tasks: [{ id: 'task', title: '<Draft> & revisão' }] }, { id: 'w1' }).tasks[0].title, '<Draft> & revisão');
 });
 
-test('auth locale survives identity clearing without retaining profile data; saved identity preferences take precedence', async () => {
-  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+test('auth locale survives identity changes without leaking profile data; saved identity preferences take precedence', async () => {
+  const { loadAppearance, saveAppearance } = await import('../src/workspace/device-preferences.js');
   const s = storage();
-  Object.defineProperty(globalThis, 'localStorage', { value: s, configurable: true });
-  try {
-    const { S, save, clearWorkspace, initializeWorkspace } = await import('../src/core/store.js');
-    S.prefs.lang = 'en-US';
-    S.prefs.name = 'Private profile';
-    assert.equal(save(), true);
-    S.prefs.lang = 'pt-BR';
-    clearWorkspace();
-    assert.equal(S.prefs.lang, 'en');
-    assert.notEqual(S.prefs.name, 'Private profile');
-    assert.deepEqual(JSON.parse(s.getItem('gr8r.auth.preferences')), { lang: 'en' });
-    s.setItem('gr8r.preferences.local', JSON.stringify({ prefs: { lang: 'pt-BR' } }));
-    await initializeWorkspace();
-    assert.equal(S.prefs.lang, 'pt-BR');
-    clearWorkspace();
-  } finally {
-    if (previous) Object.defineProperty(globalThis, 'localStorage', previous);
-    else delete globalThis.localStorage;
-  }
+  saveAppearance(s, 'first-user', { lang: 'en', name: 'Private profile' });
+  assert.equal(loadAppearance(s, 'anonymous').lang, 'en');
+  assert.equal(loadAppearance(s, 'anonymous').name, undefined);
+  assert.deepEqual(JSON.parse(s.getItem('gr8r.auth.preferences')), { lang: 'en' });
+  saveAppearance(s, 'second-user', { lang: 'pt-BR' });
+  assert.equal(loadAppearance(s, 'first-user').lang, 'en');
+  assert.equal(loadAppearance(s, 'second-user').lang, 'pt-BR');
+  assert.equal(loadAppearance(s, 'second-user').name, undefined);
 });
 
 test('workspace slug generation handles Portuguese names and keeps migrated URLs intact', async () => {

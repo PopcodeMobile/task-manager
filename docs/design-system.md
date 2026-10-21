@@ -1,35 +1,23 @@
 # Adapt the design system
 
-`src/styles/tokens.css` is the source of values. `src/core/design-tokens.js` lists every
-public token and shared accent choice. The application's Design system page reads their
-computed values and previews actual controls in the selected language and theme.
+`src/styles/tokens.css` defines the values; `src/core/design-tokens.js` inventories all 234 public tokens and shared accents for tooling. The React Design system route previews actual buttons, fields, dialogs and six semantic color swatches in the current language/theme. It is not a full computed-value inventory; `check:tokens` checks that inventory.
 
-Use foundational tokens for scale and semantic tokens for meaning:
+| Change            | Tokens                                                        |
+| ----------------- | ------------------------------------------------------------- |
+| Brand             | `--acc-l`, `--acc-d`, `--brand-bg`, `--brand-fg`              |
+| Surface and text  | `--bg`, `--surface`, `--text`, `--text-2`, `--border`         |
+| Space and corners | `--space-unit`, `--radius-unit`, derived `--s-*`, `--r-*`     |
+| Typography        | `--font`, `--mono`, `--fs-*`, `--fw-*`, `--lh-*`              |
+| Density/layout    | `--row-h`, `--card-pad`, `--gutter`, `--side-w`, `--drawer-w` |
+| Feedback          | `--success`, `--warning`, `--danger`, `--focus-ring`          |
+| Motion/layers     | `--dur-*`, `--ease`, `--z-*`                                  |
 
-| Change             | Tokens                                                        |
-| ------------------ | ------------------------------------------------------------- |
-| Brand              | `--acc-l`, `--acc-d`, `--brand-bg`, `--brand-fg`              |
-| Surfaces and text  | `--bg`, `--surface`, `--text`, `--text-2`, `--border`         |
-| Space and corners  | `--space-unit`, `--radius-unit`, derived `--s-*` and `--r-*`  |
-| Type               | `--font`, `--mono`, `--fs-*`, `--fw-*`, `--lh-*`              |
-| Density and layout | `--row-h`, `--card-pad`, `--gutter`, `--side-w`, `--drawer-w` |
-| Feedback           | `--success`, `--warning`, `--danger`, `--focus-ring`          |
-| Motion and layers  | `--dur-*`, `--ease`, `--z-*`                                  |
+React's App preference effect resolves system theme and applies accent/density overrides. Keep accents in `ACCENTS`, including light/dark values. The foundation remains the source for both CSS and `@theme inline` semantic Tailwind aliases in `src/app/styles.css`. A semantic alias is allowed only when its authored declaration resolves to a declared foundation variable; an arbitrary familiar shadcn name is not exempt.
 
-Set a new brand palette in the token file and define both light and dark accent values.
-`applyPrefs()` resolves the system theme and applies user accent/density choices. Runtime
-preference overrides take precedence over stylesheet defaults. Keep new accents in
-`ACCENTS`, which feeds settings and the catalog together.
+For components, reference tokens instead of copying fixed colors, space, typography, radius or motion. Add public definitions to `TOKEN_GROUPS`. `npm run check:tokens` retains inventory parity, duplicate, reference, accent/status and CSS/template checks, and parses JS/JSX/TS/TSX with the installed TypeScript parser. It checks controlled `style` objects, local constants/spreads/shorthand/conditional branches, and static class sources in JSX, `cn`, `clsx` and `cva`, including variants, modifiers and arbitrary values. No shadcn/component directory is skipped.
 
-For a component, reference semantic tokens instead of copying a literal color or spacing
-value. Add a token to `TOKEN_GROUPS` whenever adding it to the public stylesheet. Run
-`npm run check:tokens`: it checks inventory parity, unresolved references, colors outside
-tokens, and fixed spacing/type/radius/motion declarations in CSS and inline templates.
+Examples: `hover:bg-primary` requires the actual semantic alias; `p-[var(--s-4)]` and `gap-(--s-2)` require defined tokens. `hover:p-4`, palette colors, `rounded` and fixed arbitrary type/spacing values fail. Token calculations can use numeric multipliers. Static control values such as `style={{ padding: 12 }}` fail; dynamic geometry such as percentage progress, schedule positions or measured widths remains runtime data. User/project/member colors remain validated domain values; the guard does not reject every hex string in arbitrary data.
 
-Widths derived from data, draggable positions, table column measurements, percentages and
-illustration geometry remain runtime values. User-selected project/member colors are domain
-data, validated separately. The audit deliberately does not turn those into theme constants.
+This is a static local-source guard, not evaluation of arbitrary imported/generated/runtime expressions. Business validation and browser tests cover runtime colors and geometry. Shared strict `safeRichText` sanitizes explicitly supported description/discussion HTML; ordinary content uses React escaping.
 
-Validate changes on the catalog, a project board and a task drawer in both themes, with a
-mobile viewport and Portuguese/English. Browser tests prove foundational radius overrides
-and automatic system-theme changes propagate to controls.
+Validate changes on the catalogue, board and drawer in light/dark, mobile/desktop and PT/EN. Current browser tests assert radius overrides and system media changes reach real React controls. See [verification](verification.md) for the final interaction and visual matrix.

@@ -40,8 +40,6 @@ try {
     console.log(JSON.stringify({ schedulerJobId: job }));
   }
 } catch {
-  console.error(
-    'Webhook setup failed. Check the selected action, administrator connection, public HTTPS DNS and private environment configuration.',
-  );
+  console.error('Webhook setup failed. Check the selected action, administrator connection, public HTTPS DNS and private environment configuration.');
   Deno.exit(1);
 }

@@ -1,0 +1,95 @@
+Check scripts/setup-webhooks.ts
+Check supabase/functions/api/index.ts
+Check supabase/functions/mcp/index.ts
+Check supabase/functions/webhook-dispatch/index.ts
+Check supabase/functions/tests/api.test.ts
+Check supabase/functions/tests/file-duplication.test.ts
+Check supabase/functions/tests/integration.test.ts
+Check supabase/functions/tests/mcp.test.ts
+Check supabase/functions/tests/oauth.test.ts
+Check supabase/functions/tests/operations.test.ts
+Check supabase/functions/tests/task-graph-copy.test.ts
+Check supabase/functions/tests/team-membership-baselines.test.ts
+Check supabase/functions/tests/webhook-delivery.test.ts
+Check supabase/functions/tests/webhook-transport.test.ts
+Check supabase/tests/webhook-dispatch-live.ts
+Check supabase/tests/webhook-edge/main.ts
+Check supabase/tests/webhook-edge/probe.ts
+TS2307 [ERROR]: Cannot find module 'file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/_shared/webhook-delivery.ts'.
+    at file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-edge/probe.ts:1:35
+
+TS2307 [ERROR]: Cannot find module 'file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/_shared/webhook-targets.ts'.
+    at file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-edge/probe.ts:2:39
+
+TS2307 [ERROR]: Cannot find module 'file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-dispatch/index.ts'.
+    at file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-edge/probe.ts:3:38
+
+TS2304 [ERROR]: Cannot find name 'EdgeRuntime'.
+  const worker = await EdgeRuntime.userWorkers.create({
+                       ~~~~~~~~~~~
+    at file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-edge/main.ts:2:24
+
+TS2322 [ERROR]: Type '{ apikey?: undefined; authorization?: undefined; 'X-Webhook-Worker-Key'?: undefined; } | { apikey: string; authorization?: undefined; 'X-Webhook-Worker-Key'?: undefined; } | { authorization: string; apikey?: undefined; 'X-Webhook-Worker-Key'?: undefined; } | { ...; }' is not assignable to type 'HeadersInit | undefined'.
+  Type '{ apikey?: undefined; authorization?: undefined; 'X-Webhook-Worker-Key'?: undefined; }' is not assignable to type 'HeadersInit | undefined'.
+    Type '{ apikey?: undefined; authorization?: undefined; 'X-Webhook-Worker-Key'?: undefined; }' is not assignable to type 'Record<string, string>'.
+      Property 'apikey' is incompatible with index signature.
+        Type 'undefined' is not assignable to type 'string'.
+      statuses.push((await handler(new Request('https://fixture.invalid', { method: 'POST', headers }))).status);
+                                                                                            ~~~~~~~
+    at file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-edge/probe.ts:25:93
+
+TS7034 [ERROR]: Variable 'peers' implicitly has type 'any[]' in some locations where its type cannot be determined.
+  const peers = [];
+        ~~~~~
+    at file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-edge/probe.ts:28:9
+
+TS2769 [ERROR]: No overload matches this call.
+  Overload 1 of 3, '(options: ConnectOptions): Promise<TcpConn>', gave the following error.
+    Argument of type 'ConnectOptions | UnixConnectOptions | VsockConnectOptions' is not assignable to parameter of type 'ConnectOptions'.
+      Property 'port' is missing in type 'UnixConnectOptions' but required in type 'ConnectOptions'.
+  Overload 2 of 3, '(options: UnixConnectOptions): Promise<UnixConn>', gave the following error.
+    Argument of type 'ConnectOptions | UnixConnectOptions | VsockConnectOptions' is not assignable to parameter of type 'UnixConnectOptions'.
+      Property 'path' is missing in type 'ConnectOptions' but required in type 'UnixConnectOptions'.
+  Overload 3 of 3, '(options: VsockConnectOptions): Promise<VsockConn>', gave the following error.
+    Argument of type 'ConnectOptions | UnixConnectOptions | VsockConnectOptions' is not assignable to parameter of type 'VsockConnectOptions'.
+      Property 'cid' is missing in type 'ConnectOptions' but required in type 'VsockConnectOptions'.
+    const conn = await connect(options);
+                               ~~~~~~~
+    at file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-edge/probe.ts:31:32
+
+    'port' is declared here.
+        port: number;
+        ~~~~
+        at asset:///lib.deno.net.d.ts:400:5    'path' is declared here.
+        path: string;
+        ~~~~
+        at asset:///lib.deno.net.d.ts:482:5    'cid' is declared here.
+        cid: number;
+        ~~~
+        at asset:///lib.deno.net.d.ts:521:5
+
+TS2339 [ERROR]: Property 'hostname' does not exist on type 'ConnectOptions | UnixConnectOptions | VsockConnectOptions'.
+  Property 'hostname' does not exist on type 'UnixConnectOptions'.
+    peers.push({ requested: options.hostname, peer: conn.remoteAddr.hostname });
+                                    ~~~~~~~~
+    at file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-edge/probe.ts:32:37
+
+TS2339 [ERROR]: Property 'hostname' does not exist on type 'never'.
+  The intersection 'NetAddr & UnixAddr & VsockAddr' was reduced to 'never' because property 'transport' has conflicting types in some constituents.
+    peers.push({ requested: options.hostname, peer: conn.remoteAddr.hostname });
+                                                                    ~~~~~~~~
+    at file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-edge/probe.ts:32:69
+
+TS7005 [ERROR]: Variable 'peers' implicitly has an 'any[]' type.
+      peers,
+      ~~~~~
+    at file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-edge/probe.ts:49:7
+
+TS7005 [ERROR]: Variable 'peers' implicitly has an 'any[]' type.
+    return Response.json({ mode, error: 'transport_failed', peers }, { status: 500 });
+                                                            ~~~~~
+    at file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/tests/webhook-edge/probe.ts:54:61
+
+Found 11 errors.
+
+error: Type checking failed.

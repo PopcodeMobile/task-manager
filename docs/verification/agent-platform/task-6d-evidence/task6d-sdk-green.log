@@ -1,0 +1,34 @@
+✔ the complete token inventory and CSS consumers pass the guard (92.824667ms)
+✔ unknown references, hardcoded CSS and inline regressions fail the guard (52.606458ms)
+✔ runtime geometry and user-owned color values are permitted (0.363791ms)
+✔ foundation overrides reach the supported React button, drawer and sidebar styles (2.480125ms)
+✔ template migration is idempotent and preserves runtime geometry and data (0.868166ms)
+✔ catalogue demonstrations never call entity writers (0.55525ms)
+✔ source discovery includes the final React TS and TSX consumers (0.140458ms)
+✔ React controlled styles follow constants, spreads, assertions and conditional branches (0.881375ms)
+✔ static cn and cva utilities reject framework scales and modified arbitrary literals (0.724541ms)
+✔ semantic aliases require authored theme declarations; token utilities and runtime geometry stay valid (0.920584ms)
+✔ real normalized SDK Auth joins tenant CAS metadata and authoritative roles (360.451875ms)
+✔ real SDK explicit legacy cutover preserves snapshot and denies every old writer after new writes (120.111541ms)
+✔ legacy data migrates only to first workspace; other workspaces start empty (3.382917ms)
+✔ local revision conflict preserves the winning tab data (0.99975ms)
+✔ pending save flushes original tenant before switching and stale scopes are refused (0.48175ms)
+✔ failed persistence blocks switch and retains unsaved data for retry (0.7445ms)
+✔ clearing identity during an in-flight save cannot restore old state (0.449542ms)
+✔ explicit cloud configuration rejects partial config and privileged keys (0.972583ms)
+✔ scope from a previous signed-in controller never matches a new session (0.190834ms)
+✔ local save reaches storage before the next navigation event without debounce (1.981208ms)
+✔ edits made while another workspace loads are flushed to the original tenant (1.896041ms)
+✔ logout while a workspace loads cannot rehydrate its private data (1.668667ms)
+✔ delayed reload cannot resurrect workspace data after logout (1.622625ms)
+✔ workspace normalization rejects executable structural fields while retaining user text (2.016833ms)
+✔ auth locale survives identity changes without leaking profile data; saved identity preferences take precedence (22.776167ms)
+✔ workspace slug generation handles Portuguese names and keeps migrated URLs intact (0.436959ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 561.243959

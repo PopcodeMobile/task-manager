@@ -1,4 +1,4 @@
-Deno.serve(async (req) => {
+Deno.serve(async req => {
   const worker = await EdgeRuntime.userWorkers.create({
     servicePath: '/probe/probe',
     memoryLimitMb: 256,

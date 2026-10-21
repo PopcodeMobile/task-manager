@@ -1,0 +1,58 @@
+# Agent platform evidence archive
+
+These source-owned reports and independent review rulings were preserved from the staged implementation workspace before cleanup. They record their own BASE/HEAD and chronology. Earlier failures/pending statements are historical; later appends and final cutover evidence take precedence. Paths under `/tmp` or private config directories identify original local logs and are not published credentials or a promise those logs remain available forever.
+
+The final [Task6d report](task-6d-report.md) and [verification matrix](../../verification.md) identify current evidence. Stage reports are retained rather than rewriting their historical claims. No scratch directory has been deleted. Final Task6d independent review, whole-branch review and actual activation remain root responsibilities.
+
+The exact [rulings](final-rulings-source.md) preserve withdrawn alternatives as well as superseding decisions, including the disproved private-http proposal. The [hosted proof](hosted-preactivation-proof.md) includes008 API/MCP and current synthetic/real-client boundaries. [Isolated Hermes proof](task-7-hermes-isolated-runtime.md) is pinned synthetic-runtime evidence, not deployed service acceptance.
+
+## Preserved records
+
+- [final-rulings-source.md](final-rulings-source.md)
+- [hosted-preactivation-proof.md](hosted-preactivation-proof.md)
+- [task-1-report.md](task-1-report.md)
+- [task-2-report.md](task-2-report.md)
+- [task-2-review.md](task-2-review.md)
+- [task-3-report.md](task-3-report.md)
+- [task-3-review.md](task-3-review.md)
+- [task-4-report.md](task-4-report.md)
+- [task-4-rereview-1.md](task-4-rereview-1.md)
+- [task-4-rereview-2.md](task-4-rereview-2.md)
+- [task-4-review.md](task-4-review.md)
+- [task-4a-report.md](task-4a-report.md)
+- [task-4a-review.md](task-4a-review.md)
+- [task-4b-report.md](task-4b-report.md)
+- [task-4b-rereview-1.md](task-4b-rereview-1.md)
+- [task-4b-review.md](task-4b-review.md)
+- [task-4c-report.md](task-4c-report.md)
+- [task-4c-review.md](task-4c-review.md)
+- [task-4d-report.md](task-4d-report.md)
+- [task-4d-review.md](task-4d-review.md)
+- [task-5-report.md](task-5-report.md)
+- [task-5-rereview-1.md](task-5-rereview-1.md)
+- [task-5-review.md](task-5-review.md)
+- [task-6-route-inventory.md](task-6-route-inventory.md)
+- [task-6a-report.md](task-6a-report.md)
+- [task-6a-rereview-1.md](task-6a-rereview-1.md)
+- [task-6a-review.md](task-6a-review.md)
+- [task-6b0-report.md](task-6b0-report.md)
+- [task-6b0-rereview-1.md](task-6b0-rereview-1.md)
+- [task-6b0-review.md](task-6b0-review.md)
+- [task-6b1-report.md](task-6b1-report.md)
+- [task-6b1-rereview-1.md](task-6b1-rereview-1.md)
+- [task-6b1-review.md](task-6b1-review.md)
+- [task-6b2-report.md](task-6b2-report.md)
+- [task-6b2-rereview-1.md](task-6b2-rereview-1.md)
+- [task-6b2-review.md](task-6b2-review.md)
+- [task-6b3-report.md](task-6b3-report.md)
+- [task-6b3-rereview-1.md](task-6b3-rereview-1.md)
+- [task-6b3-review.md](task-6b3-review.md)
+- [task-6b4-report.md](task-6b4-report.md)
+- [task-6b4-rereview-1.md](task-6b4-rereview-1.md)
+- [task-6b4-review.md](task-6b4-review.md)
+- [task-6c-report.md](task-6c-report.md)
+- [task-6c-rereview-1.md](task-6c-rereview-1.md)
+- [task-6c-rereview-2.md](task-6c-rereview-2.md)
+- [task-6c-review.md](task-6c-review.md)
+- [task-7-hermes-isolated-runtime.md](task-7-hermes-isolated-runtime.md)
+- [ui-api-parity-notes.md](ui-api-parity-notes.md)

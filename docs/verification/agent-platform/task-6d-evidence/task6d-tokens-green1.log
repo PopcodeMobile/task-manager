@@ -1,0 +1,18 @@
+✔ the complete token inventory and CSS consumers pass the guard (5.488625ms)
+✔ unknown references, hardcoded CSS and inline regressions fail the guard (134.077ms)
+✔ runtime geometry and user-owned color values are permitted (0.35725ms)
+✔ foundation overrides reach the actual button, overlay and sidebar styles (2.510417ms)
+✔ template migration is idempotent and preserves runtime geometry and data (0.673458ms)
+✔ catalog previews cannot dispatch seeded or destructive entity actions (0.4815ms)
+✔ source discovery includes the final React TS and TSX consumers (0.084083ms)
+✔ React controlled styles follow constants, spreads, assertions and conditional branches (0.746083ms)
+✔ static cn and cva utilities reject framework scales and modified arbitrary literals (0.706083ms)
+✔ semantic aliases require authored theme declarations; token utilities and runtime geometry stay valid (0.989625ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 311.358375

@@ -2,6 +2,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { auditReactSource, semanticAliases } from './token-react.mjs';
 import { ACCENTS, TOKEN_GROUPS } from '../src/core/design-tokens.js';
 
 const STYLE_COLOR = /#[\da-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\(/i;
@@ -21,7 +22,7 @@ export async function readProjectSources(base = '.') {
   }
   return Promise.all(
     (await walk(`${base}/src`))
-      .filter(path => /\.(?:css|js)$/.test(path))
+      .filter(path => /\.(?:css|js|jsx|ts|tsx)$/.test(path))
       .map(async path => ({ path: path.replace(`${base}/`, ''), source: await readFile(path, 'utf8') })),
   );
 }
@@ -41,6 +42,7 @@ export function auditTokenSources(sources, { checkInline = true } = {}) {
     for (const field of ['token', 'lightToken', 'darkToken'])
       if (!publicTokens.has(accent[field])) failures.push(`Accent ${accent.id} references undefined ${accent[field]}`);
 
+  const aliases = semanticAliases(sources);
   for (const { path, source } of sources) {
     if (path.includes('/locales/')) continue;
     const clean = stripComments(source);
@@ -49,6 +51,7 @@ export function auditTokenSources(sources, { checkInline = true } = {}) {
     if (/var\(--st-\$\{/.test(clean))
       for (const status of ['backlog', 'todo', 'progress', 'review', 'done'])
         if (!publicTokens.has(`--st-${status}`)) failures.push(`${path}: missing status token --st-${status}`);
+    for (const match of clean.matchAll(/\((--[\w-]+)\)/g)) if (!declared.has(match[1])) failures.push(`${path}: undefined ${match[1]}`);
     if (path.endsWith('tokens.css')) continue;
     if (path.endsWith('.css')) {
       if (STYLE_COLOR.test(clean)) failures.push(`${path}: fixed style color outside tokens.css`);
@@ -59,6 +62,7 @@ export function auditTokenSources(sources, { checkInline = true } = {}) {
         if (/^(animation|transition)/.test(property) && /\b\d*\.?\d+(?:ms|s)\b/.test(value)) failures.push(`${path}: fixed motion value: ${value.trim()}`);
       }
     } else if (checkInline) {
+      failures.push(...auditReactSource(path, clean, aliases));
       for (const style of clean.matchAll(/style=(['"])([\s\S]*?)\1/g)) {
         if (STYLE_COLOR.test(style[2])) failures.push(`${path}: fixed inline style color`);
         for (const match of style[2].matchAll(STATIC_DECLARATION))

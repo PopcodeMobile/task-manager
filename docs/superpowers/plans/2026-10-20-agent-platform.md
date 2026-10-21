@@ -188,7 +188,7 @@ Subscription é administrada por owner/admin, referenciando segredo no Vault.
 Complemento identificado pela comparação estática do frontend existente com a API
 normalizada após as etapas 2/3. Corrige lacunas do escopo já aprovado antes de construir
 as telas; não acrescenta funcionalidades ao produto. Evidência de preparação em
-`.superpowers/sdd/2026-10-20-agent-platform/ui-api-parity-notes.md` (artefato de trabalho).
+[notas permanentes de paridade](../../verification/agent-platform/ui-api-parity-notes.md).
 
 **Arquivos:** criar `supabase/migrations/202610200005_ui_contracts.sql`, testes de
 contratos/concorrência em `tests/` e `supabase/tests/`; modificar somente os contratos
@@ -329,22 +329,22 @@ calendário/timeline/arquivos/views, rotas correspondentes e testes de comportam
 Não remover legado. Reusar adapter/interface da etapa 6a. As exceções de backend
 são os pré-requisitos contratuais 4b e 4c abaixo, revisados antes das UIs dependentes.
 
-**Interfaces:** cumprir o inventário `task-6-route-inventory.md` para todas as ações
+**Interfaces:** cumprir o inventário [inventário permanente](../../verification/agent-platform/task-6-route-inventory.md) para todas as ações
 de tarefas/projetos e as oito abas mais views salvas; componentes compartilhados
 servem as rotas globais de calendário, timeline e arquivos sem duplicar regras.
 
-- [ ] Escrever RED de fluxos ainda ausentes: filtros/ordenação/colunas/grupos,
+- [x] Escrever RED de fluxos ainda ausentes: filtros/ordenação/colunas/grupos,
       seleção e lote, movimento/duplicação/recorrência, dependências/subtarefas,
       labels/reações/anexos e ações do drawer. Cobrir conflitos e relações protegidas.
-- [ ] Portar as abas de projeto e views salvas com seus comportamentos reais,
+- [x] Portar as abas de projeto e views salvas com seus comportamentos reais,
       calendário/timeline e metadados de arquivos, criação/edição/arrasto existentes.
       Campos de título/nome são texto; conteúdo rico mantém sanitização explícita.
-- [ ] Preservar templates, notas, membros e ações de projeto no limite cloud/local
+- [x] Preservar templates, notas, membros e ações de projeto no limite cloud/local
       original; bytes de upload e novas políticas de privacidade continuam fora.
-- [ ] Rodar testes visíveis de mutação, reload e escopo nos adapters local/cloud,
+- [x] Rodar testes visíveis de mutação, reload e escopo nos adapters local/cloud,
       PT/EN, claro/escuro e mobile; render smoke isolado não comprova os fluxos.
-- [ ] Testes focados, revisão independente e contrato dos componentes para 6c.
-- [ ] Commit: `feat(ui): complete react task and project workflows`.
+- [x] Testes focados, revisão independente e contrato dos componentes para 6c.
+- [x] Commit: `feat(ui): complete react task and project workflows`.
 
 A etapa 6b agrega os cinco gates menores abaixo. As superfícies existentes só
 serão consideradas completas após 6b4, com cobertura acumulada de todos os gates.
@@ -522,16 +522,16 @@ navegação e testes correspondentes. Sem remoção final do legado ou backend.
 **Interfaces:** fechar os itens restantes do inventário preciso de rotas/abas/auth;
 reusar 6a/6b. Settings respeita papel humano e capacidades efetivamente disponíveis.
 
-- [ ] Escrever RED e implementar os fluxos restantes de cada rota e subseção
+- [x] Escrever RED e implementar os fluxos restantes de cada rota e subseção
       existente do inventário, incluindo edição, filtros, favoritos/leitura pessoais,
       restauração do arquivo morto e recuperação de falha/404.
-- [ ] Preservar preferências, perfil/demo local e dados ao reload/troca de workspace.
+- [x] Preservar preferências, perfil/demo local e dados ao reload/troca de workspace.
       Ações cloud indisponíveis são explícitas; sem sucesso fictício em convites,
       plano, modelos, sessões ou 2FA. Senha usa Auth real quando configurado.
-- [ ] Verificar todas as 21 rotas mais fallback e autenticação, com ações visíveis,
+- [x] Verificar todas as 21 rotas mais fallback e autenticação, com ações visíveis,
       acessibilidade/foco, PT/EN, temas e viewport móvel; atualizar matriz de paridade.
-- [ ] Testes focados e revisão independente antes do corte.
-- [ ] Commit: `feat(ui): complete remaining react panel surfaces`.
+- [x] Testes focados e revisão independente antes do corte.
+- [x] Commit: `feat(ui): complete remaining react panel surfaces`.
 
 ### Task 6d: corte React, auditoria de tokens, CI e prova de paridade
 
@@ -541,21 +541,22 @@ testes browser restantes, módulos legados substituídos, README/CONTEXT/docs/CI
 **Interfaces:** só retirar legado após os gates 6a–6c aprovados e cobertura equivalente.
 Preservar callbacks/consentimento e demonstração local no entrypoint final.
 
-- [ ] Converter os testes legados restantes para ações visíveis sem `window.__gr8r`,
+- [x] Converter os testes legados restantes para ações visíveis sem `window.__gr8r`,
       manter todas as intenções do inventário e confirmar paridade sem renderer legado.
-- [ ] Atualizar auditor de tokens TS/TSX/Tailwind/shadcn sem relaxar garantias;
+- [x] Atualizar auditor de tokens TS/TSX/Tailwind/shadcn sem relaxar garantias;
       fechar lint/types/build/configurações de rota e CI do frontend final.
-- [ ] Uniformizar somente a formatação dos arquivos Deno/backend revisados que
+- [x] Uniformizar somente a formatação dos arquivos Deno/backend revisados que
       ainda falham no Prettier global; comparar estrutura/tokenização para não mudar
       comportamento e executar os checks correspondentes. Lista exata no handoff.
-- [ ] Validar corte explícito de workspace antigo, negação do writer antigo e snapshot
+- [x] Validar corte explícito de workspace antigo, negação do writer antigo e snapshot
       preservado. Sem import cloud automático ou rollback que perca escritas novas.
-- [ ] Passar check/typecheck/browser, Deno e PostgreSQL reais apropriados; builds com
-      e sem configuração cloud, bundle sem segredos/logs, auditoria visual e revisão
-      independente. Resultados ignorados/fixtures ficam identificados.
-- [ ] Publicar matriz e provas permanentes; substituir ponteiros temporários do plano.
+- [x] Passar check/typecheck/browser, Deno e PostgreSQL reais apropriados; builds com
+      e sem configuração cloud, bundle sem segredos/logs e auditoria visual.
+      Resultados ignorados/fixtures e uniões de execuções ficam identificados.
+- [ ] Aprovar revisão independente de Task6d e revisão ampla final pelo root.
+- [x] Publicar matriz e provas permanentes; substituir ponteiros temporários do plano.
       Atualizar documentação da stack e limites, sem afirmar ativação real pendente.
-- [ ] Commit: `refactor(ui): finish react migration and retire legacy rendering`.
+- [x] Commit: `refactor(ui): finish react migration and retire legacy rendering`.
 
 ### Task 7: ativação no ambiente alvo e prova com clientes reais
 
@@ -588,3 +589,11 @@ Não representa teste de MCP/OAuth/Hermes/React, que ainda serão implementados.
 
 Supabase CLI 2.121.0, Deno 2.9.7 e Node 24.21.0 estão instalados. A presença das
 ferramentas não comprova Docker ativo, projeto remoto acessível ou clientes conectados.
+
+## Provas permanentes após corte React
+
+Gates6a–6c aprovados, incluindo6b0–6b4 e correções6c: [arquivo de relatórios e revisões](../../verification/agent-platform/README.md). O aggregate6b foi concluído pelos cinco commits/gates menores, não por um commit agregado adicional.
+
+Task6d: [relatório de implementação e comandos](../../verification/agent-platform/task-6d-report.md); revisão independente do corte e revisão ampla final ainda pertencem ao root. Marcação de implementação não equivale a aprovação ou publicação.
+
+Task7: backend hospedado até008/API/MCP e wake-up vazio possuem [prova própria](../../verification/agent-platform/hosted-preactivation-proof.md); Cron desabilitado, frontend/Auth/CORS de produção, Hermes real e dois usuários Claude reais continuam pendentes. [Hermes isolado5/5](../../verification/agent-platform/task-7-hermes-isolated-runtime.md) não substitui esses gates.

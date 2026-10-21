@@ -1,0 +1,9 @@
+{"exitCode":0,"output":"/tmp/task6d-local-dev-p6RwRZ"}
+
+Running 3 tests using 1 worker
+
+  ✓  1 tests/browser/local-panel.spec.ts:1197:3 › calendar event restores keyboard opener after Escape and close (632ms)
+  ✓  2 tests/browser/local-panel.spec.ts:1197:3 › calendar overflow restores keyboard opener after Escape and close (652ms)
+  ✓  3 tests/browser/local-panel.spec.ts:1197:3 › calendar overflow event restores keyboard opener after Escape and close (699ms)
+
+  3 passed (2.9s)

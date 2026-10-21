@@ -1,0 +1,18 @@
+{
+  "privateCandidates": 2,
+  "builds": {
+    "cloud": {
+      "path": "/tmp/task6d-cloud-dLV6Ce",
+      "textArtifacts": 5,
+      "jsBundles": 3,
+      "literalPrivateMatches": 0
+    },
+    "local": {
+      "path": "/tmp/task6d-local-aB7d8J",
+      "textArtifacts": 5,
+      "jsBundles": 3,
+      "literalPrivateMatches": 0
+    }
+  },
+  "envUnchanged": true
+}

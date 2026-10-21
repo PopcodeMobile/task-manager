@@ -1,6 +1,6 @@
 # Workspace snapshots with membership authorization and revision checks
 
-Status: accepted, 2026-10-16.
+Status: accepted historical snapshot decision, 2026-10-16; superseded for the current frontend by the normalized model and final React cutover. The dated sections below preserve the original decision and transition.
 
 The existing application edits a related graph of projects, tasks, comments, files and views. Its local workspace data must survive while the first Supabase account is prepared.
 
@@ -58,3 +58,7 @@ their normalized metadata omits read state.
 Restoring the old snapshot after new normalized writes is not a supported rollback:
 export and reconcile those writes first. This migration does not switch the browser,
 apply remote migrations or claim cloud activation.
+
+## Final React cutover (2026-10-21)
+
+The single React entry now uses normalized cloud operations and the separate local panel adapter. The runtime snapshot writer and old renderer are retired. Explicit per-workspace migration, preserved recovery snapshots and writer fencing remain required; new cloud workspaces start normalized and empty. See [current setup](../supabase-setup.md), [verification](../verification.md) and the [authoritative design](../superpowers/specs/2026-10-20-agent-platform-design.md). Dedicated backend deployment through008 has separate proof; final frontend publication and real external clients remain activation gates.

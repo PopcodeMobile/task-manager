@@ -1,0 +1,8 @@
+{
+  "ownedPortListeners": false,
+  "ownedViteOrPlaywrightProcesses": [],
+  "srcDebugMatches": [],
+  "diffCheckExit": 0,
+  "freeze": "explicitly released and acknowledged by root",
+  "methodNote": "Process filter uses executable names to exclude the inspection shell itself."
+}

@@ -1,0 +1,9 @@
+{"exitCode":0,"output":"/tmp/task6d-agent-preview-vIZTtz"}
+
+Running 3 tests using 1 worker
+
+  ✓  1 tests/browser/cloud.spec.js:28:3 › final-entry live cloud lifecycle › root login creates isolated tenant project and task then logout clears rendered tenant (1.4s)
+  ✓  2 tests/browser/cloud.spec.js:62:3 › final-entry live cloud lifecycle › pre-auth language survives root document reload (344ms)
+  ✓  3 tests/browser/cutover.spec.ts:3:1 › final SPA serves root, auth callback, consent and deep links with query-preserving reload (667ms)
+
+  3 passed (3.3s)

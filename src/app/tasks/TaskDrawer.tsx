@@ -3,7 +3,7 @@ import { TaskCoreActions } from './TaskCoreActions';
 import { TaskExecutionSection } from './TaskExecutionSection';
 import type { WorkspaceRepository } from '../../workspace/repository';
 import { useEffect, useRef, useState } from 'react';
-import DOMPurify from 'dompurify';
+import { safeRichText } from '../../core/rich-text.js';
 import { TaskRelationSection } from './TaskRelationSection';
 import { TaskSubtasksSection } from './TaskSubtasksSection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
@@ -358,9 +358,7 @@ export function TaskDrawer({
               disabled={readOnly || busy || subDirty}
             />
           </label>
-          {description && (
-            <div className="rich-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(description, { USE_PROFILES: { html: true } }) }} />
-          )}
+          {description && <div className="rich-content" dangerouslySetInnerHTML={{ __html: safeRichText(description) }} />}
           <Button ref={saveButton} type="submit" disabled={busy || readOnly || conflict || !project}>
             {current ? t('Salvar alterações', 'Save changes') : t('Criar tarefa', 'Create task')}
           </Button>

@@ -1,0 +1,136 @@
+# Task 6d: final React cutover (2026-10-21)
+
+Implementation artifact for independent review. BASE `2dbd14e6b3cbd77e4408a4d6f723e7dff3f94670`. Task6a–6c reviewed gates are historical prerequisites, not work reimplemented here. Root owns independent verification and activation; this report does not approve itself.
+
+## Scope and ownership
+
+Single React entry, SPA routing/serve/deployment configuration, legacy rendering retirement, final visible tests, current normalized SDK lifecycle, token guard, frontend lint/type/CI gates, exact backend formatting and permanent evidence/docs. No dependencies, backend contracts, migrations, quotas, timeouts, remote Auth/infrastructure, Hermes service changes, publication, push or merge.
+
+Root supplied prior approval for staged migration and transferred docs at BASE. Context-manager capability was unavailable; source handoffs, permanent spec and project files supplied context. Global AGENTS and SDD/TDD/verification skills were read. Full-worktree freeze was confirmed before the first browser request; root made no writes/builds/tests during it. Only strict5180/5181 listeners were owned, sources/builds frozen during each run, changes between stopped runs, output/builds under/tmp. Local61921/61922 preserved; unrelated5173/5174 untouched.
+
+## Changes and source boundaries
+
+`index.html` loads `src/app/main.tsx`. Deleted the temporary `react.html` and multi-page rewrites; Vite's SPA dev/preview fallback and Vercel `/index.html` rewrite serve final URLs. Authenticated root/index and direct callback/consent/deep-link queries are tested. Actual React/Radix and Supabase vendor chunks replace the previous 576kB single-bundle warning; no threshold increase.
+
+Retired `src/main.js`, delegated actions, HTML pages/views/shell/overlays, legacy UI/helpers/styles, global store/navigation/theme/icons, Auth/config/status/snapshot repository and runtime controller. Retained live calendar/utils/i18n/constants/task operations/seed/local mutations and adapters/device preferences/errors/metadata/domain, plus strict `src/core/rich-text.js` reused for description and discussion previews. The latter retains the original allowed tags/attributes, strips image/data-action markup and does not broaden the sanitizer policy.
+
+Ruling10 preserves only dependency-injected historical controller and pure workspaceConfig validator under named `tests/fixtures/legacy-workspace-*`. The controller imports clone/publicError/WorkspaceError; it never instantiates Auth or a snapshot writer. The validator has no client/config module side effects. This keeps historical negative lifecycle tests without pretending they exercise current React. Cost: archived fixture maintenance and proof attribution; normalized SDK/local-panel/agent-panel are primary evidence. A parsed recursive frontend import closure from main contains 98 modules, no missing relative imports and no fixtures or retired runtime imports. `src/core/design-tokens.js` is tooling inventory, not a hidden application renderer.
+
+`npm run check` and CI now explicitly typecheck. Frontend TS includes app/components/domain/workspace and browser TS/configs; shared JavaScript is not universally `checkJs`-checked. No claim that backend Deno TS is covered by frontend tsc.
+
+## Token contract and RED/GREEN
+
+Installed TypeScript parser analyzes JS/JSX/TS/TSX controlled style objects, local const bindings/spreads/shorthand/branches, JSX classes and cn/clsx/cva sources/variants. Handles modifier prefixes and arbitrary values. Semantic aliases are accepted from actual `@theme inline` var declarations; references still must exist. No blanket shadcn exemption, broad domain hex ban, or extension-only migration.
+
+Rejects fixed padding/type/radius/color/motion, palette utilities, unmapped aliases and bare `rounded`; accepts foundation vars and token calculations with multipliers. Geometry such as measured widths, percentages and drag positions remains runtime data; domain colors remain separately validated. Static analysis intentionally does not evaluate arbitrary runtime/imported/generated expressions. Existing public234 inventory, CSS references/duplicates/accent/status/template guarantees stay active.
+
+RED `/tmp/task6d-tokens-red.log`: new parser cases failed against old guard. GREEN `/tmp/task6d-tokens-green1.log`:10/10. Edge RED `/tmp/task6d-tokens-edge-red.log` exposed overrejected token calculations and unguarded bare rounded; GREEN `/tmp/task6d-tokens-edge-green.log`:11/11. Fixtures cover TSX const style/spreads, cn/cva variants/modifiers/arbitrary values, real alias policy, geometry/domain colors and undefined shorthand vars.
+
+## Current lifecycle versus historical intents
+
+| Previous intent                                    | Current supported proof                                                                                                                                            |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Named routes, locales, project tabs, 404           | `app.spec.js`21named+fallback/eighttabs PT/EN; mature local-panel remaining/project tests                                                                          |
+| Create/persist tasks and workspaces, switch/logout | Visible app/cloud tests, normalized SDK Auth/join/tenant/CAS/metadata/roles, local-panel and agent-panel lifecycle                                                 |
+| Stored team/member/file/title markup               | Actual visible editor/reload/picker/profile/preview tests; literal React text, rich description save/reload strict sanitizer                                       |
+| Reaction tooltip author                            | Actual discussion reaction DOMtitle/literal assertion                                                                                                              |
+| Cross-workspace drag                               | Existing native task and schedule drag tests plus lifetime guards; personal project order tested through supported sidebar/keyboard actions                        |
+| Collapsed project tooltip                          | Current sidebar hides nav; collapse/reopen literal project label assertion. No tooltip feature invented                                                            |
+| Foundation tokens/system theme                     | Browser radius override and matchMedia changes reach React controls                                                                                                |
+| Old controller race/error/locale behavior          | Named legacy fixtures only; current normalized/local-panel/browser tests carry supported lifecycle/security proof                                                  |
+| Snapshot migration/writer fencing                  | Separate SDK test explicitly migrates known revision, rejects old writer/v1 bypass, preserves frozen bytes/revision and refuses to overwrite new normalized writes |
+
+SDK uses fresh unique local Auth users, ordinary sessions for commands/joins/tenant/role/CAS, service only fixture setup/cleanup. Guest denial includes owner metadata spoofing. `finally` cleans owned workspaces/users. Initial wrong migration argument was diagnosed against SQL001 (`p_expected_snapshot_revision`) and corrected in test harness. `/tmp/task6d-sdk-green.log`:26/26 SDK+tokens+workspace. These are actual local Auth/PostgREST operations, not mocks or hosted proof.
+
+## Diagnosed failures
+
+- First browser batch `/tmp/task6d-browser-migration-first.log`, `/tmp/task6d-local-dev-5z6wEH`: real fallback bug rendered project content and404 together. WorkspacePanel second conditional now excludes projects/project before404. Subsequent21route/eighttab matrix passes.
+- Second/third/fourth migration batches retained under/tmp: creation wait and locator issues diagnosed from rendered snapshots. Titles include task keys; select labels include option text; profile and file can share a name. Assertions now use visible roles and scoped regions. No fixture counts/quotas reduced.
+- Third batch rich-text save/reload found HTML profile retained img/data-action. Ruling12 reused original strict safeRichText; subsequent app tests pass after save/reload. Strip-only search uses remain distinct.
+- First complete local suite found two older6b3 expectations superseded by6c: first drawer control is now Maximize, then Tab→Title; implicit project navigation respects defaultTab and defaults toBoard. Existing opener-restoration assertions remain. Root confirmed source-backed current contract; tests updated, no unnecessary product patch.
+- Expanded Deno command at original Edge fixture paths failed11 diagnostics: relocated imports/EdgeRuntime declaration/runtime fixture typing. `/tmp/task6d-deno-check.log` retained. Supported production/test check and real Edge/TLS runtime are separate passing evidence; exclusion does not certify all fixtures as typechecked.
+- Historical webhook barrier8s failure did not recur in complete check. Diagnostics now label phases/session/elapsed/outputbytes and catch safe pg_stat_activity state/wait/blocker metadata without SQL/credentials. No timeout changed and no unsupported historical root-cause claim.
+
+## Backend formatting only
+
+Approved15 files: scripts/setup-webhooks.ts; functions/_shared/webhook-delivery.ts, webhook-signing.ts, webhook-targets.ts; functions/deno.json; functions/mcp/index.ts, tools.ts; functions/tests/oauth.test.ts, webhook-delivery.test.ts, webhook-transport.test.ts, team-membership-baselines.test.ts; functions/webhook-dispatch/index.ts; tests/webhook-dispatch-live.ts; tests/webhook-edge/main.ts, probe.ts (paths under supabase unless scripts).
+
+`/tmp/task6d-format-equivalence.mjs` parses BASE and current with no diagnostics, compares node kind, identifiers/literal values, child order and structural end markers; ignores positions/comments and only AST parenthesis wrappers, preserving operator tree/precedence. JSON parsed equivalence.15/15 `/tmp/task6d-backend-equivalence.log`. No textual parenthesis stripping. The separate webhook-recovery harness edit adds safe diagnostics only, not SQL/business behavior.
+
+## Request-budget regression and Ruling13
+
+The first complete agent run (`/tmp/task6d-browser-agent-full.log`, `/tmp/task6d-agent-dev-emBqhO`) had11pass14fail. Twelve failures were Task5 test entry assumptions superseded by6c Home/recovery navigation; helper now clicks Tasks, and recovery starts an explicit task destination/query. Project Overview locator now scopes Project tabs because6c added global Overview. Those are test migrations, not product fixes.
+
+The102-task live test found a real240-unit budget failure at Restore. Its three Auth principals were fresh and separate; the setup actor was already isolated. Trace recorded216read200,5member200,9execute200,1execute409, then2read429+1execute429. The main snapshot already exhausts comments/reactions/activity cursors for6c, while the drawer fetched those families again each revision. Source useWorkspaceData/useTaskDetails and request-operation counts established redundant reads; no sleep, quota increase or reduced fixture was used.
+
+Root Ruling13 approved a narrow frontend correction: optional complete discussion collections in TaskGraph, task/comment filtering, existing list(true) fallback when undefined, forced fresh reads on explicit retry. `[]` denotes known complete empty; callers must never supply a partial page as complete. Current TaskDrawer callers pass the authoritative `shown` snapshot, populated only after Promise.all of exhaustive reads. No new cache, authorization, cursor, mutation or backend contract. Cost if misused: a partial caller could hide/stale data; type documentation and focused tests preserve the contract. After an explicit detail retry, that mounted details reader continues forcing reads on later revisions until remount; this conservative path favors freshness over reducing retry traffic.
+
+RED `/tmp/task6d-discussion-red.log`2cases against unconditional previous fetches; GREEN `/tmp/task6d-discussion-green.log`2/2 complete empty/scope/updated snapshot, partial fallback with all=true, failure and explicit fresh retry. Browser regressions include original102task/CAS/claims test, current comments/reactions/activity, real OAuthMCP polling, event cursor hydration, failed-event-read relation refresh, dirty drafts and token rotation. Fixtures/quotas/timeouts unchanged.
+
+Token final edge: a new signed-number/computed-key fixture initially omitted the required token CSS and produced a harness error (`-signed-red.log`, `-signed-green.log`), so those are not counted as meaningful RED/GREEN. Correct fixture with foundation produced `/tmp/task6d-tokens-signed-valid-red.log`; after handling unary signed numeric styles and computed literal keys, `/tmp/task6d-tokens-signed-final-green.log` passed12/12.
+
+## Browser and visual evidence
+
+Complete local dev run:65pass2fail `/tmp/task6d-browser-local-full.log` (`rXaxms`); both failures were the documented6b3 focus/default-tab expectations. Focused3/3 `/tmp/task6d-browser-focus-green.log` (`p6RwRZ`) closes them. After Ruling13, affected local drawer/draft/relation/app regression:21pass1fail `/tmp/task6d-browser-local-discussion.log` (`pXYmPF`). That last failure left the filtered palette open after Enter; the test had not established the filtered result and textbox focus. It now explicitly waits for both accessible conditions before the same keyboard action. Focused1/1 `/tmp/task6d-browser-palette-focus.log` (`ZcIfJ5`, trace on) preserves two origins, repeated open/close, browser Back and dirty-discard behavior. No sleep/timeout increase or product patch; the original trace does not establish post-readiness focus theft. Report retains the observed timing boundary instead of claiming an unproved product cause.
+
+Complete cloud-mode dev run:11pass14fail `/tmp/task6d-browser-agent-full.log` (`emBqhO`), followed by18/18 focused `/tmp/task6d-browser-agent-focused.log` (`9BmtFg`) covering every failed case plus affected detail/MCP/event/claim regressions. Actual102task case passed4.7s under unchanged240budget. Actual details regression retained9writes, dropped read200170→122 and had no429. The broader run also passed real local schedules/files/team baseline tests, new cloud lifecycle2cases and final-entry routing. No skipped tests in these configured runs. This is a consolidated full-matrix result, not a claim that the initial aggregate commands were green.
+
+Actual local OAuth dev6/6 `/tmp/task6d-browser-oauth-dev.log` (`5a6w3M`): consent reload, PKCE exchange/revoke, denial, invalid callback, activation failure, same-request two-tab grant race and lost response. Production preview local7/7 (`/tmp/task6d-browser-preview-local.log`, `rv8KG4`) covers all21routes+fallback/eighttabs PT/EN, literal creation/reload/workspace isolation, strict rich content, reaction authors, token/media effects and root/index/callback/consent/deep-link query reload. Preview cloud3/3 (`/tmp/task6d-browser-preview-cloud.log`, `vIZTtz`) covers real local Auth lifecycle and direct entry/query reload. Production preview OAuth6/6 passed (`/tmp/task6d-browser-preview-oauth.log`, `jGPRT5`). Vercel checked-in rewrite matches final entry; no actual hosted frontend deployment or Vercel response is claimed.
+
+All browser commands use `node /tmp/task6d-browser.mjs MODE SERVE [Playwright filters]`, with local/agent/oauth and dev/preview. The wrapper asserts no existing5180/5181 listener, privately loads local fixture env for agent/oauth, passes the dedicated config, external output directory and list/JSON reporters, and records exitCode/outputdir. Its preview paths come from the two frozen builds. Raw JSON/traces stay private under/tmp because they can contain ephemeral Auth traffic; only safe summaries and inspected screenshots are preserved permanently.
+
+| Surface / evidence                                                          | Actual actions and inspection                                                                                                                                                    |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local desktop dark EN compact task table                                    | Inline edits/filter/column persistence; inspected `task6b1-table-desktop-dark-en.png`, aligned rows and scoped horizontal table scroll                                           |
+| Local mobile light PT compact                                               | Workspace create/edit/reload and honest unavailable integrations; `task6a-mobile-light-pt.png`                                                                                   |
+| Local mobile dark EN file drawer                                            | Rename/duplicate/unlink/delete metadata; `task6b3-files-mobile.png`, literal filename, visible focus and controls                                                                |
+| Local mobile light PT projects                                              | Edited/copied projects, status/progress/ordering; `task6b4-projects-mobile-pt-light.png`                                                                                         |
+| Local mobile dark EN comfortable catalogue                                  | Accent/theme/density plus modal/confirmation/focus; `task6c-system-mobile-dark-en.png`                                                                                           |
+| Local desktop light EN removed-team draft                                   | Polling deletion keeps disabled draft, explicit discard/navigation guard; `task6c-fix2-deleted-team.png`                                                                         |
+| Cloud-mode mocked transport desktop dark EN and mobile light PT comfortable | External event refresh, labels/themes and responsive task controls; `task5-desktop-dark-en.png`, `task5-mobile-light-pt.png`. This pair is fixture transport, not real MCP proof |
+| Real local Auth/DB desktop light EN project                                 | Template/members/eighttabs/savedviews/graph copy/reload; `task6b4-cloud-overview-en.png` shows literal description and copied scope                                              |
+| Real local Auth consent desktop light PT / mobile dark EN error             | Approve selected grant/PKCE/revoke and invalid access request; `task3-react-consent.png`, `task3-react-mobile-dark.png`                                                          |
+
+These11screenshots were visually inspected and preserved under `task-6d-visuals/`. Labels, focus rings, literal content and responsive controls are visible; current mobile nav/table overflow uses scoped scrolling. Keyboard tests cover dialogs, opener restoration, palette, selection and dirty navigation. No WCAG percentage or exhaustive pixel/accessibility certification is asserted.
+
+## Deno, PostgreSQL and source gates
+
+- Supported Deno command: `deno check --config supabase/functions/deno.json scripts/setup-webhooks.ts supabase/functions/api/index.ts supabase/functions/mcp/index.ts supabase/functions/webhook-dispatch/index.ts supabase/functions/tests/*.test.ts supabase/tests/webhook-dispatch-live.ts` exit0 (`/tmp/task6d-deno-check-supported.log`). Expanded unsuccessful command additionally included `supabase/tests/webhook-edge/main.ts supabase/tests/webhook-edge/probe.ts` and is retained as failure, not silently excluded proof.
+- `node /tmp/task3-run-deno.mjs --unstable-no-legacy-abort supabase/functions/tests/` private existing wrapper:28pass0fail1ignored (`/tmp/task6d-deno-live.log`); actual local Auth integration/OAuth ran. TLS fixture missing from that environment explains the ignore.
+- `DENO_CERT=/tmp/task4-webhook-tls/cert.pem TEST_WEBHOOK_TLS_DIR=/tmp/task4-webhook-tls deno test --config supabase/functions/deno.json --unstable-no-legacy-abort --allow-env --allow-net --allow-read=/tmp/task4-webhook-tls supabase/functions/tests/webhook-transport.test.ts`:2/2 (`/tmp/task6d-tls.log`).
+- `node supabase/tests/webhook-edge.mjs`:actual v1.77.4 Edge worker auth401/401/401/401/200, pinned public HTTPS POST405 (`/tmp/task6d-edge.log`). Example.com rejecting POST is transport proof, not Hermes.
+- `bash supabase/tests/run-postgres.sh all`:exit0 (`/tmp/task6d-postgres.log`). `bash supabase/tests/team-membership-baselines-postgres.sh`:exit0 TEST008 (`/tmp/task6d-team-postgres.log`). Disposable only; no shared database reset.
+- Initial full check: `VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= VITE_SUPABASE_PUBLISHABLE_KEY= GR8R_BUILD_DIR=/tmp/task6d-check-build SUPABASE_TEST_CONFIG=/tmp/task3-local-status.json npm run check`:208pass0skip, exit0 (`/tmp/task6d-check.log`). This predates routing/sanitizer/discussion changes. Later aggregate below is justified by those product/test changes, not a blind rerun of a failure.
+- `node /tmp/task6d-build.mjs`:final cloud and cleared-cloud builds exit0 (`/tmp/task6d-build-final.log`, `-build-cloud.log`, `-build-local.log`). Cloudmain480.63kB/gzip149.00, React/Radix236.62/gzip74.64, Supabase227.52/gzip59.12. Both emitted index+3JSbundles, no threshold warning. `.env.local` hash unchanged;2knownprivatecandidates,0literal matches in each output (`/tmp/task6d-build-scan.json`). No service secret is a frontend variable.
+- Recursive TypeScript-parsed relative import closure:98modules,0missing,0retired/fixture imports (`/tmp/task6d-import-closure.json`); no source @/imports require alternate resolution. Runtime retention is source-backed, not a tree-shaking assumption. Authored `src` debug scan has no console.log/debug/debugger or window.__gr8r. Tooling audit's one success console.log is intentional CLI output.
+
+## Final source aggregate and consolidated browser matrix
+
+The final source command completed with exit 0:
+
+```sh
+VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= VITE_SUPABASE_PUBLISHABLE_KEY= GR8R_BUILD_DIR=/tmp/task6d-check-final-build SUPABASE_TEST_CONFIG=/tmp/task3-local-status.json npm run check > /tmp/task6d-check-final.log 2>&1
+```
+
+It passed ESLint, explicit frontend `tsc --noEmit`, Prettier, **212 tests / 0 failures / 0 skips**, the **234 public tokens / 99 source files** audit and production build. This supersedes the earlier 208-test result for final routing, strict rich previews, discussion reuse and signed/computed style guard changes. Only documentation/evidence edits followed this command; their final formatting and secret scans are checked separately. Backend source was unchanged after the successful supported Deno, real TLS/Edge and PostgreSQL runs, so those were not redundantly repeated. The final 15-file AST comparison also passed (`task-6d-evidence/task6d-backend-equivalence-final.log`).
+
+The following table uses the latest observed outcome for each named case in each mode. It combines complete runs with justified focused regressions; it is **not one all-green browser invocation**. The machine-readable [case-to-run map](task-6d-evidence/task6d-browser-summary.json) identifies each source run and has no raw Auth/network payloads.
+
+| Mode                                                 | Cases with passing latest result | Latest failures | Skips |
+| ---------------------------------------------------- | -------------------------------: | --------------: | ----: |
+| Local dev                                            |                          67 / 67 |               0 |     0 |
+| Cloud-mode dev (mock and real cases labeled by test) |                          25 / 25 |               0 |     0 |
+| OAuth dev against local Auth/DB                      |                            6 / 6 |               0 |     0 |
+| Local production preview                             |                            7 / 7 |               0 |     0 |
+| Cloud production preview against local Auth/DB       |                            3 / 3 |               0 |     0 |
+| OAuth production preview against local Auth/DB       |                            6 / 6 |               0 |     0 |
+
+All owned browser servers/build processes were stopped before the final aggregate. The full-worktree freeze was explicitly released and acknowledged by root. Unrelated 5173/5174 and the local Supabase stack were preserved. The [reproduction methods](task-6d-evidence/methods.md) preserve the private-config wrapper logic without private values; commands and original artifact paths above retain failure chronology.
+
+## Permanent evidence and residuals
+
+Safe log copies, source-equivalence methods and reachability results are in `task-6d-evidence/`. Archived log copies normalize trailing whitespace and final blank lines for the repository whitespace gate; original bytes remain under `/tmp`. The repository ignores `*.log` by default, so these reviewed evidence logs were explicitly staged and included in the final 323-file secret scan. Final source scanning compared known private fixture values and credential-shaped/private-key markers without printing values: zero issues. The scan is bounded evidence, not an exhaustive secret certification. `task6d-final-safety.json` records no owned listeners/processes, no authored source debug matches, and a clean whitespace diff check. Its initial broad process match included the inspection shell itself; the corrected executable-name filter excludes that harness false positive. Stage reports/reviews, inventory, exact rulings (including withdrawn private-http design), hosted008 proof and isolated Hermes5/5 are preserved in this archive. Scratch is untouched. Reports preserve historical chronology and their own source SHAs; final implementation evidence does not rewrite prior independent reviews.
+
+Dedicated hosted API/MCP through008 is actual remote proof with synthetic OAuth principals. Frontend cloud browser runs use local real Auth/DB. Pinned isolated Hermes5/5 uses synthetic provider/home and persistent SQLite admission; real Hermes route/side effects, DNS/TLS, published frontend, production Auth/CORS and two actual Claude users remain activation gates. Cron remains disabled. Existing browser URL policy block is not bypassed. Main Hermes restart affects default/clara/comercial/operacoes; Lili is untouched and eligibility must be rechecked. No user-requested scope was dropped to obtain green.
+
+Task6d independent review and final whole-branch review remain root responsibilities. Stop condition is this concrete committed artifact with all owned listeners/builds stopped and freeze released. No push/merge/remote activation or scratch deletion.

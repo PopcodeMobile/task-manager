@@ -1,0 +1,47 @@
+✔ the complete token inventory and CSS consumers pass the guard (93.550792ms)
+✔ unknown references, hardcoded CSS and inline regressions fail the guard (50.443792ms)
+✔ runtime geometry and user-owned color values are permitted (0.453084ms)
+✔ foundation overrides reach the supported React button, drawer and sidebar styles (2.392875ms)
+✔ template migration is idempotent and preserves runtime geometry and data (0.6135ms)
+✔ catalogue demonstrations never call entity writers (0.445125ms)
+✔ source discovery includes the final React TS and TSX consumers (0.103583ms)
+✔ React controlled styles follow constants, spreads, assertions and conditional branches (0.698333ms)
+✔ static cn and cva utilities reject framework scales and modified arbitrary literals (0.657917ms)
+✔ semantic aliases require authored theme declarations; token utilities and runtime geometry stay valid (0.901791ms)
+✖ foundation formulas in React preserve token multipliers while bare radius utilities cannot bypass the guard (0.785291ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 10
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 311.826125
+
+✖ failing tests:
+
+test at tests/tokens.test.mjs:161:1
+✖ foundation formulas in React preserve token multipliers while bare radius utilities cannot bypass the guard (0.785291ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   'src/formula.tsx:1:24: fixed padding: padding: calc(var(--space-unit) * 3)',
+  +   'src/formula.tsx:1:69: fixed border-radius: border-radius: calc(var(--radius-unit) * 2)'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/tokens.test.mjs:163:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'src/formula.tsx:1:24: fixed padding: padding: calc(var(--space-unit) * 3)', 'src/formula.tsx:1:69: fixed border-radius: border-radius: calc(var(--radius-unit) * 2)' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

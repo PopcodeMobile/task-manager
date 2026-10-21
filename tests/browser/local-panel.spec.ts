@@ -1229,13 +1229,16 @@ for (const panel of ['event', 'overflow', 'overflow event'] as const) {
       await task.focus();
       await page.keyboard.press('Enter');
       await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Task details');
+      await expect(page.getByRole('button', { name: 'Maximize task', exact: true })).toBeFocused();
+      await page.keyboard.press('Tab');
       await expect(page.getByLabel('Title', { exact: true })).toBeFocused();
     }
     if (panel === 'overflow event') {
       await opener.press('Enter');
       await page.getByRole('dialog').getByRole('button', { name: '09:00 Focus event 2', exact: true }).press('Enter');
       await page.getByRole('button', { name: 'Open project', exact: true }).press('Enter');
-      await expect(page).toHaveURL(/\/project\?project=p1&tab=overview/);
+      // Implicit entry uses the current default tab; explicit/preferences overrides are covered below.
+      await expect(page).toHaveURL(/\/project\?project=p1&tab=board/);
       await expect(page.getByRole('dialog')).toHaveCount(0);
     }
   });
@@ -2099,8 +2102,12 @@ test('6c fix project creation requests reopen mounted collection and project wit
       await expect(page.getByRole('dialog')).toHaveCount(0);
     }
     await page.keyboard.press('Control+k');
-    await page.getByLabel('Search commands').fill('Create project');
-    await page.getByLabel('Search commands').press('Enter');
+    const search = page.getByRole('textbox', { name: 'Search commands', exact: true });
+    await search.fill('Create project');
+    // The filtered result and input focus must be committed before keyboard activation.
+    await expect(page.getByRole('dialog').getByRole('button', { name: 'Create project', exact: true })).toBeVisible();
+    await expect(search).toBeFocused();
+    await search.press('Enter');
     await expect(page.getByRole('dialog').getByLabel('Name', { exact: true })).toBeVisible();
     await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Keep mounted draft');
     await page.goBack();

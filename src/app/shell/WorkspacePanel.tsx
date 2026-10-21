@@ -694,7 +694,7 @@ export function WorkspacePanel({
                 ) : (
                   <IntegrationsPanel repo={repo} t={t} admin={admin} />
                 )
-              ) : remainingRoutes.includes(route) ? (
+              ) : ['projects', 'project'].includes(route) ? null : remainingRoutes.includes(route) ? (
                 <RemainingRoutes
                   registerDraft={registerPanelDraft}
                   key={`${workspaceId}:${route}:${route === 'settings' ? (url.searchParams.get('sec') ?? 'workspace') : ''}`}

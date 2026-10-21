@@ -7,22 +7,14 @@ Deno.test({
   name: 'pinned standard transport: fragmented/chunked/interim, redirect, invalid TLS and bounded parser',
   ignore: !tlsDir,
   fn: async () => {
-    const cert = await Deno.readTextFile(`${tlsDir}/cert.pem`), key = await Deno.readTextFile(`${tlsDir}/key.pem`);
+    const cert = await Deno.readTextFile(`${tlsDir}/cert.pem`),
+      key = await Deno.readTextFile(`${tlsDir}/key.pem`);
     const listener = Deno.listenTls({ hostname: '127.0.0.1', port: 0, cert, key, alpnProtocols: ['http/1.1'] });
-    let connections = 0, closedOnTimeout = 0;
+    let connections = 0,
+      closedOnTimeout = 0;
     const hosts: string[] = [];
     const sockets = new Set<Deno.TlsConn>();
-    const modes = [
-      'continue',
-      'fragmented',
-      'redirect',
-      'truncated',
-      'oversized',
-      'bodylarge',
-      'slow',
-      'valid',
-      'wronghostname',
-    ];
+    const modes = ['continue', 'fragmented', 'redirect', 'truncated', 'oversized', 'bodylarge', 'slow', 'valid', 'wronghostname'];
     const serving = (async () => {
       for await (const socket of listener) {
         sockets.add(socket);
@@ -37,8 +29,7 @@ Deno.test({
               if (read === null) return;
               request += new TextDecoder().decode(buffer.subarray(0, read));
             }
-            const expected = request.indexOf('\r\n\r\n') + 4 +
-              Number(request.match(/\r\ncontent-length: (\d+)/i)?.[1] ?? 0);
+            const expected = request.indexOf('\r\n\r\n') + 4 + Number(request.match(/\r\ncontent-length: (\d+)/i)?.[1] ?? 0);
             while (request.length < expected) {
               const read = await socket.read(buffer);
               if (read === null) return;
@@ -53,13 +44,12 @@ Deno.test({
             if (mode === 'continue') {
               await write('HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n');
             } else if (mode === 'fragmented') {
-              for (
-                const part of [
-                  'HTTP/1.1 103 Early Hints\r\n\r\nHTTP/1.1 20',
-                  '0 OK\r\nTransfer-Encoding: chunked\r\nRetry-After: 90\r\n\r\n',
-                  '2\r\nok\r\n0\r\n\r\n',
-                ]
-              ) await write(part);
+              for (const part of [
+                'HTTP/1.1 103 Early Hints\r\n\r\nHTTP/1.1 20',
+                '0 OK\r\nTransfer-Encoding: chunked\r\nRetry-After: 90\r\n\r\n',
+                '2\r\nok\r\n0\r\n\r\n',
+              ])
+                await write(part);
             } else if (mode === 'redirect') {
               await write('HTTP/1.1 302 Found\r\nLocation: http://169.254.169.254/\r\nContent-Length: 0\r\n\r\n');
             } else if (mode === 'truncated') await write('HTTP/1.1 200 OK\r\nContent-Length: 500\r\n\r\nshort');
@@ -70,7 +60,7 @@ Deno.test({
             } else if (mode === 'slow') {
               await write('HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n');
               try {
-                if (await socket.read(buffer) === null) closedOnTimeout++;
+                if ((await socket.read(buffer)) === null) closedOnTimeout++;
               } catch {
                 closedOnTimeout++;
               }
@@ -80,7 +70,9 @@ Deno.test({
           } finally {
             try {
               socket.close();
-            } catch { /* already closed */ }
+            } catch {
+              /* already closed */
+            }
             sockets.delete(socket);
           }
         })();
@@ -94,17 +86,14 @@ Deno.test({
     };
     try {
       await assertRejects(() => sendPinnedWebhook(target, '{}', {}, AbortSignal.timeout(1000)));
-      assertEquals(
-        await sendPinnedWebhook(target, '{}', { 'Content-Type': 'application/json' }, AbortSignal.timeout(1000)),
-        { status: 200, retryAfter: '90' },
-      );
+      assertEquals(await sendPinnedWebhook(target, '{}', { 'Content-Type': 'application/json' }, AbortSignal.timeout(1000)), { status: 200, retryAfter: '90' });
       assertEquals((await sendPinnedWebhook(target, '{}', {}, AbortSignal.timeout(1000))).status, 302);
       assertEquals(connections, 3, 'redirect did not connect to Location');
       await assertRejects(() => sendPinnedWebhook(target, '{}', {}, AbortSignal.timeout(1000)));
       await assertRejects(() => sendPinnedWebhook(target, '{}', {}, AbortSignal.timeout(1000)));
       await assertRejects(() => sendPinnedWebhook(target, '{}', {}, AbortSignal.timeout(1000)));
       await assertRejects(() => sendPinnedWebhook(target, '{}', {}, AbortSignal.timeout(25)));
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 10));
       assertEquals(closedOnTimeout, 1, 'deadline destroys the actual socket');
       assertEquals((await sendPinnedWebhook(target, '{}', {}, AbortSignal.timeout(1000))).status, 200);
       const certificateError = await assertRejects(() =>
@@ -117,14 +106,14 @@ Deno.test({
           '{}',
           {},
           AbortSignal.timeout(1000),
-        )
+        ),
       );
       assert(
         certificateError instanceof Error && /certificate|cert|hostname|name/i.test(certificateError.message),
         'TLS verification specifically rejected certificate name',
       );
       assert(
-        hosts.every((host) => host === `webhook.fixture.invalid:${listener.addr.port}`),
+        hosts.every(host => host === `webhook.fixture.invalid:${listener.addr.port}`),
         'Host preserves original hostname',
       );
     } finally {
@@ -132,10 +121,12 @@ Deno.test({
       for (const socket of sockets) {
         try {
           socket.close();
-        } catch { /* already closed */ }
+        } catch {
+          /* already closed */
+        }
       }
       await serving;
-      await new Promise((resolve) => setTimeout(resolve, 160));
+      await new Promise(resolve => setTimeout(resolve, 160));
     }
   },
 });
@@ -144,14 +135,16 @@ Deno.test('whole operation timeout stops slow DNS before socket creation', async
   const results: string[] = [];
   const store: DeliveryStore = {
     claim: () =>
-      Promise.resolve([{
-        id: 'd',
-        leaseToken: 'l',
-        eventId: 'e',
-        attempt: 1,
-        targetUrl: 'https://example.com',
-        rawBody: '{}',
-      }]),
+      Promise.resolve([
+        {
+          id: 'd',
+          leaseToken: 'l',
+          eventId: 'e',
+          attempt: 1,
+          targetUrl: 'https://example.com',
+          rawBody: '{}',
+        },
+      ]),
     secret: () => Promise.resolve('fixture'),
     complete: (_d, r) => {
       results.push(r.category);
@@ -161,7 +154,7 @@ Deno.test('whole operation timeout stops slow DNS before socket creation', async
   await dispatchWebhookBatch(store, {
     timeoutMs: 10,
     resolve: async () => {
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      await new Promise(resolve => setTimeout(resolve, 30));
       return ['8.8.8.8'];
     },
     send: () => {
@@ -169,7 +162,7 @@ Deno.test('whole operation timeout stops slow DNS before socket creation', async
       return Promise.resolve({ status: 200, retryAfter: null });
     },
   });
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  await new Promise(resolve => setTimeout(resolve, 40));
   assertEquals(sends, 0);
   assertEquals(results, ['timeout']);
 });

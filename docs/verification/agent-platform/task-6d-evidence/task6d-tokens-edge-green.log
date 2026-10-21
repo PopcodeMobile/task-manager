@@ -1,0 +1,19 @@
+✔ the complete token inventory and CSS consumers pass the guard (92.440292ms)
+✔ unknown references, hardcoded CSS and inline regressions fail the guard (51.726417ms)
+✔ runtime geometry and user-owned color values are permitted (0.376791ms)
+✔ foundation overrides reach the supported React button, drawer and sidebar styles (2.502666ms)
+✔ template migration is idempotent and preserves runtime geometry and data (0.626625ms)
+✔ catalogue demonstrations never call entity writers (0.444333ms)
+✔ source discovery includes the final React TS and TSX consumers (0.10625ms)
+✔ React controlled styles follow constants, spreads, assertions and conditional branches (0.764791ms)
+✔ static cn and cva utilities reject framework scales and modified arbitrary literals (0.878834ms)
+✔ semantic aliases require authored theme declarations; token utilities and runtime geometry stay valid (1.061792ms)
+✔ foundation formulas in React preserve token multipliers while bare radius utilities cannot bypass the guard (0.490833ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 312.224625

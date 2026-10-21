@@ -1,0 +1,15 @@
+Check scripts/setup-webhooks.ts
+Check supabase/functions/api/index.ts
+Check supabase/functions/mcp/index.ts
+Check supabase/functions/webhook-dispatch/index.ts
+Check supabase/functions/tests/api.test.ts
+Check supabase/functions/tests/file-duplication.test.ts
+Check supabase/functions/tests/integration.test.ts
+Check supabase/functions/tests/mcp.test.ts
+Check supabase/functions/tests/oauth.test.ts
+Check supabase/functions/tests/operations.test.ts
+Check supabase/functions/tests/task-graph-copy.test.ts
+Check supabase/functions/tests/team-membership-baselines.test.ts
+Check supabase/functions/tests/webhook-delivery.test.ts
+Check supabase/functions/tests/webhook-transport.test.ts
+Check supabase/tests/webhook-dispatch-live.ts

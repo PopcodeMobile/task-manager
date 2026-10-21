@@ -22,7 +22,8 @@ import type { WorkspaceRepository } from '../../workspace/repository';
 import type { Translate } from '../auth/ConsentPage';
 import type { Execute } from '../projects/ProjectsPage';
 import { errorMessage } from './messages';
-export type TaskGraph = {
+import { loadTaskDiscussion, type CompleteDiscussion } from '../tasks/task-discussion-data';
+export type TaskGraph = CompleteDiscussion & {
   labels: Label[];
   taskLabels: TaskLabel[];
   dependencies: TaskDependency[];
@@ -363,18 +364,16 @@ export function useTaskDetails(repo: WorkspaceRepository, taskId: string | undef
     let alive = true;
     setLoading(true);
     void Promise.all([
-      repo.list<import('../../domain/contracts').Comment>('list_comments', { taskId }, true),
+      loadTaskDiscussion(repo, taskId, graph, attempt > 0),
       graph.files ? Promise.resolve(graph.files) : repo.list<import('../../domain/contracts').FileMetadata>('list_files', {}, true),
       graph.attachments ? Promise.resolve(graph.attachments) : repo.list<import('../../domain/contracts').TaskAttachment>('list_attachments', {}, true),
-      repo.list<import('../../domain/contracts').CommentReaction>('list_reactions', {}, true),
-      repo.list<import('../../domain/contracts').ActivityEntry>('list_activity', { taskId }, true),
       repo.mode === 'local'
         ? repo.rpc<{ currentMemberId: string; teamId?: string | null }>('get_local_actor')
         : Promise.resolve({ currentMemberId: repo.userId, teamId: null }),
     ])
-      .then(([comments, files, attachments, reactions, history, actorId]) => {
+      .then(([discussion, files, attachments, actorId]) => {
         if (alive && !repo.controller.signal.aborted) {
-          setDetails({ comments, files, attachments, reactions, history, actorId: actorId.currentMemberId });
+          setDetails({ ...discussion, files, attachments, actorId: actorId.currentMemberId });
           setError('');
         }
       })

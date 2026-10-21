@@ -1,0 +1,13 @@
+{"exitCode":0,"output":"/tmp/task6d-local-preview-rv8KG4"}
+
+Running 7 tests using 1 worker
+
+  ✓  1 tests/browser/app.spec.js:13:1 › final entry reaches every named route and eight project views in both locales (4.3s)
+  ✓  2 tests/browser/app.spec.js:59:1 › language persistence retains literal task titles after create and reload (1.1s)
+  ✓  3 tests/browser/app.spec.js:73:1 › new workspace is empty, selected after reload and isolated from the original workspace (1.1s)
+  ✓  4 tests/browser/app.spec.js:91:1 › visible rich description retains formatting and strips executable markup (952ms)
+  ✓  5 tests/browser/app.spec.js:105:1 › reaction authors remain literal text in the actual task discussion (687ms)
+  ✓  6 tests/browser/app.spec.js:122:1 › foundation token overrides and system theme reach final React controls (453ms)
+  ✓  7 tests/browser/cutover.spec.ts:3:1 › final SPA serves root, auth callback, consent and deep links with query-preserving reload (799ms)
+
+  7 passed (10.3s)

@@ -1,0 +1,43 @@
+✔ the complete token inventory and CSS consumers pass the guard (91.588417ms)
+✔ unknown references, hardcoded CSS and inline regressions fail the guard (51.318541ms)
+✔ runtime geometry and user-owned color values are permitted (0.358958ms)
+✔ foundation overrides reach the supported React button, drawer and sidebar styles (2.308375ms)
+✔ template migration is idempotent and preserves runtime geometry and data (0.586833ms)
+✔ catalogue demonstrations never call entity writers (0.3885ms)
+✔ source discovery includes the final React TS and TSX consumers (0.079708ms)
+✔ React controlled styles follow constants, spreads, assertions and conditional branches (0.64275ms)
+✔ static cn and cva utilities reject framework scales and modified arbitrary literals (0.694083ms)
+✔ semantic aliases require authored theme declarations; token utilities and runtime geometry stay valid (0.980084ms)
+✔ foundation formulas in React preserve token multipliers while bare radius utilities cannot bypass the guard (0.49475ms)
+✖ signed numeric styles and computed literal keys cannot bypass controlled spacing (2.17ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 11
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 321.060166
+
+✖ failing tests:
+
+test at tests/tokens.test.mjs:176:1
+✖ signed numeric styles and computed literal keys cannot bypass controlled spacing (2.17ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+    assert.ok(faults.some(fault => fault.includes('fixed padding')))
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/tokens.test.mjs:178:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

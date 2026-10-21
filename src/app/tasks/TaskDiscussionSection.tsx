@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import DOMPurify from 'dompurify';
+import { safeRichText } from '../../core/rich-text.js';
 import type { Task, Comment, CommentReaction, ActivityEntry } from '../../domain/contracts';
 import type { Member, DomainEvent, Agent } from '../../workspace/normalized';
 import type { Translate } from '../auth/ConsentPage';
@@ -107,7 +107,7 @@ export function TaskDiscussionSection({
           {comments.map(item => (
             <article className="comment" key={item.id}>
               <strong>{members.find(m => m.user_id === item.authorUserId)?.name ?? t('Autor histórico', 'Historical author')}</strong>
-              <div className="rich-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.body, { USE_PROFILES: { html: true } }) }} />
+              <div className="rich-content" dangerouslySetInnerHTML={{ __html: safeRichText(item.body) }} />
               <div className="comment-reactions">
                 {[...new Set(['👍', '❤️', '🎉', ...reactions.filter(r => r.commentId === item.id).map(r => r.reaction)])].map(reaction => {
                   const people = reactions.filter(r => r.commentId === item.id && r.reaction === reaction),

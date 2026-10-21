@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
-function session(container) {
+function session(container, label) {
   const child = spawn('docker', [
     'exec',
     '-i',
@@ -28,14 +28,26 @@ function session(container) {
     errors += value;
   });
   return {
-    async query(sql) {
+    async query(sql, phase) {
       const marker = `review_barrier_${++sequence}`,
         start = output.length;
       child.stdin.write(`${sql}\n\\echo ${marker}\n`);
-      const deadline = Date.now() + 8000;
+      const started = Date.now(),
+        deadline = started + 8000;
+      const diagnostic = () =>
+        JSON.stringify({
+          label,
+          phase,
+          sequence,
+          elapsedMs: Date.now() - started,
+          outputBytes: output.length - start,
+          stderrBytes: errors.length,
+          exitCode: child.exitCode,
+          signal: child.signalCode,
+        });
       while (!output.slice(start).includes(marker)) {
-        if (child.exitCode !== null) throw new Error(`PostgreSQL session exited: ${errors.trim()}`);
-        if (Date.now() >= deadline) throw new Error(`PostgreSQL barrier timed out: ${errors.trim()}`);
+        if (child.exitCode !== null) throw new Error(`PostgreSQL session exited: ${diagnostic()}`);
+        if (Date.now() >= deadline) throw new Error(`PostgreSQL barrier timed out: ${diagnostic()}`);
         await delay(10);
       }
       return output.slice(start).split(marker)[0].trim();
@@ -51,17 +63,24 @@ export async function verifyWebhookRecovery({ container, sql, scenario }) {
   const id = fixture.id,
     lease = fixture.lease_token;
   if (scenario === 'secret-lock' || scenario === 'completion-lock') {
-    const holder = session(container),
-      waiter = session(container);
+    const holder = session(container, `${scenario}:holder`),
+      waiter = session(container, `${scenario}:waiter`);
+    let waiterPid = null;
+    let phase = 'waiter-startup';
     try {
-      const waiterPid = Number(await waiter.query("set statement_timeout='7s'; select pg_backend_pid();"));
+      waiterPid = Number(await waiter.query("set statement_timeout='7s'; select pg_backend_pid();", phase));
+      phase = 'holder-lock';
       sql(`update public.webhook_deliveries set lease_until=clock_timestamp()+interval '2 seconds' where id='${id}';`);
-      await holder.query(`begin;select id from public.webhook_deliveries where id='${id}' for update;`);
+      await holder.query(`begin;select id from public.webhook_deliveries where id='${id}' for update;`, phase);
+      phase = 'rpc-lock-and-expiry';
       const waiting = waiter.query(
         scenario === 'secret-lock'
           ? `select public.webhook_delivery_secret('${id}','${lease}') is null;`
           : `select not public.complete_webhook_delivery('${id}','${lease}','accepted',200);`,
+        phase,
       );
+      // Attach observation immediately; the original promise is still asserted below.
+      void waiting.catch(() => {});
       const deadline = Date.now() + 6000;
       let blocked = false;
       while (Date.now() < deadline) {
@@ -76,7 +95,9 @@ export async function verifyWebhookRecovery({ container, sql, scenario }) {
         assert.ok(Date.now() < deadline, 'lease must expire while RPC is blocked');
         await delay(20);
       }
-      await holder.query('commit;');
+      phase = 'holder-commit';
+      await holder.query('commit;', phase);
+      phase = 'waiter-result';
       assert.equal(await waiting, 't', `${scenario}: production RPC accepted a lease that expired while awaiting its lock`);
       assert.equal(
         sql(
@@ -85,6 +106,17 @@ export async function verifyWebhookRecovery({ container, sql, scenario }) {
         't',
         'rejected stale RPC must not alter state/token or archive the queue',
       );
+    } catch (error) {
+      // No SQL, lease values, payloads or credentials in diagnostics.
+      let activity = 'unavailable';
+      try {
+        activity = sql(
+          `select coalesce(json_agg(json_build_object('pid',pid,'state',state,'waitType',wait_event_type,'waitEvent',wait_event,'blockers',pg_blocking_pids(pid)))::text,'[]') from pg_stat_activity where pid=${Number(waiterPid) || 0};`,
+        ).trim();
+      } catch {
+        /* preserve the original failure */
+      }
+      throw new Error(`Webhook recovery ${scenario}, phase=${phase}, waiter=${waiterPid}, activity=${activity}`, { cause: error });
     } finally {
       holder.close();
       waiter.close();
