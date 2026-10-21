@@ -248,7 +248,7 @@ test('board drag preserves manual order and recurring completion, column menus a
   await expect(page.getByLabel('Due date', { exact: true })).toHaveValue('2026-11-27');
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   const todo = page.locator('[data-task-group="todo"]');
-  await todo.getByText('⋯', { exact: true }).click();
+  await todo.getByLabel('Column options: To do', { exact: true }).click();
   await todo.getByRole('button', { name: 'Complete column', exact: true }).click();
   await expect(todo.getByRole('button', { name: title })).toHaveCount(1); // recurring completion creates the next instance
   await page.getByRole('checkbox', { name: 'Select all visible tasks', exact: true }).check();
@@ -474,4 +474,97 @@ test('a native task drag cannot mutate an identical ID after changing workspace'
     }),
     contentType: 'application/json',
   });
+});
+test('task context menu supports right click, keyboard focus and guarded core actions', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local');
+  const initial = data.tasks.find(task => task.status !== 'done')!;
+  const trigger = page.getByRole('button', { name: initial.title });
+  await trigger.click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: 'Task actions', exact: true });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Open task', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Complete task', exact: true })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(menu.getByRole('menuitem', { name: 'Delete task…', exact: true })).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(menu.getByRole('menuitem', { name: 'Open task', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.press('Shift+F10');
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('combobox', { name: 'Status: ' + initial.key, exact: true })).toHaveValue('done');
+  await page.getByRole('button', { name: 'Task actions: ' + initial.key, exact: true }).click();
+  await menu.getByRole('menuitem', { name: 'Duplicate task', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toBeVisible();
+  const cloneId = new URL(page.url()).searchParams.get('task');
+  expect(cloneId).not.toBe(initial.id);
+  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('todo');
+  const cloneKey = await page.locator('.drawer-eyebrow').textContent();
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await page.getByRole('button', { name: 'Task actions: ' + cloneKey, exact: true }).click();
+  await menu.getByRole('menuitem', { name: 'Delete task…', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Task actions: ' + cloneKey, exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Task actions: ' + cloneKey, exact: true }).click();
+  await menu.getByRole('menuitem', { name: 'Delete task…', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm deletion', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Task actions: ' + cloneKey, exact: true })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('combobox', { name: 'Status: ' + initial.key, exact: true })).toHaveValue('done');
+  await page.getByRole('link', { name: 'Board', exact: true }).click();
+  const card = page.locator('.task-card').filter({ has: page.getByRole('button', { name: initial.title }) });
+  await card.click({ button: 'right', position: { x: 5, y: 5 } });
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(card.getByRole('button', { name: 'Task actions: ' + initial.key, exact: true })).toBeFocused();
+});
+test('task context menu is invalidated across workspaces even when text IDs match', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local');
+  const initial = data.tasks.find(task => task.status !== 'done')!;
+  await page.evaluate(
+    ({ task, project }) => {
+      const state = JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!);
+      state.records.w2.data.projects = [project];
+      state.records.w2.data.tasks = [{ ...task, title: 'Menu in another workspace', status: 'todo', subtasks: [], deps: [], attachments: [] }];
+      localStorage.setItem('gr8r.workspaces.v1', JSON.stringify(state));
+    },
+    { task: initial, project: data.projects.find(p => p.id === initial.project)! },
+  );
+  await page.getByRole('button', { name: initial.title }).click({ button: 'right' });
+  await expect(page.getByRole('menu', { name: 'Task actions', exact: true })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Workspace', exact: true }).selectOption('w2');
+  await expect(page.getByRole('button', { name: 'Menu in another workspace' })).toBeVisible();
+  await expect(page.getByRole('menu', { name: 'Task actions', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Menu in another workspace' }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Complete task', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Status: ' + initial.key, exact: true })).toHaveValue('done');
+  const records = await page.evaluate(id => {
+    const state = JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!);
+    return {
+      first: state.records.w1.data.tasks.find((t: { id: string }) => t.id === id).status,
+      second: state.records.w2.data.tasks.find((t: { id: string }) => t.id === id).status,
+    };
+  }, initial.id);
+  expect(records).toEqual({ first: initial.status, second: 'done' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('pt-BR');
+  await page.getByRole('button', { name: 'Alternar tema' }).click();
+  await page.getByRole('button', { name: 'Ações da tarefa: ' + initial.key, exact: true }).click();
+  const mobileMenu = page.getByRole('menu', { name: 'Ações da tarefa', exact: true });
+  await expect(mobileMenu).toBeVisible();
+  const rect = (await mobileMenu.boundingBox())!;
+  expect(rect.x).toBeGreaterThanOrEqual(0);
+  expect(rect.x + rect.width).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: '/tmp/task6b1-context-mobile-light-pt.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Ações da tarefa: ' + initial.key, exact: true })).toBeFocused();
 });

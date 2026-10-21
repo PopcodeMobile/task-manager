@@ -923,3 +923,98 @@ test('actual cloud task views follow cursors, keep atomic CAS/claim guards and r
   }
   if (cleanupErrors.length) throw Error('Fixture cleanup failed: ' + cleanupErrors.join(', '));
 });
+
+test('actual cloud task context menu completes, reopens and respects active reservations', async ({ page }) => {
+  test.skip(!process.env.TEST_SUPABASE_URL || !process.env.TEST_SUPABASE_SERVICE_ROLE_KEY, 'Requires dedicated local Supabase');
+  test.setTimeout(45000);
+  const { createClient } = await import('@supabase/supabase-js');
+  const base = process.env.TEST_SUPABASE_URL!,
+    key = process.env.TEST_SUPABASE_ANON_KEY!;
+  const service = createClient(base, process.env.TEST_SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } }),
+    human = createClient(base, key, { auth: { persistSession: false, autoRefreshToken: false } }),
+    executor = createClient(base, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const suffix = crypto.randomUUID(),
+    email = `task6b1-${suffix}@example.test`,
+    agentEmail = `task6b1-executor-${suffix}@example.test`,
+    password = `Task6b1-${crypto.randomUUID()}!`,
+    users: string[] = [];
+  let ws = '';
+  const cleanupErrors: string[] = [];
+  try {
+    for (const address of [email, agentEmail]) {
+      const result = await service.auth.admin.createUser({ email: address, password, email_confirm: true });
+      expect(!!result.error).toBe(false);
+      users.push(result.data.user!.id);
+    }
+    expect(!!(await human.auth.signInWithPassword({ email, password })).error).toBe(false);
+    expect(!!(await executor.auth.signInWithPassword({ email: agentEmail, password })).error).toBe(false);
+    const made = await human.rpc('create_workspace_v2', { p_name: 'Task views actual', p_slug: `task6b1-${suffix}`, p_idempotency_key: suffix });
+    expect(!!made.error).toBe(false);
+    ws = made.data.data.id;
+    expect(!!(await service.from('workspace_memberships').insert({ workspace_id: ws, user_id: users[1], role: 'member' })).error).toBe(false);
+    expect(!!(await service.from('agents').insert({ workspace_id: ws, id: 'views-agent', name: 'Views executor', auth_user_id: users[1] })).error).toBe(false);
+    const command = async (operation: string, input: Record<string, unknown>, version?: number, client = human) => {
+      const result = await client.rpc('execute_operation', {
+        p_workspace_id: ws,
+        p_operation: operation,
+        p_command: input,
+        p_expected_version: version ?? null,
+        p_idempotency_key: crypto.randomUUID(),
+      });
+      expect(!!result.error).toBe(false);
+      return result.data.data;
+    };
+    const readTask = async (id: string) => {
+      const result = await human.rpc('read_operation', { p_workspace_id: ws, p_operation: 'get_task', p_query: { id } });
+      expect(!!result.error).toBe(false);
+      return result.data.data;
+    };
+    const project = await command('create_project', { name: 'Menu project' });
+    let task = await command('create_task', { projectId: project.id, title: 'Cloud menu task' });
+    await page.goto(`/app/w/${ws}/tasks`);
+    await page.getByLabel('E-mail').fill(email);
+    await page.getByLabel('Senha', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await page.getByRole('button', { name: task.key + ' Cloud menu task', exact: true }).click({ button: 'right' });
+    await expect(page.getByRole('menuitem', { name: 'Open task', exact: true })).toBeFocused();
+    await page.getByRole('menuitem', { name: 'Complete task', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: 'Status: ' + task.key, exact: true })).toHaveValue('done');
+    await expect(page.getByRole('menu', { name: 'Task actions', exact: true })).toHaveCount(0);
+    task = await readTask(task.id);
+    expect(task.status).toBe('done');
+    await page.getByRole('button', { name: task.key + ' Cloud menu task', exact: true }).focus();
+    await page.keyboard.press('Shift+F10');
+    await page.getByRole('menuitem', { name: 'Reopen task', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: 'Status: ' + task.key, exact: true })).toHaveValue('todo');
+    await expect(page.getByRole('menu', { name: 'Task actions', exact: true })).toHaveCount(0);
+    task = await readTask(task.id);
+    expect(task.status).toBe('todo');
+    await command('claim_task', { id: task.id }, task.version, executor);
+    await page.getByRole('button', { name: 'Refresh data', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: 'Status: ' + task.key, exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: task.key + ' Cloud menu task', exact: true }).click({ button: 'right' });
+    await expect(page.getByRole('menuitem', { name: 'Complete task', exact: true })).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByRole('menuitem', { name: 'Archive task', exact: true })).toHaveAttribute('aria-disabled', 'true');
+    const claimed = await readTask(task.id);
+    await page.getByRole('menuitem', { name: 'Complete task', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    expect((await readTask(task.id)).version).toBe(claimed.version);
+    await page.screenshot({ path: '/tmp/task6b1-context-cloud-claimed.png', fullPage: true });
+    await page.getByRole('menuitem', { name: 'Open task', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Resume human control', exact: true })).toBeEnabled();
+  } finally {
+    if (ws) {
+      const claims = await service.from('task_claims').delete().eq('workspace_id', ws);
+      if (claims.error) cleanupErrors.push('claims');
+      const result = await service.from('workspaces').delete().eq('id', ws);
+      if (result.error) cleanupErrors.push('workspace');
+    }
+    for (const id of users) {
+      if ((await service.auth.admin.deleteUser(id)).error) cleanupErrors.push('user');
+    }
+    await human.auth.signOut();
+    await executor.auth.signOut();
+  }
+  if (cleanupErrors.length) throw Error('Fixture cleanup failed: ' + cleanupErrors.join(', '));
+});

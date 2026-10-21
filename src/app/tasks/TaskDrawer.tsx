@@ -1,10 +1,11 @@
+import { prepareTaskAction } from './task-view-model';
 import { TaskCoreActions } from './TaskCoreActions';
 import { TaskExecutionSection } from './TaskExecutionSection';
 import type { WorkspaceRepository } from '../../workspace/repository';
 import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
 import { MessageSquare, Plus, Unlink } from 'lucide-react';
-import type { Task, Project, Comment, Subtask, TaskDependency, TaskStatus, TaskPriority, Recurrence } from '../../domain/contracts';
+import type { Task, Project, Comment, Subtask, TaskDependency, TaskStatus, TaskPriority, Recurrence, Json } from '../../domain/contracts';
 import { type Agent, type Member } from '../../workspace/normalized';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import {
@@ -215,10 +216,11 @@ export function TaskDrawer({
     saveButton.current?.focus();
     return false;
   }
-  function taskAction(operation: string, input: Record<string, unknown> = {}, after?: 'open' | 'close') {
+  function taskAction(operation: string, input: Record<string, Json> = {}, after?: 'open' | 'close') {
     if (!current || !requireSaved()) return;
     void action(async () => {
-      const result = await execute<Task>(operation, { id: current.id, ...input }, editVersion);
+      const command = prepareTaskAction(current, operation, input, editVersion);
+      const result = await execute<Task>(command.operation, command.input, command.expectedVersion);
       if (after === 'open') {
         registerDraft(null);
         created(result.id);

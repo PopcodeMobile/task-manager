@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react';
-import type { Project, Task } from '../../domain/contracts';
+import type { Project, Task, Json } from '../../domain/contracts';
 import type { Translate } from '../auth/ConsentPage';
 import { Button } from '../../components/ui/button';
+export function coreTaskLabels(t: Translate) {
+  return {
+    complete_task: t('Concluir tarefa', 'Complete task'),
+    move_task: t('Mover tarefa', 'Move task'),
+    duplicate_task: t('Duplicar tarefa', 'Duplicate task'),
+    archive_task: t('Arquivar tarefa', 'Archive task'),
+    restore_task: t('Restaurar tarefa', 'Restore task'),
+    reopen: t('Reabrir tarefa', 'Reopen task'),
+    delete_task: t('Excluir tarefa…', 'Delete task…'),
+  };
+}
 export function TaskCoreActions({
   task,
   projects,
@@ -13,7 +24,7 @@ export function TaskCoreActions({
   projects: Project[];
   t: Translate;
   disabled: boolean;
-  run: (operation: string, input: Record<string, unknown>, after?: 'open' | 'close') => void;
+  run: (operation: string, input: Record<string, Json>, after?: 'open' | 'close') => void;
 }) {
   const [project, setProject] = useState(task.projectId);
   useEffect(() => setProject(task.projectId), [task.projectId]);
@@ -32,17 +43,17 @@ export function TaskCoreActions({
       </label>
       <div className="button-row">
         <Button variant="outline" disabled={disabled || project === task.projectId} onClick={() => run('move_task', { projectId: project })}>
-          {t('Mover tarefa', 'Move task')}
+          {coreTaskLabels(t).move_task}
         </Button>
         <Button variant="outline" disabled={disabled} onClick={() => run('duplicate_task', {}, 'open')}>
-          {t('Duplicar tarefa', 'Duplicate task')}
+          {coreTaskLabels(t).duplicate_task}
         </Button>
         <Button variant="outline" disabled={disabled} onClick={() => run(task.archived ? 'restore_task' : 'archive_task', {}, 'close')}>
-          {task.archived ? t('Restaurar tarefa', 'Restore task') : t('Arquivar tarefa', 'Archive task')}
+          {task.archived ? coreTaskLabels(t).restore_task : coreTaskLabels(t).archive_task}
         </Button>
         {task.status === 'done' && (
           <Button variant="outline" disabled={disabled} onClick={() => run('update_task', { status: 'todo' })}>
-            {t('Reabrir tarefa', 'Reopen task')}
+            {coreTaskLabels(t).reopen}
           </Button>
         )}
       </div>

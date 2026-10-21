@@ -130,3 +130,15 @@ test('drag payload is fenced to its repository lifetime, including identical IDs
   assert.equal(taskDragId(JSON.stringify({ id: 't1', scope: 'workspace-a-session-1' }), 'workspace-a-session-2'), null);
   assert.equal(taskDragId('t1', 'workspace-a-session-1'), null);
 });
+test('core task action preparation shares reservation and CAS guards while explicit intervention remains intentional', async () => {
+  const { prepareTaskAction } = await import('../src/app/tasks/task-view-model.ts');
+  assert.equal(typeof prepareTaskAction, 'function');
+  const active = task('a', { reservation: { active: true, expiresAt: '2099-01-01' } });
+  assert.throws(() => prepareTaskAction(active, 'duplicate_task', {}, 3), /already_claimed/);
+  assert.deepEqual(prepareTaskAction(task('a'), 'archive_task', {}, 7), { operation: 'archive_task', input: { id: 'a' }, expectedVersion: 7 });
+  assert.deepEqual(prepareTaskAction(active, 'intervene_task', { action: 'release' }, 3), {
+    operation: 'intervene_task',
+    input: { id: 'a', action: 'release' },
+    expectedVersion: 3,
+  });
+});

@@ -16,6 +16,7 @@ import {
 } from '../../components/ui/alert-dialog';
 import { errorMessage } from '../shell/messages';
 import { TaskViewToolbar, fieldLabel, groupLabel } from './TaskViewToolbar';
+import { TaskContextMenu, type ExtraTaskMenuAction } from './TaskContextMenu';
 import { TaskCell } from './TaskCells';
 import {
   applyTaskView,
@@ -51,9 +52,11 @@ export type TaskViewsProps = {
   viewKey?: string;
   initialView?: unknown;
   onViewChange?: (view: TaskView) => void;
+  extraTaskMenuActions?: ExtraTaskMenuAction[];
 };
 export function TaskViews(props: TaskViewsProps) {
   const { tasks, projects, members, t, repo, execute, board, table, open, projectId } = props;
+  const [context, setContext] = useState<{ task: Task; x: number; y: number; trigger: HTMLElement; scope: string } | null>(null);
   const dragScope = useMemo(() => crypto.randomUUID(), [repo]);
   const mode = board ? 'board' : table ? 'table' : 'list',
     key = props.viewKey ?? `${projectId ? `project:${projectId}` : 'tasks'}:${mode}`;
@@ -67,6 +70,7 @@ export function TaskViews(props: TaskViewsProps) {
     let alive = true;
     setReady(false);
     setSelected([]);
+    setContext(null);
     setError('');
     void (async () => {
       try {
@@ -156,9 +160,57 @@ export function TaskViews(props: TaskViewsProps) {
       onChange={() => toggle(task.id)}
     />
   );
+  function closeContext(restoreFocus = true) {
+    const previous = context;
+    setContext(null);
+    if (restoreFocus)
+      requestAnimationFrame(() => {
+        const current = previous?.trigger.isConnected
+          ? previous.trigger
+          : [...document.querySelectorAll<HTMLElement>('[data-task-menu]')].find(el => el.dataset.taskMenu === previous?.task.id);
+        (current ?? document.querySelector<HTMLElement>('.work-content'))?.focus();
+      });
+  }
+  function openContext(task: Task, trigger: HTMLElement, x: number, y: number) {
+    setContext({ task, trigger, x, y, scope: dragScope });
+  }
+  function contextProps(task: Task) {
+    return {
+      onContextMenu: (event: React.MouseEvent<HTMLElement>) => {
+        if ((event.target as HTMLElement).closest('input,textarea,select')) return;
+        event.preventDefault();
+        const trigger =
+          (event.target as HTMLElement).closest<HTMLElement>('button') ??
+          event.currentTarget.querySelector<HTMLElement>('[data-task-menu]') ??
+          event.currentTarget;
+        openContext(task, trigger, event.clientX, event.clientY);
+      },
+      onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => {
+        if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+          event.preventDefault();
+          const trigger = event.target as HTMLElement,
+            rect = trigger.getBoundingClientRect();
+          openContext(task, trigger, rect.left, rect.bottom);
+        }
+      },
+    };
+  }
   function movement(task: Task, index: number, rows: Task[], group: string, groupId: string) {
     return (
       <div className="task-order-controls">
+        <Button
+          variant="ghost"
+          data-task-menu={task.id}
+          aria-label={t('Ações da tarefa', 'Task actions') + ': ' + (task.key ?? task.id)}
+          aria-haspopup="menu"
+          aria-expanded={context?.scope === dragScope && context.task.id === task.id}
+          onClick={event => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            openContext(task, event.currentTarget, rect.left, rect.bottom);
+          }}
+        >
+          ⋯
+        </Button>
         <Button variant="ghost" aria-label={t('Arrastar tarefa', 'Drag task') + ': ' + (task.key ?? task.id)} disabled={disabled(task)} {...dragProps(task)}>
           <GripVertical size={14} />
         </Button>
@@ -418,7 +470,13 @@ export function TaskViews(props: TaskViewsProps) {
                     {board ? (
                       <div className="board-cards">
                         {group.tasks.map((task, index) => (
-                          <article className="task-card" key={task.id} {...dragProps(task)} {...dropProps(groupType, group.key, task.id)}>
+                          <article
+                            className="task-card"
+                            key={task.id}
+                            {...contextProps(task)}
+                            {...dragProps(task)}
+                            {...dropProps(groupType, group.key, task.id)}
+                          >
                             {pick(task)}
                             <Button variant="ghost" className="task-title" onClick={() => open(task.id)}>
                               <small>{task.key}</small>
@@ -443,7 +501,7 @@ export function TaskViews(props: TaskViewsProps) {
                             aria-label={name}
                             style={
                               {
-                                '--task-table-width': `${shownColumns.reduce((sum, c) => sum + (view.colW[c] ?? (c === 'title' ? 300 : 150)), 136)}px`,
+                                '--task-table-width': `${shownColumns.reduce((sum, c) => sum + (view.colW[c] ?? (c === 'title' ? 300 : 150)), 168)}px`,
                               } as React.CSSProperties
                             }
                           >
@@ -452,7 +510,7 @@ export function TaskViews(props: TaskViewsProps) {
                               {shownColumns.map(c => (
                                 <col key={c} style={{ width: view.colW[c] ?? (c === 'title' ? 300 : 150) }} />
                               ))}
-                              <col style={{ width: 96 }} />
+                              <col style={{ width: 128 }} />
                             </colgroup>
                             <thead>
                               <tr>
@@ -479,7 +537,7 @@ export function TaskViews(props: TaskViewsProps) {
                             </thead>
                             <tbody>
                               {group.tasks.map((task, index) => (
-                                <tr key={task.id} {...dragProps(task)} {...dropProps(groupType, group.key, task.id)}>
+                                <tr key={task.id} {...contextProps(task)} {...dragProps(task)} {...dropProps(groupType, group.key, task.id)}>
                                   <td>{pick(task)}</td>
                                   {shownColumns.map(c => (
                                     <td key={c} data-task-column={c}>
@@ -523,6 +581,22 @@ export function TaskViews(props: TaskViewsProps) {
             );
           })}
         </div>
+      )}
+      {context?.scope === dragScope && (
+        <TaskContextMenu
+          key={`${dragScope}:${context.task.id}`}
+          task={context.task}
+          projects={projects}
+          x={context.x}
+          y={context.y}
+          t={t}
+          execute={execute}
+          readOnly={!props.canCreate}
+          signal={repo.controller.signal}
+          close={closeContext}
+          open={open}
+          extraActions={props.extraTaskMenuActions}
+        />
       )}
       <AlertDialog open={remove} onOpenChange={setRemove}>
         <AlertDialogContent>
