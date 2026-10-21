@@ -1,3 +1,4 @@
+import { iso, addD } from '../../core/calendar.js';
 import { useEffect, useMemo, useState } from 'react';
 import { List, Columns3, Table2, Plus, GripVertical } from 'lucide-react';
 import type { Task, Project, Json, BatchCommand } from '../../domain/contracts';
@@ -62,6 +63,8 @@ export function TaskViews(props: TaskViewsProps) {
     key = props.viewKey ?? `${projectId ? `project:${projectId}` : 'tasks'}:${mode}`;
   const [view, setViewState] = useState<TaskView>(() => readTaskView(props.initialView)),
     [ready, setReady] = useState(false),
+    [loadFailed, setLoadFailed] = useState(false),
+    [loadAttempt, setLoadAttempt] = useState(0),
     [selected, setSelected] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -69,6 +72,7 @@ export function TaskViews(props: TaskViewsProps) {
   useEffect(() => {
     let alive = true;
     setReady(false);
+    setLoadFailed(false);
     setSelected([]);
     setContext(null);
     setError('');
@@ -78,14 +82,14 @@ export function TaskViews(props: TaskViewsProps) {
         if (!alive || repo.controller.signal.aborted) return;
         setViewState(props.initialView ? readTaskView(props.initialView) : loadTaskView(localStorage, repo.userId, repo.workspaceId!, key));
         setReady(true);
-      } catch (err) {
-        if (alive) setError(errorMessage(err, t));
+      } catch {
+        if (alive && !repo.controller.signal.aborted) setLoadFailed(true);
       }
     })();
     return () => {
       alive = false;
     };
-  }, [repo, key]);
+  }, [repo, key, loadAttempt]);
   function setView(v: TaskView) {
     try {
       saveTaskView(localStorage, repo.userId, repo.workspaceId!, key, v);
@@ -254,7 +258,22 @@ export function TaskViews(props: TaskViewsProps) {
   const cell = (task: Task, column: Column) => (
     <TaskCell task={task} column={column} projects={projects} members={members} agents={props.agents} t={t} open={open} edit={edit} disabled={disabled(task)} />
   );
-  if (!ready) return <p role="status">{t('Carregando visualização...', 'Loading view...')}</p>;
+  if (!ready)
+    return loadFailed ? (
+      <div>
+        <p role="alert">
+          {t(
+            'Não foi possível carregar as preferências da visualização. Seus dados foram mantidos. Tente novamente.',
+            'Could not load view preferences. Your stored data was kept. Try again.',
+          )}
+        </p>
+        <Button variant="outline" onClick={() => setLoadAttempt(attempt => attempt + 1)}>
+          {t('Tentar novamente', 'Try again')}
+        </Button>
+      </div>
+    ) : (
+      <p role="status">{t('Carregando visualização...', 'Loading view...')}</p>
+    );
   return (
     <>
       <div className="work-toolbar">
@@ -640,18 +659,21 @@ function GroupComposer({
   create: (input: Record<string, unknown>) => Promise<boolean>;
 }) {
   const [title, setTitle] = useState(''),
-    [project, setProject] = useState(projectId ?? projects[0]?.id ?? '');
+    [project, setProject] = useState(projectId || projects[0]?.id || '');
+  const targetProject = group === 'project' ? groupId : projectId || projects.find(p => p.id === project)?.id || projects[0]?.id || '';
+  const validProject = projects.some(p => p.id === targetProject);
   return (
     <form
       className="task-group-composer"
       onSubmit={e => {
         e.preventDefault();
-        const input: Record<string, unknown> = { id: crypto.randomUUID(), title, projectId: group === 'project' ? groupId : project };
+        if (disabled || !validProject) return;
+        const input: Record<string, unknown> = { id: crypto.randomUUID(), title, projectId: targetProject };
         if (group === 'status') input.status = groupId;
         if (group === 'priority') input.priority = groupId;
         if (group === 'assignee') input.assigneeUserId = groupId === 'none' ? null : groupId;
         if (group === 'due' && ['today', 'week', 'overdue'].includes(groupId))
-          input.dueDate = new Date(Date.now() + (groupId === 'overdue' ? -1 : groupId === 'week' ? 7 : 0) * 86400000).toISOString().slice(0, 10);
+          input.dueDate = iso(addD(new Date(), groupId === 'overdue' ? -1 : groupId === 'week' ? 7 : 0));
         void create(input).then(ok => {
           if (ok) setTitle('');
         });
@@ -663,15 +685,15 @@ function GroupComposer({
         aria-label={t('Nova tarefa no grupo', 'New task in group') + ': ' + groupId}
         placeholder={t('Nova tarefa...', 'New task...')}
         value={title}
-        disabled={disabled}
+        disabled={disabled || !validProject}
         onChange={e => setTitle(e.target.value)}
       />
       {!projectId && group !== 'project' && (
         <select
           aria-label={t('Projeto da nova tarefa', 'New task project') + ': ' + groupId}
-          value={project}
+          value={validProject ? targetProject : ''}
           onChange={e => setProject(e.target.value)}
-          disabled={disabled}
+          disabled={disabled || !validProject}
         >
           {projects.map(p => (
             <option key={p.id} value={p.id}>
@@ -680,7 +702,8 @@ function GroupComposer({
           ))}
         </select>
       )}
-      <Button variant="ghost" type="submit" disabled={disabled || !projects.length}>
+      {!validProject && <p>{t('Crie um projeto antes de adicionar tarefas.', 'Create a project before adding tasks.')}</p>}
+      <Button variant="ghost" type="submit" disabled={disabled || !validProject}>
         <Plus size={16} />
         <span className="sr-only">{t('Adicionar ao grupo', 'Add to group') + ': ' + groupId}</span>
       </Button>

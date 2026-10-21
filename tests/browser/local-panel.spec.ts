@@ -568,3 +568,91 @@ test('task context menu is invalidated across workspaces even when text IDs matc
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Ações da tarefa: ' + initial.key, exact: true })).toBeFocused();
 });
+test.describe('local calendar boundary', () => {
+  test.use({ timezoneId: 'America/Maceio' });
+  test('Today composer uses the actual local day at 22:30 and preserves it after reload', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-10-20T22:30:00-03:00'));
+    await prepare(page);
+    await page.addInitScript(() => {
+      const legacy = JSON.parse(localStorage.getItem('gr8r.v2')!);
+      legacy.data.tasks[0] = { ...legacy.data.tasks[0], title: 'Calendar today seed', due: '2026-10-20', status: 'todo' };
+      legacy.data.tasks[1] = { ...legacy.data.tasks[1], title: 'Calendar next day seed', due: '2026-10-21', status: 'todo' };
+      localStorage.setItem('gr8r.v2', JSON.stringify(legacy));
+    });
+    await page.goto('/app-local');
+    await page.getByRole('combobox', { name: 'Group', exact: true }).selectOption('due');
+    const today = page.locator('[data-task-group="today"]');
+    await today.getByRole('combobox', { name: 'New task project: today', exact: true }).selectOption('p1');
+    await today.getByRole('textbox', { name: 'New task in group: today', exact: true }).fill('Created on local Today');
+    await today.getByRole('button', { name: 'Add to group: today', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Created on local Today' })).toBeVisible();
+    const due = await page.evaluate(() => {
+      const state = JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!);
+      return state.records.w1.data.tasks.find((task: { title: string }) => task.title === 'Created on local Today').due;
+    });
+    expect(due).toBe('2026-10-20');
+    await expect(today.getByRole('button', { name: 'Calendar today seed' })).toBeVisible();
+    await expect(today.getByRole('button', { name: 'Calendar next day seed' })).toHaveCount(0);
+    await page.reload();
+    await expect(today.getByRole('button', { name: 'Created on local Today' })).toBeVisible();
+    await page.getByRole('button', { name: 'Created on local Today' }).click();
+    await expect(page.getByLabel('Due date', { exact: true })).toHaveValue('2026-10-20');
+  });
+});
+test('failed task view preferences show an explicit retry and retain stored bytes and unknown metadata', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local');
+  await expect(page.getByRole('textbox', { name: 'Search tasks', exact: true })).toBeVisible();
+  const stored = await page.evaluate(title => {
+    const key = 'gr8r.preferences.local';
+    const personal = JSON.parse(localStorage.getItem(key)!);
+    personal.unknown = { literal: '<preserved>', nested: [17] };
+    personal.views.w1['tasks:table'] = { q: title, unknownView: ['keep'] };
+    const repaired = JSON.stringify(personal);
+    const broken = repaired + ' invalid-tail';
+    localStorage.setItem(key, broken);
+    return { repaired, broken };
+  }, firstTitle);
+  await page.getByRole('link', { name: 'Table', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText('Could not load view preferences. Your stored data was kept. Try again.');
+  const retry = page.getByRole('button', { name: 'Try again', exact: true });
+  await expect(retry).toBeEnabled();
+  await expect(page.getByText('Loading view...', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('gr8r.preferences.local'))).toBe(stored.broken);
+  await retry.click();
+  await expect(retry).toBeEnabled();
+  await expect(page.getByRole('textbox', { name: 'Search tasks', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('gr8r.preferences.local'))).toBe(stored.broken);
+  await page.evaluate(raw => localStorage.setItem('gr8r.preferences.local', raw), stored.repaired);
+  await retry.click();
+  await expect(page.getByRole('textbox', { name: 'Search tasks', exact: true })).toHaveValue(firstTitle);
+  await expect(page.getByRole('button', { name: firstTitle })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('gr8r.preferences.local'))).toBe(stored.repaired);
+  await page.getByRole('textbox', { name: 'Search tasks', exact: true }).fill('');
+  const metadata = await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('gr8r.preferences.local')!);
+    return { unknown: saved.unknown, unknownView: saved.views.w1['tasks:table'].unknownView };
+  });
+  expect(metadata).toEqual({ unknown: { literal: '<preserved>', nested: [17] }, unknownView: ['keep'] });
+});
+test('group composer creates in the hydrated default project and preserves an explicit valid choice', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local');
+  const group = page.locator('[data-task-group="todo"]');
+  await expect(group.getByRole('combobox', { name: 'New task project: todo', exact: true })).toHaveValue('p1');
+  await group.getByRole('textbox', { name: 'New task in group: todo', exact: true }).fill('Created with hydrated project');
+  await group.getByRole('button', { name: 'Add to group: todo', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Created with hydrated project' })).toBeVisible();
+  await group.getByRole('combobox', { name: 'New task project: todo', exact: true }).selectOption('p2');
+  await group.getByRole('textbox', { name: 'New task in group: todo', exact: true }).fill('Created with explicit project');
+  await group.getByRole('button', { name: 'Add to group: todo', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Created with explicit project' })).toBeVisible();
+  const projects = await page.evaluate(() => {
+    const tasks = JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.tasks;
+    return ['Created with hydrated project', 'Created with explicit project'].map(
+      title => tasks.find((task: { title: string }) => task.title === title).project,
+    );
+  });
+  expect(projects).toEqual(['p1', 'p2']);
+  await expect(group.getByRole('combobox', { name: 'New task project: todo', exact: true })).toHaveValue('p2');
+});

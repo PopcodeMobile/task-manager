@@ -142,3 +142,59 @@ test('core task action preparation shares reservation and CAS guards while expli
     expectedVersion: 3,
   });
 });
+test('due groups use the local calendar at 22:30 in Maceio and across daylight-saving changes', async () => {
+  const { dueGroup } = await import('../src/app/tasks/task-view-model.ts');
+  const previousTZ = process.env.TZ;
+  try {
+    process.env.TZ = 'America/Maceio';
+    const now = new Date('2026-10-20T22:30:00-03:00');
+    assert.equal(dueGroup(task('today', { dueDate: '2026-10-20' }), now), 'today');
+    assert.equal(dueGroup(task('yesterday', { dueDate: '2026-10-19' }), now), 'overdue');
+    assert.equal(dueGroup(task('week', { dueDate: '2026-10-27' }), now), 'week');
+    assert.equal(dueGroup(task('later', { dueDate: '2026-10-28' }), now), 'later');
+    process.env.TZ = 'America/New_York';
+    const beforeDST = new Date('2026-03-07T22:30:00-05:00');
+    assert.equal(dueGroup(task('localToday', { dueDate: '2026-03-07' }), beforeDST), 'today');
+    assert.equal(dueGroup(task('weekAcrossDST', { dueDate: '2026-03-14' }), beforeDST), 'week');
+    assert.equal(dueGroup(task('laterAcrossDST', { dueDate: '2026-03-15' }), beforeDST), 'later');
+  } finally {
+    if (previousTZ === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTZ;
+  }
+});
+test('due filters overlap today and next seven days, exclude completed overdue, and negate the full predicate', () => {
+  const previousTZ = process.env.TZ;
+  try {
+    process.env.TZ = 'America/Maceio';
+    const now = new Date('2026-10-20T12:00:00-03:00');
+    const rows = [
+      task('today', { dueDate: '2026-10-20' }),
+      task('plus7', { dueDate: '2026-10-27' }),
+      task('plus8', { dueDate: '2026-10-28' }),
+      task('overdue', { dueDate: '2026-10-19' }),
+      task('completedOverdue', { dueDate: '2026-10-19', status: 'done' }),
+      task('nodate'),
+    ];
+    for (const [value, expected] of [
+      ['today', ['today']],
+      ['week', ['today', 'plus7']],
+      ['overdue', ['overdue']],
+      ['later', ['plus8']],
+      ['nodate', ['nodate']],
+    ]) {
+      for (const op of ['is', 'not']) {
+        const view = readTaskView({ filters: [{ f: 'due', op, v: [value] }] });
+        const ids = applyTaskView(rows, view, [], [], now).map(t => t.id);
+        assert.deepEqual(ids, op === 'is' ? expected : rows.map(t => t.id).filter(id => !expected.includes(id)), `${op} ${value}`);
+      }
+    }
+  } finally {
+    if (previousTZ === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTZ;
+  }
+});
+test('legacy calendar helper exports share the pure implementation without changing the existing API', async () => {
+  const calendar = await import('../src/core/calendar.js');
+  const legacy = await import('../src/core/utils.js');
+  for (const name of ['DAY', 'sod', 'iso', 'parse', 'addD', 'diffD']) assert.equal(legacy[name], calendar[name], name);
+});

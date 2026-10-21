@@ -1,3 +1,4 @@
+import { diffD, parse } from '../../core/calendar.js';
 import type { BatchCommand, Json, Project, Task } from '../../domain/contracts.ts';
 import { RepositoryError, type Member } from '../../workspace/normalized.ts';
 export const taskStatuses = ['backlog', 'todo', 'progress', 'review', 'done'] as const;
@@ -45,9 +46,20 @@ export function metadataStrings(task: Task, key: string): string[] {
 }
 export function dueGroup(task: Task, now = new Date()): string {
   if (!task.dueDate) return 'nodate';
-  const today = now.toISOString().slice(0, 10),
-    days = (Date.parse(task.dueDate) - Date.parse(today)) / 86400000;
+  const days = diffD(parse(task.dueDate), now);
   return days < 0 ? 'overdue' : days === 0 ? 'today' : days <= 7 ? 'week' : 'later';
+}
+function matchesDue(task: Task, value: string, now: Date): boolean {
+  if (value === 'nodate') return !task.dueDate;
+  if (!task.dueDate) return false;
+  const days = diffD(parse(task.dueDate), now);
+  return value === 'overdue'
+    ? task.status !== 'done' && days < 0
+    : value === 'today'
+      ? days === 0
+      : value === 'week'
+        ? days >= 0 && days <= 7
+        : value === 'later' && days > 7;
 }
 function match(task: Task, filter: Filter, now: Date) {
   if (!filter.v.length) return true;
@@ -56,14 +68,15 @@ function match(task: Task, filter: Filter, now: Date) {
     priority: task.priority,
     assignee: task.assigneeUserId ?? 'none',
     project: task.projectId,
-    due: dueGroup(task, now),
   };
   const hit =
     filter.f === 'labels'
       ? filter.v.some(v => metadataStrings(task, 'labels').includes(v))
-      : ['created', 'updated'].includes(filter.f)
-        ? filter.v.some(v => now.getTime() - Date.parse(filter.f === 'created' ? task.createdAt : task.updatedAt) <= Number(v) * 86400000)
-        : filter.v.includes(values[filter.f] ?? '');
+      : filter.f === 'due'
+        ? filter.v.some(value => matchesDue(task, value, now))
+        : ['created', 'updated'].includes(filter.f)
+          ? filter.v.some(v => now.getTime() - Date.parse(filter.f === 'created' ? task.createdAt : task.updatedAt) <= Number(v) * 86400000)
+          : filter.v.includes(values[filter.f] ?? '');
   return filter.op === 'not' ? !hit : hit;
 }
 export function applyTaskView(tasks: Task[], view: TaskView, projects: Project[] = [], members: Member[] = [], now = new Date()): Task[] {

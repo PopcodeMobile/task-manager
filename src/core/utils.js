@@ -1,3 +1,4 @@
+import { sod, iso, parse, addD, diffD } from './calendar.js';
 import { t, formatDate, formatRelative } from './i18n.js';
 /* =====================================================================
    QUIRE — core: utils, icons, seed data, store, render loop, events
@@ -15,29 +16,9 @@ export const isMac = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform || gl
 export const MOD = isMac ? '⌘' : 'Ctrl';
 
 /* ---------- dates ---------- */
-export const DAY = 864e5;
-export const sod = d => {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-};
+export { DAY, sod, iso, parse, addD, diffD } from './calendar.js';
 export const TODAY = sod(new Date());
-export const iso = d => {
-  const x = new Date(d);
-  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
-};
-export const parse = s => {
-  if (!s) return null;
-  const [y, m, d] = s.split('-').map(Number);
-  return new Date(y, m - 1, d);
-};
-export const addD = (d, n) => {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-};
 export const dOff = n => iso(addD(TODAY, n));
-export const diffD = (a, b) => Math.round((sod(a) - sod(b)) / DAY);
 export const MON = [];
 export const MONL = [];
 export const WD = [];
