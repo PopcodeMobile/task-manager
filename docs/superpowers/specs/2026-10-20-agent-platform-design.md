@@ -22,7 +22,8 @@ Este documento transforma essas escolhas no escopo concreto da migração.
 
 - Base inspecionada: commit `d0c1557`, branch `main`, árvore limpa.
 - `src/main.js` inicia módulos JavaScript; `src/shell/render.js` substitui HTML.
-  Há 22 rotas em `src/shell/layout.js`, oito abas de projeto e rotas de autenticação.
+  Há 21 rotas registradas em `src/shell/layout.js` mais o fallback 404, oito abas
+  de projeto e rotas de autenticação.
 - `src/styles/tokens.css` e `src/core/design-tokens.js` definem o visual, os temas,
   os acentos e a densidade. PT-BR é o idioma padrão; inglês também é suportado.
 - Supabase tem `workspaces`, `workspace_memberships` e `workspace_snapshots`.
