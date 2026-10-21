@@ -245,7 +245,7 @@ begin
   if data is null then raise exception 'not_found' using errcode='PT404';end if;
   if p_query?'cursor' then
    cur:=(p_query->>'cursor')::jsonb;
-   if jsonb_typeof(cur)<>'array' or jsonb_array_length(cur)<>4 or cur->>0<>p_workspace_id::text or cur->>1<>p_query->>'id' or cur->>2<>family or jsonb_typeof(cur->3)<>'string' then raise exception 'validation_error' using errcode='PT422';end if;
+   if jsonb_typeof(cur)<>'array' or jsonb_array_length(cur)<>4 or cur->>0 is distinct from p_workspace_id::text or cur->>1 is distinct from p_query->>'id' or cur->>2 is distinct from family or jsonb_typeof(cur->3) is distinct from 'string' then raise exception 'validation_error' using errcode='PT422';end if;
    inner_cursor:=cur->>3;
   end if;
   if family='files' then

@@ -124,6 +124,11 @@ test('009 MCP SDK context pages exact human instructions, task cursor binding an
       (await client.callTool({ name: 'get_task', arguments: { workspace_id: ws, id: 't1', context: 'subtasks', cursor: first.context.nextCursor } })).isError,
       true,
     );
+    const malformedCursor = JSON.stringify([null, null, null, JSON.parse(first.context.nextCursor)[3]]);
+    assert.equal(
+      (await client.callTool({ name: 'get_task', arguments: { workspace_id: ws, id: 't1', context: 'comments', cursor: malformedCursor } })).isError,
+      true,
+    );
     for (const kind of ['subtasks', 'dependencies', 'files', 'attachments']) {
       const context = (await client.callTool({ name: 'get_task', arguments: { workspace_id: ws, id: 't1', context: kind } })).structuredContent.context;
       assert.equal(context.kind, kind);
