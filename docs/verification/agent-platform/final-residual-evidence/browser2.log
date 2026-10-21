@@ -1,0 +1,41 @@
+
+Running 2 tests using 1 worker
+
+  ✘  1 tests/browser/agent-panel.spec.ts:2093:1 › residual contextual history survives reload, continues later pages, and palette preserves comment query (700ms)
+  ✓  2 tests/browser/agent-panel.spec.ts:2180:1 › residual revoked execution keeps future reservation action gates and explicit intervention (611ms)
+
+
+  1) tests/browser/agent-panel.spec.ts:2093:1 › residual contextual history survives reload, continues later pages, and palette preserves comment query
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "list_activity",
+    + ]
+
+      2139 |   });
+      2140 |   await login(page);
+    > 2141 |   expect(calls.filter(op => op === 'list_comments' || op === 'list_activity')).toEqual([]);
+           |                                                                                ^
+      2142 |   await page.goto(`/app/w/${workspace}/project?project=project-1&tab=overview`);
+      2143 |   const feed = page.locator('.context-history');
+      2144 |   await expect(feed.getByText('Atividade histórica inicial', { exact: false })).toBeVisible();
+        at /Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/browser/agent-panel.spec.ts:2141:80
+
+    Error Context: ../../../../../../tmp/task-manager-residual-browser2-20261021/agent-panel-residual-conte-0e9fc-tte-preserves-comment-query/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../tmp/task-manager-residual-browser2-20261021/agent-panel-residual-conte-0e9fc-tte-preserves-comment-query/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../../../tmp/task-manager-residual-browser2-20261021/agent-panel-residual-conte-0e9fc-tte-preserves-comment-query/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/browser/agent-panel.spec.ts:2093:1 › residual contextual history survives reload, continues later pages, and palette preserves comment query
+  1 passed (2.5s)

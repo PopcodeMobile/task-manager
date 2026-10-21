@@ -1,0 +1,13 @@
+
+> gr8r-studio@1.0.0 typecheck
+> tsc --noEmit
+
+src/app/activity/ContextHistory.tsx(50,138): error TS2339: Property 'id' does not exist on type '{ taskId?: string | undefined; projectId?: string | undefined; }'.
+src/app/activity/ContextHistory.tsx(64,42): error TS2339: Property 'projectId' does not exist on type '{ taskId?: string | undefined; projectId?: string | undefined; } | { projectId: string | null; taskId: string | null; } | { taskId: string; }'.
+  Property 'projectId' does not exist on type '{ taskId: string; }'.
+src/app/activity/ContextHistory.tsx(84,11): error TS2322: Type '(DomainEvent | { id: string; operation: string; entityId: string | null; actorUserId: string; actorAgentId: null; createdAt: string; payload: { projectId: string | null; taskId: string | null; }; } | { ...; })[]' is not assignable to type 'DomainEvent[]'.
+  Type 'DomainEvent | { id: string; operation: string; entityId: string | null; actorUserId: string; actorAgentId: null; createdAt: string; payload: { projectId: string | null; taskId: string | null; }; } | { ...; }' is not assignable to type 'DomainEvent'.
+    Type '{ id: string; operation: string; entityId: string | null; actorUserId: string; actorAgentId: null; createdAt: string; payload: { projectId: string | null; taskId: string | null; }; }' is not assignable to type 'DomainEvent'.
+      The types of 'payload.taskId' are incompatible between these types.
+        Type 'string | null' is not assignable to type 'string | undefined'.
+          Type 'null' is not assignable to type 'string | undefined'.

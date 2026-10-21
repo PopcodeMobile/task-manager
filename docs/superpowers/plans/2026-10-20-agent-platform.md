@@ -607,3 +607,12 @@ Task7: backend hospedado até008/API/MCP e wake-up vazio possuem [prova própria
 - [ ] Root: uma rerevisão scoped do pacote de correções.
 - [ ] Root: aplicar009 revisada nos alvos corretos e provar API/MCP com Auth/transportes reais, sem confundir SDK/PGlite com esse gate.
 - [ ] Root: confirmar política efetiva de retenção e horizonte completo de entrega/replay antes da ativação.604800segundos cobrem apenas sete esperas Retry-After máximas; fila/outage/replay podem exceder esse prazo.
+
+## Remediação residual N1/N2 autorizada pelo root
+
+A rerevisão preservada aprovou os demais achados e encontrou N1(histórico contextual desconectado) e N2(projeção da reserva). As duas últimas decisões no arquivo de rulings registram a exceção explícita ao limite processual de uma onda, sob o escopo já autorizado. Não houve nova revisão ampla ou redução de aceite.
+
+- [x] Corrigir N1/N2 com escopo limitado, provas e novo hash009 no [relatório residual](../../verification/agent-platform/final-residual-report.md).
+- [ ] Root: revisão independente apenas de N1/N2 e depois gate runtime/API/MCP/Auth na009aceita.
+
+Ativação real permanece separada; resultados anteriores não substituem o novo gate.

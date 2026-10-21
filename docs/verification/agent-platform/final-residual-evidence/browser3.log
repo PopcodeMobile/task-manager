@@ -1,0 +1,37 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 tests/browser/agent-panel.spec.ts:2093:1 › residual contextual history survives reload, continues later pages, and palette preserves comment query (11.4s)
+
+
+  1) tests/browser/agent-panel.spec.ts:2093:1 › residual contextual history survives reload, continues later pages, and palette preserves comment query
+
+    Error: locator.click: Error: strict mode violation: getByRole('dialog').getByRole('button', { name: 'Busca', exact: true }) resolved to 2 elements:
+        1) <button class="ui-button ui-button-ghost">Busca</button> aka getByRole('button', { name: 'Busca' }).first()
+        2) <button data-command="true" class="ui-button ui-button-ghost">Busca</button> aka getByRole('button', { name: 'Busca' }).nth(1)
+
+    Call log:
+      - waiting for getByRole('dialog').getByRole('button', { name: 'Busca', exact: true })
+
+
+      2161 |   await page.evaluate(() => document.dispatchEvent(new CustomEvent('gr8r:palette', { detail: { mode: 'search' } })));
+      2162 |   const palette = page.getByRole('dialog');
+    > 2163 |   await palette.getByRole('button', { name: 'Busca', exact: true }).click();
+           |                                                                     ^
+      2164 |   await palette.getByRole('textbox', { name: 'Buscar comandos', exact: true }).fill('Instrução singular posterior');
+      2165 |   await palette.getByRole('combobox', { name: 'Categoria da busca' }).selectOption('comment');
+      2166 |   await palette.getByRole('button', { name: 'Continuar busca no histórico' }).click();
+        at /Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/browser/agent-panel.spec.ts:2163:69
+
+    Error Context: ../../../../../../tmp/task-manager-residual-browser3-20261021/agent-panel-residual-conte-0e9fc-tte-preserves-comment-query/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../tmp/task-manager-residual-browser3-20261021/agent-panel-residual-conte-0e9fc-tte-preserves-comment-query/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../../../tmp/task-manager-residual-browser3-20261021/agent-panel-residual-conte-0e9fc-tte-preserves-comment-query/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/browser/agent-panel.spec.ts:2093:1 › residual contextual history survives reload, continues later pages, and palette preserves comment query

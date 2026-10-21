@@ -1,0 +1,15 @@
+(node:15479) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 009 MCP SDK context pages exact human instructions, task cursor binding and revocation (957.81375ms)
+✔ 009 blocked execution preserves renewal, clears on running/intervention, fences stale claimant and receipts (751.558208ms)
+✔ 009 completed creation is atomic, replay safe, and deletion cascades calendar/notifications (686.311167ms)
+✔ residual revoked authority keeps an unexpired reservation locked until explicit human intervention (662.815167ms)
+✔ residual contextual history pages actual sources, keeps pending context visible, and merges polled events without duplicate comment entries (50.091167ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3258.86125

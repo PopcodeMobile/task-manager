@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/browser/agent-panel.spec.ts:2093:1 › residual contextual history survives reload, continues later pages, and palette preserves comment query (11.6s)
+
+  1 passed (12.5s)

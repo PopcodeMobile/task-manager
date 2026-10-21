@@ -1,0 +1,34 @@
+(node:11425) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 009 MCP SDK context pages exact human instructions, task cursor binding and revocation (941.685208ms)
+✔ 009 blocked execution preserves renewal, clears on running/intervention, fences stale claimant and receipts (687.123125ms)
+✔ 009 completed creation is atomic, replay safe, and deletion cascades calendar/notifications (668.355542ms)
+✔ residual revoked authority keeps an unexpired reservation locked until explicit human intervention (650.427917ms)
+✖ residual contextual history pages actual sources, keeps pending context visible, and merges polled events without duplicate comment entries (47.4785ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3145.658125
+
+✖ failing tests:
+
+test at tests/residual-history.test.mjs:76:1
+✖ residual contextual history pages actual sources, keeps pending context visible, and merges polled events without duplicate comment entries (47.4785ms)
+  AssertionError [ERR_ASSERTION]: canonical comment and its event appear once
+
+  2 !== 1
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/residual-history.test.mjs:112:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
