@@ -141,3 +141,37 @@ test('residual contextual history pages actual sources, keeps pending context vi
   tree = render({ ...props, actorId: 'missing' });
   assert.equal(nodes(tree).filter(n => n.type === 'feed').length, 0, 'no actor match on partial pages is not empty final history');
 });
+
+for (const [label, operation, entityId, visible] of [
+  ['hidden project', 'update_project', 'private-project', false],
+  ['visible project', 'update_project', 'public-project', true],
+  ['unscoped member event', 'local_workspace_member', 'u', true],
+])
+  test(`local history visibility retains only allowed context: ${label}`, async () => {
+    const entry = { ...event(label, operation), entityId, payload: {} };
+    const repo = {
+      mode: 'local',
+      workspaceId: 'w',
+      controller: new AbortController(),
+      query: async operation => ({ items: operation === 'list_domain_events' ? [entry] : [], nextCursor: null }),
+    };
+    const snapshot = {
+      historyComplete: false,
+      projects: [{ id: 'public-project' }],
+      tasks: [],
+      members: [],
+      agents: [],
+      events: [],
+      activity: [],
+      comments: [],
+    };
+    const props = { repo, snapshot, actorId: 'u', t: (_pt, en) => en, openTask() {} };
+    const render = harness();
+    render(props);
+    await flush();
+    const feed = nodes(render(props)).find(node => node.type === 'feed');
+    assert.deepEqual(
+      feed.props.events.map(event => event.id),
+      visible ? [label] : [],
+    );
+  });

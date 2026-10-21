@@ -59,6 +59,22 @@ export function ContextHistory({
       })),
   ]
     .filter(event => {
+      // Local project mutations can identify their project only through entityId.
+      if (
+        repo.mode === 'local' &&
+        [
+          'create_project',
+          'update_project',
+          'delete_project',
+          'archive_project',
+          'restore_project',
+          'set_project_member',
+          'remove_project_member',
+          'local_project_sharing',
+        ].includes(event.operation) &&
+        !snapshot.projects.some(project => project.id === (event.payload.projectId ?? event.entityId))
+      )
+        return false;
       const taskId = event.payload.taskId ?? event.entityId;
       const task = snapshot.tasks.find(task => task.id === taskId);
       const eventProject = event.payload.projectId ?? task?.projectId;
