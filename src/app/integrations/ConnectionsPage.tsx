@@ -57,8 +57,8 @@ export function ConnectionsPage({ t }: { t: Translate }) {
           <h2>{t('Nenhum aplicativo conectado', 'No connected apps')}</h2>
           <p>
             {t(
-              'Inicie uma conexão pelo aplicativo que você quer usar. O pedido de acesso aparece aqui no Gr8r.',
-              'Start a connection from the app you want to use. Its access request will appear here in Gr8r.',
+              'Inicie uma conexão pelo aplicativo que você quer usar. O pedido de acesso aparece aqui no Kairos.',
+              'Start a connection from the app you want to use. Its access request will appear here in Kairos.',
             )}
           </p>
         </div>

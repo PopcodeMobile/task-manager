@@ -1,4 +1,4 @@
-import { Gr8rLogo } from '../design/Gr8rMark';
+import { KairosLogo } from '../design/KairosMark';
 import { useState, type FormEvent } from 'react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -77,7 +77,7 @@ export function AuthScreen({ t }: { t: Translate }) {
   return (
     <section className="auth-card">
       <div className="auth-logo">
-        <Gr8rLogo />
+        <KairosLogo />
       </div>
       <h1>
         {recovery
@@ -98,7 +98,7 @@ export function AuthScreen({ t }: { t: Translate }) {
             : mode === 'sent'
               ? t('Se esta conta existir, o link de recuperação chegará em instantes.', 'If this account exists, a recovery link will arrive shortly.')
               : mode === 'signup'
-                ? t('Crie seu espaço de trabalho no Gr8r.', 'Create your workspace in Gr8r.')
+                ? t('Crie seu espaço de trabalho no Kairos.', 'Create your workspace in Kairos.')
                 : mode === 'forgot'
                   ? t('Informe seu e-mail para receber um link de recuperação.', 'Enter your email to receive a password reset link.')
                   : t('Acesse suas organizações e acompanhe o trabalho da equipe.', 'Access your workspaces and follow your team’s work.')}

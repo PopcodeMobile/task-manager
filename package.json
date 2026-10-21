@@ -1,8 +1,8 @@
 {
-  "name": "gr8r-studio",
+  "name": "kairos",
   "version": "1.0.0",
   "private": true,
-  "description": "Gr8r Studio: a calm, structured project management workspace.",
+  "description": "Kairos: a calm, structured project management workspace.",
   "type": "module",
   "scripts": {
     "dev": "vite",

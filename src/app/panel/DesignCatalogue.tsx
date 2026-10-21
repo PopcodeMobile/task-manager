@@ -270,7 +270,7 @@ export function DesignCatalogue(p: PanelProps & { onModal: () => void; onConfirm
           </label>
           <label className="field">
             <span>{t('Desabilitado', 'Disabled')}</span>
-            <Input defaultValue="hello@gr8rstudio.com" disabled />
+            <Input defaultValue="hello@example.com" disabled />
           </label>
           <label className="field">
             <span>{t('Busca', 'Search')}</span>

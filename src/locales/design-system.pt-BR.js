@@ -78,7 +78,7 @@ export default {
   Rose: 'Rosa',
   Graphite: 'Grafite',
   'System states': 'Estados do sistema',
-  'Empty, loading, error, and confirmation states used throughout Gr8r.': 'Estados vazios, carregamento, erros e confirmações usados no Gr8r.',
+  'Empty, loading, error, and confirmation states used throughout Kairos.': 'Estados vazios, carregamento, erros e confirmações usados no Kairos.',
   'Empty states': 'Estados vazios',
   'No notifications': 'Nenhuma notificação',
   'New mentions and assignments will show up here.': 'Novas menções e atribuições aparecerão aqui.',

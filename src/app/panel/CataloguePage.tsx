@@ -38,10 +38,13 @@ export function CataloguePage(p: PanelProps) {
           <p>
             {p.route === 'system'
               ? t(
-                  'Tokens e componentes do Gr8r. Alterne o tema para ver as duas paletas.',
-                  'Tokens and components that make up Gr8r. Switch themes to see both palettes.',
+                  'Tokens e componentes do Kairos. Alterne o tema para ver as duas paletas.',
+                  'Tokens and components that make up Kairos. Switch themes to see both palettes.',
                 )
-              : t('Estados vazios, carregamento, erro e confirmação usados no Gr8r.', 'Empty, loading, error, and confirmation states used throughout Gr8r.')}
+              : t(
+                  'Estados vazios, carregamento, erro e confirmação usados no Kairos.',
+                  'Empty, loading, error, and confirmation states used throughout Kairos.',
+                )}
           </p>
         </div>
         <div className="acts">

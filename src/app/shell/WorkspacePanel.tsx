@@ -304,7 +304,7 @@ export function WorkspacePanel({
           ? { label: shown.teams.find(team => team.id === url.searchParams.get('id'))?.name ?? t('Equipe', 'Team') }
           : nav.find(item => item.id === route);
   useEffect(() => {
-    document.title = `${activeNav?.label ?? 'Gr8r Studio'} | Gr8r Studio`;
+    document.title = `${activeNav?.label ?? 'Kairos'} | Kairos`;
   }, [activeNav?.label]);
   const taskList = shown.tasks.filter(
       task =>
@@ -529,7 +529,7 @@ export function WorkspacePanel({
               t={t}
             />
           ) : (
-            <span className="brand">Gr8r Studio</span>
+            <span className="brand">Kairos</span>
           )}
           <Button
             className="sidebar-toggle"
@@ -733,7 +733,7 @@ export function WorkspacePanel({
               </>
             )}
             <strong>{activeNav?.label ?? t('Página', 'Page')}</strong>
-            <span className="sr-only">{current?.name ?? 'Gr8r Studio'}</span>
+            <span className="sr-only">{current?.name ?? 'Kairos'}</span>
           </div>
           <span className="sp" />
           <Button className="topsearch" variant="ghost" aria-label={t('Busca e comandos', 'Search and commands')} onClick={openPalette}>

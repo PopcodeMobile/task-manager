@@ -69,7 +69,7 @@ export const supervisionPtBR = {
   'Create your account': 'Crie sua conta',
   'Create your first project to add tasks.': 'Crie seu primeiro projeto para adicionar tarefas.',
   'Create your first workspace to begin.': 'Crie sua primeira organização para começar.',
-  'Create your workspace in Gr8r.': 'Crie seu espaço de trabalho no Gr8r.',
+  'Create your workspace in Kairos.': 'Crie seu espaço de trabalho no Kairos.',
   'created a project': 'criou um projeto',
   'created the task': 'criou a tarefa',
   'Dark theme': 'Tema escuro',
@@ -197,8 +197,8 @@ export const supervisionPtBR = {
   'Sign in to continue': 'Entre pra continuar',
   'Sign out': 'Sair',
   'Skip to content': 'Ir para conteúdo',
-  'Start a connection from the app you want to use. Its access request will appear here in Gr8r.':
-    'Inicie uma conexão pelo aplicativo que você quer usar. O pedido de acesso aparece aqui no Gr8r.',
+  'Start a connection from the app you want to use. Its access request will appear here in Kairos.':
+    'Inicie uma conexão pelo aplicativo que você quer usar. O pedido de acesso aparece aqui no Kairos.',
   Status: 'Status',
   Subtasks: 'Subtarefas',
   'Supervise assignments and execution reservations.': 'Acompanhe atribuições e reservas de execução.',

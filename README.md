@@ -1,4 +1,4 @@
-# Gr8r Studio
+# Kairos
 
 Project and task coordination for people and external agents. React + TypeScript + Vite render the panel; shadcn/Radix controls, Lucide React, Tailwind and the existing 234 public CSS tokens provide the interface. Supabase Auth, PostgreSQL/RLS and Edge Functions provide cloud operations, OAuth, remote MCP and durable webhook delivery. Hermes and Claude execute outside this product.
 

@@ -50,7 +50,7 @@ import { PeoplePages } from './PeoplePages';
 import { PermissionMatrix } from './PermissionMatrix';
 import type { PanelProps } from './types';
 import type { Project } from '../../domain/contracts';
-import { Gr8rMark } from '../design/Gr8rMark';
+import { KairosMark } from '../design/KairosMark';
 export function SettingsPage(p: PanelProps) {
   const { t, snapshot: s, prefs } = p,
     sec = p.params.get('sec') ?? 'appearance',
@@ -104,7 +104,7 @@ export function SettingsPage(p: PanelProps) {
     tz: t('Usado nos prazos e lembretes.', 'Used for due dates and reminders.'),
     dateFmt: t('Formato das datas mostradas no espaço.', 'How dates appear throughout the workspace.'),
     weekStart: t('Afeta calendários e cronograma.', 'Affects calendars and the timeline.'),
-    home: t('Página mostrada quando o Gr8r abre.', 'The page you see when Gr8r opens.'),
+    home: t('Página mostrada quando o Kairos abre.', 'The page you see when Kairos opens.'),
     openTasks: t('O painel lateral mantém seu lugar na lista.', 'Side panel keeps your place in the list.'),
     defaultTab: t('A aba mostrada ao abrir um projeto.', 'The tab that opens when you open a project.'),
     permGuests: t('Convidados veem somente projetos permitidos.', 'Guests only see projects they are added to.'),
@@ -113,7 +113,7 @@ export function SettingsPage(p: PanelProps) {
   };
   const leads: Record<string, string> = {
     workspace: t('Nome, endereço e identidade do seu espaço.', 'Your workspace name, address, and identity.'),
-    appearance: t('Escolha como o Gr8r aparece neste dispositivo.', 'Customize how Gr8r looks on this device.'),
+    appearance: t('Escolha como o Kairos aparece neste dispositivo.', 'Customize how Kairos looks on this device.'),
     language: t('Idioma e formatos regionais.', 'Language and regional formats.'),
     datetime: t('Como datas e horários aparecem no espaço.', 'How dates and times appear across the workspace.'),
     members: `${s.members.length} ${t('pessoas têm acesso a', 'people have access to')} ${p.workspace.name}.`,
@@ -310,7 +310,7 @@ export function SettingsPage(p: PanelProps) {
                 >
                   <div className="row settings-identity">
                     <span className="workspace-identity" style={{ background: workspace.color }}>
-                      {workspace.name === 'Gr8r Studio' ? <Gr8rMark /> : workspace.name.slice(0, 1)}
+                      {workspace.name === 'Kairos' ? <KairosMark /> : workspace.name.slice(0, 1)}
                     </span>
                     <div>
                       <div className="label">{t('Ícone do espaço', 'Workspace icon')}</div>

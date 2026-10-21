@@ -1,4 +1,4 @@
-import { Gr8rLogo } from './design/Gr8rMark';
+import { KairosLogo } from './design/KairosMark';
 import { supervisionCatalogs } from '../locales/supervision.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../components/ui/button';
@@ -146,8 +146,8 @@ function AppearanceApp({ identityKey, local }: { identityKey: string; local: boo
   return (
     <div className="react-shell">
       <header className="shell-header">
-        <a className="brand" href="/app" aria-label="Gr8r Studio">
-          <Gr8rLogo height={22} />
+        <a className="brand" href="/app" aria-label="Kairos">
+          <KairosLogo height={22} />
         </a>
         <div className="shell-controls">{controls}</div>
       </header>

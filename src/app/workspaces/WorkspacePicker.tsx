@@ -1,5 +1,5 @@
 import { Check, ChevronsUpDown, Plus, Settings, UserPlus } from 'lucide-react';
-import { Gr8rMark } from '../design/Gr8rMark';
+import { KairosMark } from '../design/KairosMark';
 import { ShellPopover } from '../design/ShellPopover';
 import type { Workspace } from '../../domain/contracts';
 import type { Translate } from '../auth/ConsentPage';
@@ -29,7 +29,7 @@ export function WorkspacePicker({
       trigger={
         <>
           <span className="brand-symbol" aria-hidden="true" style={current?.id === items[0]?.id ? undefined : { background: current?.color }}>
-            {current?.id === items[0]?.id ? <Gr8rMark /> : current?.name[0]}
+            {current?.id === items[0]?.id ? <KairosMark /> : current?.name[0]}
           </span>
           <span className="workspace-name">{current?.name ?? t('Organização', 'Workspace')}</span>
           <ChevronsUpDown className="picker-chevrons" size={13} aria-hidden="true" />
@@ -46,7 +46,7 @@ export function WorkspacePicker({
           onClick={() => onChange(workspace.id)}
         >
           <span className="workspace-choice-mark" aria-hidden="true" style={workspace.id === items[0]?.id ? undefined : { background: workspace.color }}>
-            {workspace.id === items[0]?.id ? <Gr8rMark /> : workspace.name[0]}
+            {workspace.id === items[0]?.id ? <KairosMark /> : workspace.name[0]}
           </span>
           <span className="grow">{workspace.name}</span>
           {workspace.id === value && <Check size={14} />}

@@ -528,9 +528,9 @@ export function seed() {
   const tmp = tk('t3');
   tmp.updated = minsAgo(38);
   return {
-    ws: { name: 'Gr8r Studio', url: 'gr8rstudio', c: '#1D1C1A', brand: true },
+    ws: { name: 'Kairos', url: 'kairos', c: '#1D1C1A', brand: true },
     workspaces: [
-      { id: 'w1', name: 'Gr8r Studio', c: '#1D1C1A', plan: 'Team', brand: true },
+      { id: 'w1', name: 'Kairos', c: '#1D1C1A', plan: 'Team', brand: true },
       { id: 'w2', name: 'Pessoal', c: '#3D8E5F', plan: 'Free' },
       { id: 'w3', name: 'Acme Labs', c: '#3B82C4', plan: 'Business' },
     ],
@@ -548,7 +548,7 @@ export function seed() {
     recentSearches: ['página inicial', 'Marina', 'wireframes'],
     sessions: [
       { id: 'se1', dev: 'MacBook Pro · Chrome', loc: 'San Francisco, US', at: 'Active now', cur: true },
-      { id: 'se2', dev: 'iPhone 15 · Gr8r app', loc: 'San Francisco, US', at: '2 hours ago' },
+      { id: 'se2', dev: 'iPhone 15 · Kairos app', loc: 'San Francisco, US', at: '2 hours ago' },
       { id: 'se3', dev: 'Windows · Edge', loc: 'Oakland, US', at: 'Sep 12' },
     ],
     invoices: [

@@ -209,7 +209,7 @@ export function StateExamples({
           <div className="state-validation-example">
             <label className="field">
               Email
-              <Input className="is-error" defaultValue="hello@gr8rstudio" aria-invalid="true" aria-describedby="gallery-email-error" />
+              <Input className="is-error" defaultValue="hello@example" aria-invalid="true" aria-describedby="gallery-email-error" />
               <span className="err" id="gallery-email-error">
                 <CircleAlert size={12} />
                 {t('Informe um email válido, como nome@empresa.com', 'Enter a valid email, like name@company.com')}
