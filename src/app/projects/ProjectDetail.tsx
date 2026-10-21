@@ -1,4 +1,24 @@
-import { useState } from 'react';
+import { type CSSProperties, useState } from 'react';
+import {
+  LayoutDashboard,
+  Columns3,
+  List,
+  Table2,
+  Calendar,
+  ChartGantt,
+  Paperclip,
+  Activity,
+  ListFilter,
+  Plus,
+  CircleDot,
+  User,
+  Users,
+  Flag,
+  UserPlus,
+  Pencil,
+  Diamond,
+  ClockAlert,
+} from 'lucide-react';
 import type { Project, Json, Task, SavedView } from '../../domain/contracts';
 import type { Snapshot } from '../shell/useWorkspaceData';
 import type { WorkspaceRepository } from '../../workspace/repository';
@@ -11,7 +31,11 @@ import { prepareTaskAction, readTaskView, saveTaskView, type TaskView } from '..
 import { ScheduleView } from '../schedules/ScheduleView';
 import { FilesView } from '../files/FilesView';
 import { ContextHistory } from '../activity/ContextHistory';
-import { projectStatusLabel } from './project-model';
+import { taskDateLabel } from '../tasks/TaskFieldPopover';
+import { diffD, parse, iso } from '../../core/calendar.js';
+import { preferredDate } from '../panel/panel-model';
+import { MemberAvatar, MemberStack, ProjectStatus, projectTone } from './ProjectVisual';
+import { TaskStatusIcon, TaskPriorityIcon } from '../tasks/TaskVisual';
 import { projectError } from './ProjectEditor';
 import type { ViewEdit } from './SavedViewEditor';
 import { SavedViewMenu } from './SavedViewMenu';
@@ -66,7 +90,7 @@ export function ProjectDetail({
   tab: string;
   href: (params: Record<string, string>) => string;
   navigate: (href: string) => void;
-  openTask: (id: string) => void;
+  openTask: (id: string, options?: { quick?: boolean }) => void;
   createTask: (date?: string) => void;
   openProject: (id: string) => void;
   edit: () => void;
@@ -122,10 +146,11 @@ export function ProjectDetail({
   );
   return (
     <>
-      <nav className="project-tabs" aria-label={t('Abas do projeto', 'Project tabs')}>
+      <nav className="project-tabs tabs" aria-label={t('Abas do projeto', 'Project tabs')}>
         {[...projectTabs, ...views.map(v => `v:${v.id}`)].map(id => (
           <a
             key={id}
+            className={`tab ${id === tab ? 'on' : ''}`}
             href={href({ tab: id, view: '', task: '', file: '' })}
             aria-current={id === tab ? 'page' : undefined}
             onContextMenu={e => {
@@ -146,9 +171,44 @@ export function ProjectDetail({
               navigate(e.currentTarget.href);
             }}
           >
+            {(() => {
+              const Icon =
+                (
+                  {
+                    overview: LayoutDashboard,
+                    board: Columns3,
+                    list: List,
+                    table: Table2,
+                    calendar: Calendar,
+                    timeline: ChartGantt,
+                    files: Paperclip,
+                    activity: Activity,
+                  } as Record<string, typeof List>
+                )[id] ?? ListFilter;
+              return <Icon size={14} />;
+            })()}
             {id.startsWith('v:') ? views.find(v => v.id === id.slice(2))?.name : tabLabel(id, t)}
           </a>
         ))}
+        <Button
+          variant="ghost"
+          className="project-save-view-trigger ibtn ibtn-sm"
+          aria-label={t('Salvar visualização', 'Save view')}
+          disabled={readOnly}
+          onClick={e => {
+            let filters: Json[] = currentView.filters;
+            try {
+              const stored = rawPersonal(repo, !saved && ['calendar', 'timeline'].includes(mode) ? `p:${project.id}:${mode}` : key);
+              filters = (Array.isArray(stored.filters) ? stored.filters : (saved?.filters ?? currentView.filters)) as Json[];
+            } catch (err) {
+              setError(projectError(err, t));
+              return;
+            }
+            saveView({ projectId: project.id, filters, type: ['list', 'board', 'table'].includes(mode) ? mode : 'list', opener: e.currentTarget });
+          }}
+        >
+          <Plus size={14} />
+        </Button>
       </nav>
       {viewMenu && (
         <SavedViewMenu
@@ -182,45 +242,17 @@ export function ProjectDetail({
         <p role="status">{t('Página não encontrada.', 'Page not found.')}</p>
       ) : (
         <>
-          {['board', 'list', 'table', 'calendar', 'timeline'].includes(mode) && (
-            <div className="project-view-actions">
-              <Button
-                disabled={readOnly}
-                variant="outline"
-                onClick={e => {
-                  let filters: Json[] = currentView.filters;
-                  try {
-                    const stored = rawPersonal(repo, !saved && ['calendar', 'timeline'].includes(mode) ? `p:${project.id}:${mode}` : key);
-                    filters = (Array.isArray(stored.filters) ? stored.filters : (saved?.filters ?? currentView.filters)) as Json[];
-                  } catch (err) {
-                    setError(projectError(err, t));
-                    return;
-                  }
-                  saveView({ projectId: project.id, filters, type: ['list', 'board', 'table'].includes(mode) ? mode : 'list', opener: e.currentTarget });
-                }}
-              >
-                {t('Salvar visualização', 'Save view')}
-              </Button>
-              {saved && (
-                <>
-                  <Button
-                    disabled={readOnly}
-                    variant="ghost"
-                    onClick={e => saveView({ projectId: project.id, view: saved, filters: saved.filters, type: saved.viewType, opener: e.currentTarget })}
-                  >
-                    {t('Renomear visualização', 'Rename view')}
-                  </Button>
-                  <Button disabled={readOnly} variant="ghost" onClick={e => deleteView(saved.id, e.currentTarget)}>
-                    {t('Excluir visualização', 'Delete view')}
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
           {['board', 'list', 'table'].includes(mode) && (
             <TaskList
               hideLayoutSwitch
+              toolbarActions={
+                <Button className="btn-sm" disabled={readOnly} onClick={() => openTask('new')}>
+                  <Plus size={13} />
+                  {t('Nova tarefa', 'New task')}
+                </Button>
+              }
               tasks={tasks}
+              prefs={snapshot.preferences}
               graph={snapshot}
               projects={snapshot.projects.filter(p => !p.archived)}
               members={snapshot.members}
@@ -243,6 +275,12 @@ export function ProjectDetail({
           )}
           {(mode === 'calendar' || mode === 'timeline') && (
             <ScheduleView
+              toolbarActions={
+                <Button className="btn-sm" disabled={readOnly} onClick={() => openTask('new')}>
+                  <Plus size={13} />
+                  {t('Nova tarefa', 'New task')}
+                </Button>
+              }
               mode={mode}
               projectId={project.id}
               viewKey={saved ? key : `p:${project.id}:${mode}`}
@@ -282,110 +320,221 @@ export function ProjectDetail({
           )}
           {mode === 'activity' && <div className="project-activity">{activity()}</div>}
           {mode === 'overview' && (
-            <div className="project-overview">
-              <section>
-                <div className="project-section-heading">
-                  <h2>{t('Sobre', 'About')}</h2>
-                  <Button variant="ghost" disabled={readOnly} onClick={edit}>
-                    {t('Editar', 'Edit')}
-                  </Button>
-                </div>
-                <p className="project-description">{project.description || t('Sem descrição.', 'No description.')}</p>
-              </section>
-              <section>
-                <h2>{t('Detalhes', 'Details')}</h2>
-                <dl>
-                  <dt>{t('Status', 'Status')}</dt>
-                  <dd>{projectStatusLabel(project.status, t)}</dd>
-                  <dt>{t('Líder', 'Lead')}</dt>
-                  <dd>{snapshot.members.find(m => m.user_id === project.leadUserId)?.name ?? t('Sem líder', 'No lead')}</dd>
-                  <dt>{t('Equipe', 'Team')}</dt>
-                  <dd>{snapshot.teams.find(team => team.id === project.teamId)?.name ?? t('Sem equipe', 'No team')}</dd>
-                  <dt>{t('Início', 'Start')}</dt>
-                  <dd>{project.startDate ?? '—'}</dd>
-                  <dt>{t('Prazo', 'Due date')}</dt>
-                  <dd>{project.dueDate ?? '—'}</dd>
-                  <dt>{t('Membros', 'Members')}</dt>
-                  <dd>
-                    <Button variant="ghost" onClick={share}>
-                      {snapshot.members
-                        .filter(m => members.includes(m.user_id))
-                        .map(m => m.name)
-                        .join(', ') || '0'}
-                    </Button>
-                  </dd>
-                </dl>
-              </section>
-              <section>
-                <h2>{t('Progresso', 'Progress')}</h2>
-                <strong className="project-progress-number">
-                  {Math.round((tasks.filter(task => task.status === 'done').length / Math.max(1, tasks.length)) * 100)}%
-                </strong>
-                <progress
-                  max={Math.max(1, tasks.length)}
-                  value={tasks.filter(task => task.status === 'done').length}
-                  aria-label={t('Progresso do projeto', 'Project progress')}
-                />
-                <div className="button-row">
-                  {statuses.map(status => (
-                    <Button key={status} variant="ghost" onClick={() => filtered(status)}>
-                      {statusLabel(status, t)} <strong>{tasks.filter(task => task.status === status).length}</strong>
-                    </Button>
-                  ))}
-                </div>
-              </section>
-              <section>
-                <h2>{t('Marcos', 'Milestones')}</h2>
-                {Array.isArray(project.legacyMetadata.milestones) && project.legacyMetadata.milestones.length ? (
-                  project.legacyMetadata.milestones.map((m, i) =>
-                    m && typeof m === 'object' && !Array.isArray(m) ? (
-                      <p key={i}>
-                        {String(m.name ?? '')} <time>{String(m.date ?? '')}</time>
-                      </p>
-                    ) : null,
-                  )
-                ) : (
-                  <p>{t('Ainda não há marcos.', 'No milestones yet.')}</p>
-                )}
-              </section>
-              <section>
-                <h2>{t('A seguir', 'Coming up')}</h2>
-                {tasks
-                  .filter(task => task.status !== 'done' && task.dueDate)
-                  .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!))
-                  .slice(0, 6)
-                  .map(task => (
-                    <div className="project-upcoming" key={task.id}>
-                      <Button
-                        variant="ghost"
-                        disabled={busy || readOnly || !!task.reservation?.active}
-                        aria-label={t('Concluir ', 'Complete ') + task.title}
-                        onClick={() => void complete(task)}
-                      >
-                        ○
-                      </Button>
-                      <button className="inline-link" onClick={() => openTask(task.id)}>
-                        {task.title}
-                      </button>
-                      <time>{task.dueDate}</time>
+            <div className="project-overview page" style={{ maxWidth: 1160, paddingTop: 'calc(var(--space-unit) * 5.5)' }}>
+              <div className="grid2">
+                <div className="stack">
+                  <section className="panel">
+                    <div className="panel-h">
+                      <h2>{t('Sobre', 'About')}</h2>
+                      <div className="acts">
+                        <Button variant="ghost" className="btn-sm" disabled={readOnly} onClick={edit}>
+                          <Pencil size={13} />
+                          {t('Editar', 'Edit')}
+                        </Button>
+                      </div>
                     </div>
-                  ))}
-              </section>
-              <section>
-                <div className="project-section-heading">
-                  <h2>{t('Atividade recente', 'Recent activity')}</h2>
-                  <a
-                    href={href({ tab: 'activity' })}
-                    onClick={e => {
-                      e.preventDefault();
-                      navigate(e.currentTarget.href);
-                    }}
-                  >
-                    {t('Ver tudo', 'View all')}
-                  </a>
+                    <div className="panel-b project-description">{project.description || t('Sem descrição.', 'No description.')}</div>
+                  </section>
+                  <section className="panel">
+                    <div className="panel-h">
+                      <h2>{t('Progresso', 'Progress')}</h2>
+                      <div className="acts">
+                        <span className="faint">
+                          {tasks.filter(task => task.status === 'done').length} {t('de', 'of')} {tasks.length} {t('tarefas concluídas', 'tasks done')}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="panel-b">
+                      <div className="row project-progress-summary">
+                        <strong className="num">{Math.round((tasks.filter(task => task.status === 'done').length / Math.max(1, tasks.length)) * 100)}%</strong>
+                        <span className="muted">
+                          {project.dueDate
+                            ? `${diffD(parse(project.dueDate), new Date())} ${t('dias até', 'days until')} ${preferredDate(project.dueDate, snapshot.preferences, t('pt-BR', 'en'))}`
+                            : t('Sem prazo', 'No due date')}
+                        </span>
+                        {tasks.some(task => task.status !== 'done' && task.dueDate && task.dueDate < iso(new Date())) && (
+                          <span className="badge project-overdue">
+                            <ClockAlert size={11} />
+                            {tasks.filter(task => task.status !== 'done' && task.dueDate && task.dueDate < iso(new Date())).length} {t('atrasada', 'overdue')}
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        className="stackbar"
+                        role="progressbar"
+                        aria-label={t('Progresso do projeto', 'Project progress')}
+                        aria-valuemin={0}
+                        aria-valuemax={tasks.length || 1}
+                        aria-valuenow={tasks.filter(task => task.status === 'done').length}
+                      >
+                        {statuses.map(status => (
+                          <i
+                            key={status}
+                            style={{
+                              width: `${(tasks.filter(task => task.status === status).length / Math.max(1, tasks.length)) * 100}%`,
+                              background: `var(--st-${status})`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <div className="row project-status-counts">
+                        {statuses.map(status => (
+                          <button className="row" key={status} onClick={() => filtered(status)}>
+                            <TaskStatusIcon status={status} size={12} />
+                            <span className="muted">{statusLabel(status, t)}</span>
+                            <b className="num">{tasks.filter(task => task.status === status).length}</b>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                  <section className="panel">
+                    <div className="panel-h">
+                      <h2>{t('A seguir', 'Coming up')}</h2>
+                      <div className="acts">
+                        <a
+                          className="btn btn-sm btn-ghost"
+                          href={href({ tab: 'list' })}
+                          onClick={e => {
+                            e.preventDefault();
+                            navigate(e.currentTarget.href);
+                          }}
+                        >
+                          {t('Ver lista', 'View list')}
+                        </a>
+                      </div>
+                    </div>
+                    {tasks
+                      .filter(task => task.status !== 'done' && task.dueDate)
+                      .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!))
+                      .slice(0, 6)
+                      .map(task => (
+                        <div className="project-upcoming mini" key={task.id}>
+                          <input
+                            className="check round"
+                            type="checkbox"
+                            checked={task.status === 'done'}
+                            disabled={busy || readOnly || !!task.reservation?.active}
+                            aria-label={t('Concluir ', 'Complete ') + task.title}
+                            onChange={() => void complete(task)}
+                          />
+                          <TaskStatusIcon status={task.status} />
+                          <button className="tt inline-link" onClick={() => openTask(task.id)}>
+                            {task.title}
+                          </button>
+                          <TaskPriorityIcon priority={task.priority} />
+                          <time className={`hide-m ${task.dueDate! < iso(new Date()) ? 'over' : diffD(parse(task.dueDate), new Date()) <= 1 ? 'soon' : ''}`}>
+                            {taskDateLabel(task.dueDate, t, snapshot.preferences)}
+                          </time>
+                          <MemberAvatar member={snapshot.members.find(m => m.user_id === task.assigneeUserId)} />
+                        </div>
+                      ))}
+                    {!tasks.some(task => task.status !== 'done' && task.dueDate) && (
+                      <div className="empty-state sm">
+                        <h3>{t('Nada agendado', 'Nothing scheduled')}</h3>
+                        <p>{t('Tarefas com prazo aparecem aqui.', 'Tasks with due dates will show up here.')}</p>
+                      </div>
+                    )}
+                  </section>
                 </div>
-                {activity(6)}
-              </section>
+                <div className="stack">
+                  <section className="panel">
+                    <div className="panel-h">
+                      <h2>{t('Detalhes', 'Details')}</h2>
+                    </div>
+                    <div className="panel-b">
+                      <dl className="kv">
+                        <dt>
+                          <CircleDot size={14} />
+                          {t('Status', 'Status')}
+                        </dt>
+                        <dd>
+                          <ProjectStatus status={project.status} t={t} />
+                        </dd>
+                        <dt>
+                          <User size={14} />
+                          {t('Líder', 'Lead')}
+                        </dt>
+                        <dd>
+                          <span className="pillbtn">
+                            <MemberAvatar member={snapshot.members.find(m => m.user_id === project.leadUserId)} />
+                            {snapshot.members.find(m => m.user_id === project.leadUserId)?.name ?? t('Sem líder', 'No lead')}
+                          </span>
+                        </dd>
+                        <dt>
+                          <Users size={14} />
+                          {t('Equipe', 'Team')}
+                        </dt>
+                        <dd>
+                          <span className="pillbtn">{snapshot.teams.find(team => team.id === project.teamId)?.name ?? t('Sem equipe', 'No team')}</span>
+                        </dd>
+                        <dt>
+                          <Calendar size={14} />
+                          {t('Início', 'Start')}
+                        </dt>
+                        <dd>
+                          <span className="pillbtn num">{preferredDate(project.startDate, snapshot.preferences, t('pt-BR', 'en'), true) || '—'}</span>
+                        </dd>
+                        <dt>
+                          <Flag size={14} />
+                          {t('Prazo', 'Due date')}
+                        </dt>
+                        <dd>
+                          <span className="pillbtn num">{preferredDate(project.dueDate, snapshot.preferences, t('pt-BR', 'en'), true) || '—'}</span>
+                        </dd>
+                        <dt>
+                          <UserPlus size={14} />
+                          {t('Membros', 'Members')}
+                        </dt>
+                        <dd>
+                          <button className="pillbtn" onClick={share}>
+                            <MemberStack ids={members} members={snapshot.members} max={6} />
+                            <span className="faint">{members.length}</span>
+                          </button>
+                        </dd>
+                      </dl>
+                    </div>
+                  </section>
+                  <section className="panel">
+                    <div className="panel-h">
+                      <h2>{t('Marcos', 'Milestones')}</h2>
+                    </div>
+                    <div className="panel-b">
+                      {Array.isArray(project.legacyMetadata.milestones) && project.legacyMetadata.milestones.length ? (
+                        project.legacyMetadata.milestones.map((m, i) =>
+                          m && typeof m === 'object' && !Array.isArray(m) ? (
+                            <div className="row project-milestone" key={i}>
+                              <Diamond size={13} fill="currentColor" style={{ color: projectTone(project) } as CSSProperties} />
+                              <span className="grow trunc">{String(m.name ?? '')}</span>
+                              <time className="num muted">{preferredDate(String(m.date ?? ''), snapshot.preferences, t('pt-BR', 'en'))}</time>
+                            </div>
+                          ) : null,
+                        )
+                      ) : (
+                        <span className="faint">{t('Ainda não há marcos.', 'No milestones yet.')}</span>
+                      )}
+                    </div>
+                  </section>
+                  <section className="panel">
+                    <div className="panel-h">
+                      <h2>{t('Atividade recente', 'Recent activity')}</h2>
+                      <div className="acts">
+                        <a
+                          className="btn btn-sm btn-ghost"
+                          href={href({ tab: 'activity' })}
+                          onClick={e => {
+                            e.preventDefault();
+                            navigate(e.currentTarget.href);
+                          }}
+                        >
+                          {t('Ver tudo', 'View all')}
+                        </a>
+                      </div>
+                    </div>
+                    <div className="panel-b feed">{activity(6)}</div>
+                  </section>
+                </div>
+              </div>
             </div>
           )}
         </>

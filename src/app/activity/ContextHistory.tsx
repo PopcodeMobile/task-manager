@@ -37,15 +37,6 @@ export function ContextHistory({
   const domain = [...new Map([...eventPage.items, ...snapshot.events].map(event => [event.id, event])).values()];
   const events = [
     ...domain.filter(event => event.operation !== 'batch'),
-    ...activityPage.items.map((entry): DomainEvent => ({
-      id: 'history:' + entry.id,
-      operation: entry.verb,
-      entityId: entry.taskId,
-      actorUserId: entry.actorUserId ?? '',
-      actorAgentId: null,
-      createdAt: entry.createdAt,
-      payload: { projectId: entry.projectId ?? undefined, taskId: entry.taskId ?? undefined },
-    })),
     ...commentPage.items
       .filter(comment => !domain.some(event => event.operation === 'add_task_comment' && event.entityId === comment.id))
       .map((comment): DomainEvent => ({
@@ -83,8 +74,16 @@ export function ContextHistory({
       return (!actorId || event.actorUserId === actorId) && (!projectId || eventProject === projectId || event.entityId === projectId);
     })
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const history = activityPage.items.filter(
+    entry =>
+      (!actorId || entry.actorUserId === actorId) &&
+      (!projectId || entry.projectId === projectId || snapshot.tasks.some(task => task.id === entry.taskId && task.projectId === projectId)) &&
+      (repo.mode !== 'local' ||
+        ((!entry.projectId || snapshot.projects.some(project => project.id === entry.projectId)) &&
+          (!entry.taskId || snapshot.tasks.some(task => task.id === entry.taskId)))),
+  );
   return (
-    <div className="context-history">
+    <div className={'context-history' + (limit !== undefined ? ' compact-context-history' : projectId ? ' project-context-history' : '')}>
       {!complete && (
         <p role={failed ? 'alert' : 'status'}>
           {failed
@@ -95,9 +94,15 @@ export function ContextHistory({
               )}
         </p>
       )}
-      {(events.length > 0 || complete) && (
+      {(events.length > 0 || history.length > 0 || complete) && (
         <ActivityPage
-          events={limit ? events.slice(-limit) : events}
+          actorId={snapshot.actorId}
+          grouped={!!projectId && limit === undefined}
+          contextProjectId={projectId}
+          events={events}
+          history={history}
+          projects={snapshot.projects}
+          limit={limit}
           members={snapshot.members}
           agents={snapshot.agents}
           tasks={snapshot.tasks}

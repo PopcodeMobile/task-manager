@@ -1,8 +1,31 @@
 import { taskCreateCommand, knownNonCommitting } from './task-create-command';
 import { iso, addD } from '../../core/calendar.js';
-import { useEffect, useMemo, useState } from 'react';
-import { List, Columns3, Table2, Plus, GripVertical } from 'lucide-react';
-import type { Task, Project, Json, BatchCommand, Label, TaskLabel, TaskDependency, Subtask } from '../../domain/contracts';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  List,
+  Columns3,
+  Table2,
+  Plus,
+  GripVertical,
+  ChevronDown,
+  ChevronRight,
+  MoreHorizontal,
+  Check,
+  Pencil,
+  Repeat2,
+  MessageSquare,
+  Paperclip,
+  RotateCcw,
+  ArrowUp,
+  ArrowDown,
+  ListChecks,
+  Timer,
+  ClockAlert,
+  Sun,
+  CalendarDays,
+  CircleCheck,
+} from 'lucide-react';
+import type { Task, Project, Json, BatchCommand, Label, TaskLabel, TaskDependency, Subtask, Comment, TaskAttachment } from '../../domain/contracts';
 import type { Agent, Member } from '../../workspace/normalized';
 import type { WorkspaceRepository } from '../../workspace/repository';
 import type { Translate } from '../auth/ConsentPage';
@@ -29,23 +52,36 @@ import {
   saveTaskView,
   readTaskView,
   taskDragId,
-  columns,
   priorities,
   taskStatuses,
   type TaskView,
   type Column,
+  defaultTaskColumnWidths,
 } from './task-view-model';
+import { ProjectProgress, projectTone } from '../projects/ProjectVisual';
+import { TaskStatusIcon, labelVisual } from './TaskVisual';
 import { statusLabel, priorityLabel } from './TaskList';
 export type TaskViewsProps = {
   tasks: Task[];
-  graph?: { labels: Label[]; taskLabels: TaskLabel[]; dependencies: TaskDependency[]; subtasks: Subtask[] };
+  prefs?: Record<string, unknown>;
+  toolbarActions?: React.ReactNode;
+  columnOrder?: Column[];
+  graph?: {
+    labels: Label[];
+    taskLabels: TaskLabel[];
+    dependencies: TaskDependency[];
+    subtasks: Subtask[];
+    comments?: Comment[];
+    attachments?: TaskAttachment[];
+    historyComplete?: boolean;
+  };
   projects: Project[];
   agents: Agent[];
   members: Member[];
   board: boolean;
   table?: boolean;
   href: (params: Record<string, string>) => string;
-  open: (id: string) => void;
+  open: (id: string, options?: { quick?: boolean }) => void;
   view: (href: string) => void;
   t: Translate;
   canCreate: boolean;
@@ -55,7 +91,16 @@ export type TaskViewsProps = {
   projectId?: string;
   viewKey?: string;
   hideLayoutSwitch?: boolean;
+  fixedGroups?: {
+    key: string;
+    name: string;
+    taskIds: string[];
+    creationContext?: TaskViewsProps['creationContext'];
+    collapsed?: boolean;
+    onSelect?: () => void;
+  }[];
   initialView?: unknown;
+  defaultView?: unknown;
   onViewChange?: (view: TaskView) => void;
   extraTaskMenuActions?: ExtraTaskMenuAction[];
 };
@@ -79,7 +124,7 @@ export function TaskViews(props: TaskViewsProps) {
   const dragScope = useMemo(() => crypto.randomUUID(), [repo]);
   const mode = board ? 'board' : table ? 'table' : 'list',
     key = props.viewKey ?? `${projectId ? `project:${projectId}` : 'tasks'}:${mode}`;
-  const [view, setViewState] = useState<TaskView>(() => readTaskView(props.initialView)),
+  const [view, setViewState] = useState<TaskView>(() => readTaskView(props.initialView ?? props.defaultView)),
     [ready, setReady] = useState(false),
     [loadFailed, setLoadFailed] = useState(false),
     [loadAttempt, setLoadAttempt] = useState(0),
@@ -98,7 +143,7 @@ export function TaskViews(props: TaskViewsProps) {
       try {
         await repo.personal?.();
         if (!alive || repo.controller.signal.aborted) return;
-        setViewState(props.initialView ? readTaskView(props.initialView) : loadTaskView(localStorage, repo.userId, repo.workspaceId!, key));
+        setViewState(props.initialView ? readTaskView(props.initialView) : loadTaskView(localStorage, repo.userId, repo.workspaceId!, key, props.defaultView));
         setReady(true);
       } catch {
         if (alive && !repo.controller.signal.aborted) setLoadFailed(true);
@@ -118,9 +163,12 @@ export function TaskViews(props: TaskViewsProps) {
     }
   }
   const visible = applyTaskView(tasks, view, projects, members),
-    groups = groupTaskView(visible, board ? 'status' : view.group, projects, members),
+    groups = props.fixedGroups
+      ? props.fixedGroups.map(group => ({ key: group.key, tasks: visible.filter(task => group.taskIds.includes(task.id)) }))
+      : groupTaskView(visible, board ? 'status' : view.group, projects, members),
     chosen = tasks.filter(task => selected.includes(task.id)),
-    limited = chosen.length > 100;
+    limited = chosen.length > 100,
+    resolvedGrouping = board ? 'status' : props.fixedGroups ? 'none' : view.group;
   useEffect(() => {
     setSelected(ids => ids.filter(id => tasks.some(task => task.id === id && !task.archived)));
   }, [tasks]);
@@ -152,6 +200,20 @@ export function TaskViews(props: TaskViewsProps) {
       );
     }
   }
+  async function createTask(input: Record<string, unknown>) {
+    setBusy(true);
+    setError('');
+    try {
+      const command = taskCreateCommand(input);
+      await execute(command.operation, command.input);
+      return true;
+    } catch (err) {
+      if (!repo.controller.signal.aborted) setError(errorMessage(err, t));
+      throw err;
+    } finally {
+      setBusy(false);
+    }
+  }
   function edit(task: Task, patch: Record<string, Json>, operation = 'update_task') {
     bulk([task], operation, patch);
   }
@@ -170,6 +232,13 @@ export function TaskViews(props: TaskViewsProps) {
       );
     }
   }
+  const listColumns: Column[] = (props.columnOrder ?? ['title', 'status', 'assignee', 'priority', 'due', projectId ? 'labels' : 'project']).filter(
+    column => column !== 'title',
+  );
+  const listTemplate = `18px 30px minmax(220px,1fr) ${listColumns
+    .map(column => (({ status: 126, assignee: 150, priority: 108, due: 104, project: 160, labels: 168 }) as Record<string, number>)[column] ?? 112)
+    .map(width => `${width}px`)
+    .join(' ')} 40px`;
   const active = (task: Task) => !!task.reservation?.active && Date.parse(task.reservation.expiresAt) > Date.now();
   const disabled = (task: Task) => busy || !props.canCreate || active(task);
   const toggle = (id: string) => setSelected(ids => (ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]));
@@ -180,6 +249,16 @@ export function TaskViews(props: TaskViewsProps) {
       checked={selected.includes(task.id)}
       disabled={busy || !props.canCreate}
       onChange={() => toggle(task.id)}
+    />
+  );
+  const selectAll = (
+    <input
+      type="checkbox"
+      className="check"
+      aria-label={t('Selecionar todas as tarefas visíveis', 'Select all visible tasks')}
+      disabled={busy || !props.canCreate || !visible.length}
+      checked={!!visible.length && visible.every(task => selected.includes(task.id))}
+      onChange={e => setSelected(e.target.checked ? visible.map(task => task.id) : [])}
     />
   );
   function closeContext(restoreFocus = true) {
@@ -217,7 +296,7 @@ export function TaskViews(props: TaskViewsProps) {
       },
     };
   }
-  function movement(task: Task, index: number, rows: Task[], group: string, groupId: string) {
+  function movement(task: Task, index: number, rows: Task[], group: string, groupId: string, compact = false) {
     return (
       <div className="task-order-controls">
         <Button
@@ -231,27 +310,36 @@ export function TaskViews(props: TaskViewsProps) {
             openContext(task, event.currentTarget, rect.left, rect.bottom);
           }}
         >
-          ⋯
+          <MoreHorizontal size={15} />
         </Button>
-        <Button variant="ghost" aria-label={t('Arrastar tarefa', 'Drag task') + ': ' + (task.key ?? task.id)} disabled={disabled(task)} {...dragProps(task)}>
-          <GripVertical size={14} />
-        </Button>
-        <Button
-          variant="ghost"
-          aria-label={t('Mover para cima', 'Move up') + ': ' + (task.key ?? task.id)}
-          disabled={disabled(task) || index === 0}
-          onClick={() => drop(task.id, rows[index - 1].id, group, groupId)}
-        >
-          ↑
-        </Button>
-        <Button
-          variant="ghost"
-          aria-label={t('Mover para baixo', 'Move down') + ': ' + (task.key ?? task.id)}
-          disabled={disabled(task) || index === rows.length - 1}
-          onClick={() => drop(task.id, rows[index + 2]?.id ?? null, group, groupId)}
-        >
-          ↓
-        </Button>
+        {!compact && (
+          <>
+            <Button
+              variant="ghost"
+              aria-label={t('Arrastar tarefa', 'Drag task') + ': ' + (task.key ?? task.id)}
+              disabled={disabled(task)}
+              {...dragProps(task)}
+            >
+              <GripVertical size={14} />
+            </Button>
+            <Button
+              variant="ghost"
+              aria-label={t('Mover para cima', 'Move up') + ': ' + (task.key ?? task.id)}
+              disabled={disabled(task) || index === 0}
+              onClick={() => drop(task.id, rows[index - 1].id, group, groupId)}
+            >
+              <ArrowUp size={12} />
+            </Button>
+            <Button
+              variant="ghost"
+              aria-label={t('Mover para baixo', 'Move down') + ': ' + (task.key ?? task.id)}
+              disabled={disabled(task) || index === rows.length - 1}
+              onClick={() => drop(task.id, rows[index + 2]?.id ?? null, group, groupId)}
+            >
+              <ArrowDown size={12} />
+            </Button>
+          </>
+        )}
       </div>
     );
   }
@@ -286,6 +374,7 @@ export function TaskViews(props: TaskViewsProps) {
       disabled={disabled(task)}
       graph={props.graph}
       tasks={tasks}
+      prefs={props.prefs}
     />
   );
   if (!ready)
@@ -306,66 +395,69 @@ export function TaskViews(props: TaskViewsProps) {
     );
   return (
     <>
-      <div className="work-toolbar">
-        {!props.hideLayoutSwitch && (
-          <div className="view-tabs">
-            {[
-              ['list', t('Lista', 'List'), List],
-              ['board', t('Quadro', 'Board'), Columns3],
-              ['table', t('Tabela', 'Table'), Table2],
-            ].map(([id, name, Icon]) => {
-              const I = Icon as typeof List;
-              return (
-                <a
-                  key={String(id)}
-                  href={props.href({ view: String(id) })}
-                  aria-current={mode === id ? 'page' : undefined}
-                  onClick={e => {
-                    e.preventDefault();
-                    props.view(e.currentTarget.href);
-                  }}
-                >
-                  <I size={15} />
-                  {String(name)}
-                </a>
-              );
-            })}
-          </div>
-        )}
-        <span>
-          {visible.length} / {tasks.length} {t('tarefas', 'tasks')}
-        </span>
+      <div className="task-toolbar">
+        <TaskViewToolbar
+          view={view}
+          setView={setView}
+          projects={projects}
+          members={members}
+          tasks={tasks}
+          t={t}
+          table={!!table}
+          grouping={!props.fixedGroups && !board}
+          selectionControl={
+            <label className={`task-select-all ${!board && !table ? 'only-m' : ''}`}>
+              {selectAll}
+              <span>{t('Selecionar visíveis', 'Select visible')}</span>
+            </label>
+          }
+          right={
+            <div className="task-layout-toolbar">
+              {props.toolbarActions}{' '}
+              {!props.hideLayoutSwitch && (
+                <div className="view-tabs seg">
+                  {[
+                    ['list', t('Lista', 'List'), List],
+                    ['board', t('Quadro', 'Board'), Columns3],
+                    ['table', t('Tabela', 'Table'), Table2],
+                  ].map(([id, name, Icon]) => {
+                    const I = Icon as typeof List;
+                    return (
+                      <a
+                        key={String(id)}
+                        aria-label={String(name)}
+                        className={mode === id ? 'on' : ''}
+                        href={props.href({ view: String(id) })}
+                        aria-current={mode === id ? 'page' : undefined}
+                        onClick={e => {
+                          e.preventDefault();
+                          props.view(e.currentTarget.href);
+                        }}
+                      >
+                        <I size={15} />
+                        <span className="hide-m">{String(name)}</span>
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          }
+        />
       </div>
-      <TaskViewToolbar view={view} setView={setView} projects={projects} members={members} tasks={tasks} t={t} table={!!table} />
       {error && (
         <p role="alert" className="error-message">
           {error}
         </p>
       )}
-      <div className="task-selection">
-        <label>
-          <input
-            type="checkbox"
-            aria-label={t('Selecionar todas as tarefas visíveis', 'Select all visible tasks')}
-            disabled={busy || !props.canCreate || !visible.length}
-            checked={!!visible.length && visible.every(task => selected.includes(task.id))}
-            onChange={e => setSelected(e.target.checked ? visible.map(task => task.id) : [])}
-          />
-          {t('Selecionar visíveis', 'Select visible')}
-        </label>
-        {selected.length > 0 && (
-          <>
-            <strong>
-              {selected.length} {t('selecionadas', 'selected')}
-            </strong>
-            <Button variant="ghost" onClick={() => setSelected([])}>
-              {t('Limpar seleção', 'Clear selection')}
-            </Button>
-          </>
-        )}
-      </div>
       {!!chosen.length && (
         <div className="task-bulk" role="group" aria-label={t('Ações em lote', 'Bulk actions')}>
+          <strong>
+            {selected.length} {t('selecionadas', 'selected')}
+          </strong>
+          <Button variant="ghost" onClick={() => setSelected([])}>
+            {t('Limpar seleção', 'Clear selection')}
+          </Button>
           <p>
             {t(
               'Máximo de 100 tarefas por ação atômica. Reservas ativas exigem retomada explícita.',
@@ -459,31 +551,85 @@ export function TaskViews(props: TaskViewsProps) {
             {t('Limpar filtros', 'Clear filters')}
           </Button>
         </div>
+      ) : table ? (
+        <TaskTableView
+          groups={groups}
+          orderedTasks={visible}
+          createTask={createTask}
+          busy={busy}
+          view={view}
+          setView={setView}
+          props={props}
+          selected={selected}
+          pick={pick}
+          movement={movement}
+          cell={cell}
+          contextProps={contextProps}
+          dragProps={dragProps}
+          dropProps={dropProps}
+        />
       ) : (
-        <div className={board ? 'task-board' : 'task-view-groups'}>
+        <div
+          className={board ? 'task-board board' : table ? 'task-view-groups table-groups' : 'task-view-groups list-wrap'}
+          role={!board && !table ? 'table' : undefined}
+          aria-label={!board && !table ? t('Tarefas', 'Tasks') : undefined}
+        >
+          {!board && !table && (
+            <div className="thead" role="row" style={{ '--cols': listTemplate } as React.CSSProperties}>
+              <div />
+              <div>{selectAll}</div>
+              <div role="columnheader">{t('Tarefa', 'Task')}</div>
+              {listColumns.map(c => (
+                <div role="columnheader" key={c}>
+                  <button onClick={() => setView({ ...view, sort: { f: c === 'labels' ? 'manual' : c, dir: view.sort.f === c ? -view.sort.dir : 1 } })}>
+                    {fieldLabel(c, t)}
+                  </button>
+                </div>
+              ))}
+              <div />
+            </div>
+          )}
           {groups.map(group => {
-            const groupType = board ? 'status' : view.group,
-              name = groupLabel(group.key, groupType, projects, members, t),
-              collapsed = view.collapsed.includes(group.key),
-              shownColumns = columns.filter(c => c === 'title' || !view.hidden.includes(c));
+            const groupType = resolvedGrouping,
+              name = props.fixedGroups?.find(item => item.key === group.key)?.name ?? groupLabel(group.key, groupType, projects, members, t),
+              collapsed =
+                view.collapsed.includes(group.key) ||
+                (!!props.fixedGroups?.find(item => item.key === group.key)?.collapsed && !view.collapsed.includes(`expanded:${group.key}`));
             return (
               <section
-                className={board ? 'board-column' : 'task-view-group'}
+                className={board ? `board-column bcol ${collapsed ? 'collapsed' : ''}` : 'task-view-group task-list-group'}
                 key={group.key}
                 {...dropProps(groupType, group.key, null)}
                 data-task-group={group.key}
               >
-                <header className="task-group-heading">
+                <header className={`task-group-heading ${board ? 'bcol-h' : 'grp'}`}>
                   <Button
                     variant="ghost"
                     aria-expanded={!collapsed}
-                    onClick={() => setView({ ...view, collapsed: collapsed ? view.collapsed.filter(k => k !== group.key) : [...view.collapsed, group.key] })}
+                    onClick={() => {
+                      props.fixedGroups?.find(item => item.key === group.key)?.onSelect?.();
+                      const retained = view.collapsed.filter(k => k !== group.key && k !== `expanded:${group.key}`);
+                      setView({ ...view, collapsed: [...retained, collapsed ? `expanded:${group.key}` : group.key] });
+                    }}
                   >
-                    {collapsed ? '▸' : '▾'} {name} <small>{group.tasks.length}</small>
+                    {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                    {groupType === 'status' && taskStatuses.includes(group.key as Task['status']) && <TaskStatusIcon status={group.key as Task['status']} />}
+                    {props.fixedGroups &&
+                      (() => {
+                        const Icon = ({ overdue: ClockAlert, today: Sun, upcoming: CalendarDays, completed: CircleCheck } as Record<string, typeof ClockAlert>)[
+                          group.key
+                        ];
+                        return Icon ? (
+                          <Icon size={14} style={{ color: group.key === 'overdue' ? 'var(--red)' : group.key === 'completed' ? 'var(--green)' : undefined }} />
+                        ) : null;
+                      })()}
+                    {name} <small className="cnt">{group.tasks.length}</small>
                   </Button>
                   {board && (
                     <details>
-                      <summary aria-label={t('Opções da coluna', 'Column options') + ': ' + name}>⋯</summary>
+                      <summary className="ibtn ibtn-sm" aria-label={t('Opções da coluna', 'Column options') + ': ' + name}>
+                        <MoreHorizontal size={15} />
+                      </summary>
                       <div className="view-options-body">
                         <Button
                           variant="ghost"
@@ -519,99 +665,164 @@ export function TaskViews(props: TaskViewsProps) {
                 {!collapsed && (
                   <>
                     {board ? (
-                      <div className="board-cards">
+                      <div className="board-cards bcol-b">
                         {group.tasks.map((task, index) => (
                           <article
-                            className="task-card"
+                            className={`task-card kcard ${task.status === 'done' ? 'done' : ''}`}
                             key={task.id}
                             {...contextProps(task)}
                             {...dragProps(task)}
                             {...dropProps(groupType, group.key, task.id)}
                           >
-                            {pick(task)}
-                            <Button variant="ghost" className="task-title" onClick={() => open(task.id)}>
-                              <small>{task.key}</small>
-                              <strong>{task.title}</strong>
-                            </Button>
-                            <span>{priorityLabel(task.priority, t)}</span>
-                            <footer>
-                              {members.find(m => m.user_id === task.assigneeUserId)?.name ?? t('Sem responsável', 'Unassigned')}
-                              {task.executorAgentId && (
-                                <small className="task-executor">{props.agents.find(a => a.id === task.executorAgentId)?.name ?? t('Agente', 'Agent')}</small>
+                            {!!props.graph?.taskLabels.some(link => link.taskId === task.id) && (
+                              <div className="labels">
+                                {props.graph.labels
+                                  .filter(label => props.graph!.taskLabels.some(link => link.taskId === task.id && link.labelId === label.id))
+                                  .map(label => (
+                                    <span className="lbl" key={label.id} style={{ '--c': labelVisual(label, t).color } as React.CSSProperties}>
+                                      <i />
+                                      {labelVisual(label, t).name}
+                                    </span>
+                                  ))}
+                              </div>
+                            )}
+                            <div className="top">
+                              {task.status === 'done' && (
+                                <span className="done-ic">
+                                  <TaskStatusIcon status="done" size={14} />
+                                </span>
                               )}
-                            </footer>
-                            {cell(task, 'status')}
-                            {movement(task, index, group.tasks, groupType, group.key)}
+                              <Button variant="ghost" className="task-title title" onClick={() => open(task.id)}>
+                                {task.title}
+                              </Button>
+                            </div>
+                            {!!props.graph?.subtasks.some(sub => sub.taskId === task.id) && (
+                              <div className="subp">
+                                <ListChecks size={12} />
+                                <span className="num">
+                                  {props.graph.subtasks.filter(sub => sub.taskId === task.id && sub.done).length}/
+                                  {props.graph.subtasks.filter(sub => sub.taskId === task.id).length}
+                                </span>
+                                <ProjectProgress
+                                  value={Math.round(
+                                    (props.graph.subtasks.filter(sub => sub.taskId === task.id && sub.done).length /
+                                      Math.max(1, props.graph.subtasks.filter(sub => sub.taskId === task.id).length)) *
+                                      100,
+                                  )}
+                                  name={t('Progresso das subtarefas', 'Subtask progress')}
+                                />
+                              </div>
+                            )}
+                            <div className="meta">
+                              {!projectId && (
+                                <span className="m">
+                                  <span
+                                    className="pdot"
+                                    style={
+                                      {
+                                        '--c': projects.find(p => p.id === task.projectId)
+                                          ? projectTone(projects.find(p => p.id === task.projectId)!)
+                                          : 'var(--accent)',
+                                      } as React.CSSProperties
+                                    }
+                                  />
+                                </span>
+                              )}
+                              <span className="key">{task.key}</span>
+                              <span className="board-priority">{cell(task, 'priority')}</span>
+                              {task.dueDate && <span className="board-due">{cell(task, 'due')}</span>}
+                              {task.recurrence && (
+                                <span className="m" title={task.recurrence}>
+                                  <Repeat2 size={12} />
+                                </span>
+                              )}
+                              {!!props.graph?.comments?.filter(item => item.taskId === task.id).length && (
+                                <span
+                                  className="m"
+                                  aria-label={`${props.graph.comments.filter(item => item.taskId === task.id).length} ${t('comentários carregados', 'loaded comments')}`}
+                                >
+                                  <MessageSquare size={12} />
+                                  {props.graph.comments.filter(item => item.taskId === task.id).length}
+                                </span>
+                              )}
+                              {!!props.graph?.attachments?.filter(item => item.taskId === task.id).length && (
+                                <span className="m">
+                                  <Paperclip size={12} />
+                                  {props.graph.attachments.filter(item => item.taskId === task.id).length}
+                                </span>
+                              )}
+                              <span className="board-assignee">{cell(task, 'assignee')}</span>
+                            </div>
+                            {task.executorAgentId && (
+                              <small className="task-executor">{props.agents.find(a => a.id === task.executorAgentId)?.name ?? t('Agente', 'Agent')}</small>
+                            )}
+                            <div className="hacts">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                className="ibtn ibtn-xs"
+                                aria-label={task.status === 'done' ? t('Reabrir', 'Reopen') : t('Marcar como concluída', 'Mark complete')}
+                                disabled={disabled(task)}
+                                onClick={() =>
+                                  bulk([task], task.status === 'done' ? 'update_task' : 'complete_task', task.status === 'done' ? { status: 'todo' } : {})
+                                }
+                              >
+                                {task.status === 'done' ? <RotateCcw size={13} /> : <Check size={13} />}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                className="ibtn ibtn-xs"
+                                aria-label={t('Edição rápida', 'Quick edit')}
+                                onClick={() => open(task.id, { quick: true })}
+                              >
+                                <Pencil size={12} />
+                              </Button>
+                              {movement(task, index, group.tasks, groupType, group.key, true)}
+                            </div>
                           </article>
                         ))}
                       </div>
                     ) : (
-                      <>
-                        <div className={`task-view-table ${table ? 'is-table' : ''}`}>
-                          <table
-                            aria-label={name}
-                            style={
-                              {
-                                '--task-table-width': `${shownColumns.reduce((sum, c) => sum + (view.colW[c] ?? (c === 'title' ? 300 : 150)), 168)}px`,
-                              } as React.CSSProperties
-                            }
+                      <div className="task-view-table task-list-rows">
+                        {group.tasks.map((task, index) => (
+                          <div
+                            className={`trow ${task.status === 'done' ? 'done' : ''} ${selected.includes(task.id) ? 'sel' : ''}`}
+                            role="row"
+                            data-task-row={task.id}
+                            key={task.id}
+                            style={{ '--cols': listTemplate } as React.CSSProperties}
+                            {...contextProps(task)}
+                            {...dragProps(task)}
+                            {...dropProps(groupType, group.key, task.id)}
                           >
-                            <colgroup>
-                              <col style={{ width: 40 }} />
-                              {shownColumns.map(c => (
-                                <col key={c} style={{ width: view.colW[c] ?? (c === 'title' ? 300 : 150) }} />
-                              ))}
-                              <col style={{ width: 128 }} />
-                            </colgroup>
-                            <thead>
-                              <tr>
-                                <th>
-                                  <span className="sr-only">{t('Seleção', 'Selection')}</span>
-                                </th>
-                                {shownColumns.map(c => (
-                                  <th
-                                    key={c}
-                                    style={{ minWidth: view.colW[c] ?? (c === 'title' ? 300 : 150) }}
-                                    aria-sort={view.sort.f === c ? (view.sort.dir === 1 ? 'ascending' : 'descending') : 'none'}
-                                  >
-                                    <Button
-                                      variant="ghost"
-                                      disabled={c === 'labels' || c === 'deps'}
-                                      onClick={() => setView({ ...view, sort: { f: c, dir: view.sort.f === c ? -view.sort.dir : 1 } })}
-                                    >
-                                      {fieldLabel(c, t)}
-                                    </Button>
-                                  </th>
-                                ))}
-                                <th>{t('Ordem', 'Order')}</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {group.tasks.map((task, index) => (
-                                <tr key={task.id} {...contextProps(task)} {...dragProps(task)} {...dropProps(groupType, group.key, task.id)}>
-                                  <td>{pick(task)}</td>
-                                  {shownColumns.map(c => (
-                                    <td key={c} data-task-column={c}>
-                                      {cell(task, c)}
-                                    </td>
-                                  ))}
-                                  <td>{movement(task, index, group.tasks, groupType, group.key)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </>
+                            <div className="handle">
+                              <GripVertical size={14} />
+                            </div>
+                            <div className="c-check">{pick(task)}</div>
+                            <div className="ttl" data-task-column="title">
+                              {cell(task, 'title')}
+                            </div>
+                            {listColumns.map(c => (
+                              <div className={`c-meta c-${c}`} data-task-column={c} key={c}>
+                                {cell(task, c)}
+                              </div>
+                            ))}
+                            <div className="c-more">{movement(task, index, group.tasks, groupType, group.key)}</div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                     {props.canCreate && (
                       <GroupComposer
+                        compact
                         projectId={projectId}
                         group={groupType}
                         groupId={group.key}
                         projects={projects}
                         t={t}
                         disabled={busy}
-                        creationContext={props.creationContext}
+                        creationContext={props.fixedGroups?.find(item => item.key === group.key)?.creationContext ?? props.creationContext}
                         create={async input => {
                           setBusy(true);
                           setError('');
@@ -648,7 +859,27 @@ export function TaskViews(props: TaskViewsProps) {
           signal={repo.controller.signal}
           close={closeContext}
           open={open}
-          extraActions={props.extraTaskMenuActions}
+          extraActions={[
+            ...(props.extraTaskMenuActions ?? []),
+            {
+              id: 'selection',
+              personal: true,
+              label: selected.includes(context.task.id) ? t('Desmarcar tarefa', 'Deselect task') : t('Selecionar tarefa', 'Select task'),
+              run: task => toggle(task.id),
+            },
+            ...([-1, 1] as const).map(direction => ({
+              id: `order:${direction}`,
+              label: direction < 0 ? t('Mover para cima', 'Move up') : t('Mover para baixo', 'Move down'),
+              disabled: disabled(context.task),
+              run: (task: Task) => {
+                const group = groups.find(item => item.tasks.some(row => row.id === task.id));
+                if (!group) return;
+                const index = group.tasks.findIndex(row => row.id === task.id);
+                if (direction < 0 && index > 0) drop(task.id, group.tasks[index - 1].id, resolvedGrouping, group.key);
+                if (direction > 0 && index < group.tasks.length - 1) drop(task.id, group.tasks[index + 2]?.id ?? null, resolvedGrouping, group.key);
+              },
+            })),
+          ]}
         />
       )}
       <AlertDialog open={remove} onOpenChange={setRemove}>
@@ -676,6 +907,9 @@ export function TaskViews(props: TaskViewsProps) {
   );
 }
 function GroupComposer({
+  compact = false,
+  onCreated,
+  onCancel,
   creationContext,
   projectId,
   group,
@@ -685,6 +919,9 @@ function GroupComposer({
   disabled,
   create,
 }: {
+  compact?: boolean;
+  onCreated?: () => void;
+  onCancel?: () => void;
   projectId?: string;
   group: string;
   groupId: string;
@@ -694,11 +931,26 @@ function GroupComposer({
   creationContext?: Record<string, unknown>;
   create: (input: Record<string, unknown>) => Promise<boolean>;
 }) {
+  const [composing, setComposing] = useState(!compact);
   const [title, setTitle] = useState(''),
     [project, setProject] = useState(projectId || projects[0]?.id || ''),
     [attempt, setAttempt] = useState<Record<string, unknown> | null>(null);
   const targetProject = group === 'project' ? groupId : projectId || projects.find(p => p.id === project)?.id || projects[0]?.id || '';
   const validProject = projects.some(p => p.id === targetProject);
+  if (!composing)
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        className="group-add-task"
+        disabled={disabled || !validProject}
+        aria-label={t('Adicionar tarefa no grupo', 'Add task in group') + ': ' + groupId}
+        onClick={() => setComposing(true)}
+      >
+        <Plus size={13} />
+        {t('Adicionar tarefa', 'Add task')}
+      </Button>
+    );
   return (
     <form
       className="task-group-composer"
@@ -718,6 +970,8 @@ function GroupComposer({
             if (ok) {
               setTitle('');
               setAttempt(null);
+              if (compact) setComposing(false);
+              onCreated?.();
             }
           })
           .catch(error => {
@@ -727,6 +981,7 @@ function GroupComposer({
     >
       <input
         required
+        autoFocus
         maxLength={500}
         aria-label={t('Nova tarefa no grupo', 'New task in group') + ': ' + groupId}
         placeholder={t('Nova tarefa...', 'New task...')}
@@ -754,6 +1009,205 @@ function GroupComposer({
         <Plus size={16} />
         <span className="sr-only">{t('Adicionar ao grupo', 'Add to group') + ': ' + groupId}</span>
       </Button>
+      {onCancel && (
+        <Button variant="ghost" type="button" disabled={disabled || !!attempt || !!title} onClick={onCancel}>
+          {t('Cancelar criação', 'Cancel creation')}
+        </Button>
+      )}
     </form>
+  );
+}
+
+const originalTableColumns: Column[] = ['title', 'status', 'priority', 'assignee', 'due', 'start', 'labels', 'deps', 'estimate', 'created', 'project'];
+
+function TaskTableView({
+  groups,
+  orderedTasks,
+  createTask,
+  busy,
+  view,
+  setView,
+  props,
+  selected,
+  pick,
+  movement,
+  cell,
+  contextProps,
+  dragProps,
+  dropProps,
+}: {
+  groups: { key: string; tasks: Task[] }[];
+  orderedTasks: Task[];
+  createTask: (input: Record<string, unknown>) => Promise<boolean>;
+  busy: boolean;
+  view: TaskView;
+  setView: (view: TaskView) => void;
+  props: TaskViewsProps;
+  selected: string[];
+  pick: (task: Task) => React.ReactNode;
+  movement: (task: Task, index: number, rows: Task[], group: string, groupId: string, compact?: boolean) => React.ReactNode;
+  cell: (task: Task, column: Column) => React.ReactNode;
+  contextProps: (task: Task) => React.HTMLAttributes<HTMLElement>;
+  dragProps: (task: Task) => React.HTMLAttributes<HTMLElement>;
+  dropProps: (group: string, groupId: string, before: string | null) => React.HTMLAttributes<HTMLElement>;
+}) {
+  const { t, projects, members } = props;
+  const [composer, setComposer] = useState<{ group: string; groupId: string } | null>(null);
+  const shown = originalTableColumns.filter(c => c === 'title' || (!view.hidden.includes(c) && !(props.projectId && c === 'project')));
+  const width = (c: Column) => view.colW[c] ?? defaultTaskColumnWidths[c];
+  return (
+    <>
+      <div className="task-view-table is-table tbl-wrap hide-m">
+        <table className="tbl" aria-label={t('Tabela de tarefas', 'Tasks table')} style={{ width: shown.reduce((sum, c) => sum + width(c), 0) }}>
+          <colgroup>
+            {shown.map(c => (
+              <col key={c} data-col={c} style={{ width: width(c) }} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              {shown.map(c => (
+                <th
+                  key={c}
+                  scope="col"
+                  className={c === 'title' ? 'sticky' : ''}
+                  aria-sort={view.sort.f === c ? (view.sort.dir === 1 ? 'ascending' : 'descending') : 'none'}
+                >
+                  <Button
+                    variant="ghost"
+                    className="thi"
+                    onClick={() =>
+                      setView({ ...view, sort: { f: ['labels', 'deps'].includes(c) ? 'manual' : c, dir: view.sort.f === c ? -view.sort.dir : 1 } })
+                    }
+                  >
+                    {c === 'title' ? t('Tarefa', 'Task') : fieldLabel(c, t)}
+                  </Button>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map(group => (
+              <React.Fragment key={group.key}>
+                {view.group !== 'none' && (
+                  <tr className="grow-row">
+                    <td className="sticky" colSpan={shown.length}>
+                      <div className="row">
+                        <Button
+                          variant="ghost"
+                          className="row"
+                          aria-expanded={!view.collapsed.includes(group.key)}
+                          onClick={() =>
+                            setView({
+                              ...view,
+                              collapsed: view.collapsed.includes(group.key) ? view.collapsed.filter(key => key !== group.key) : [...view.collapsed, group.key],
+                            })
+                          }
+                        >
+                          {view.collapsed.includes(group.key) ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+                          {view.group === 'status' && taskStatuses.includes(group.key as Task['status']) && (
+                            <TaskStatusIcon status={group.key as Task['status']} />
+                          )}
+                          <b>{groupLabel(group.key, view.group, projects, members, t)}</b>
+                          <span className="faint">{group.tasks.length}</span>
+                        </Button>
+                        {props.canCreate && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="ibtn ibtn-xs"
+                            aria-label={t('Adicionar tarefa no grupo', 'Add task in group') + ': ' + group.key}
+                            disabled={busy || composer !== null}
+                            onClick={() => setComposer({ group: view.group, groupId: group.key })}
+                          >
+                            <Plus size={13} />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {(view.group === 'none' || !view.collapsed.includes(group.key)) &&
+                  group.tasks.map((task, index) => (
+                    <tr
+                      key={task.id}
+                      data-task-row={task.id}
+                      className={selected.includes(task.id) ? 'sel' : ''}
+                      {...contextProps(task)}
+                      {...dragProps(task)}
+                      {...dropProps(view.group, group.key, task.id)}
+                    >
+                      {shown.map(c => (
+                        <td key={c} data-task-column={c} className={c === 'title' ? 'sticky task-table-title-cell' : ''}>
+                          {c === 'title' ? (
+                            <div className="row task-table-title">
+                              {pick(task)}
+                              <TaskStatusIcon status={task.status} size={13} />
+                              {cell(task, c)}
+                              <div className="table-row-actions">{movement(task, index, group.tasks, view.group, group.key, true)}</div>
+                            </div>
+                          ) : (
+                            cell(task, c)
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+              </React.Fragment>
+            ))}
+            {props.canCreate && (
+              <tr className="table-new-row">
+                <td colSpan={shown.length}>
+                  {composer ? (
+                    <GroupComposer
+                      projectId={props.projectId}
+                      group={composer.group}
+                      groupId={composer.groupId}
+                      projects={projects}
+                      t={t}
+                      disabled={busy}
+                      creationContext={props.creationContext}
+                      create={createTask}
+                      onCreated={() => setComposer(null)}
+                      onCancel={() => setComposer(null)}
+                    />
+                  ) : (
+                    <Button variant="ghost" className="table-new-task" onClick={() => setComposer({ group: 'none', groupId: 'all' })}>
+                      <Plus size={14} />
+                      {t('Nova tarefa', 'New task')}
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="task-mobile-cards only-m">
+        {orderedTasks.map(task => (
+          <article className="task-mobile-card panel" key={task.id} {...contextProps(task)}>
+            <div className="row">
+              {pick(task)}
+              <TaskStatusIcon status={task.status} />
+              <Button variant="ghost" className="task-mobile-title" onClick={() => props.open(task.id)}>
+                {task.title}
+              </Button>
+              <span className="key faint">{task.key}</span>
+            </div>
+            <div className="row task-mobile-meta">
+              {cell(task, 'priority')}
+              <span data-mobile-assignee>{cell(task, 'assignee')}</span>
+              <span data-mobile-due>{cell(task, 'due')}</span>
+              {task.legacyMetadata.estimate && (
+                <span className="num faint">
+                  <Timer size={12} />
+                  {String(task.legacyMetadata.estimate)}
+                </span>
+              )}
+            </div>
+          </article>
+        ))}
+      </div>
+    </>
   );
 }

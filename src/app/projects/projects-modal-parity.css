@@ -1,0 +1,269 @@
+/* Radix portals sit outside the shell's scoped original styles. */
+.ui-sheet.project-modal {
+  font-size: var(--fs);
+  line-height: var(--lh-body);
+  border: 1px solid var(--border);
+}
+.project-modal .project-modal-form {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.project-modal .project-form-fields {
+  margin: 0;
+  overflow: visible;
+}
+.project-editor-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.project-modal > p:not(.sr-only) {
+  font-size: var(--fs-sm);
+  margin-top: var(--s-half);
+}
+.project-modal .modal-f {
+  background: var(--surface);
+}
+.project-modal .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1-5);
+  font-size: var(--fs-sm);
+}
+.project-modal .ui-input,
+.project-modal select {
+  flex-shrink: 0;
+  height: var(--h-md);
+  min-height: var(--h-md);
+  font-size: var(--fs);
+  padding: 0 var(--s-2-5);
+}
+.project-editor-modal .project-name-row,
+.project-editor-modal .project-choice-row {
+  display: flex;
+}
+.project-editor-modal .project-name-row > .picon {
+  flex-shrink: 0;
+  margin-top: calc(var(--space-unit) * 5.5);
+}
+.project-editor-modal .project-choice-row {
+  flex-wrap: wrap;
+}
+.project-editor-modal .project-choice-row > .grow {
+  min-width: 220px;
+}
+.project-editor-modal .project-choice-row > .form-field:last-child {
+  width: 140px;
+}
+.project-editor-modal .iconpick {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+.project-editor-modal .iconpick .ui-button {
+  width: auto;
+  height: 32px;
+  border-radius: var(--r-sm);
+}
+.project-editor-modal .swatches {
+  max-width: 140px;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.project-editor-modal textarea {
+  height: auto;
+  min-height: 72px;
+  padding: var(--s-2) var(--s-2-5);
+  font: inherit;
+  line-height: var(--lh-copy);
+}
+.project-editor-modal .tmpls {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.project-editor-modal .tmpls .opt {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: var(--s-2);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: none;
+  justify-content: flex-start;
+}
+.project-editor-modal .tmpls .opt.on {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+.project-editor-modal .tmpls .opt > .picon {
+  display: inline-grid;
+  color: var(--text-2);
+  width: 16px;
+  height: 16px;
+}
+.project-editor-modal .tmpls .opt.on > .picon {
+  color: var(--accent);
+}
+.project-editor-modal .tmpls .opt b {
+  font-size: var(--fs-sm);
+}
+.project-editor-modal .tmpls .opt > span:last-child {
+  line-height: var(--lh-body);
+}
+.ui-sheet.saved-view-modal {
+  width: min(var(--modal-sm), calc(100vw - var(--s-8)));
+}
+.saved-view-modal .saved-view-no-filters {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2-5);
+  margin: 0;
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-copy);
+}
+.saved-view-no-filters > svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.project-sharing-modal .sharing-title {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+.project-sharing-modal .sharing-invite {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1-5);
+}
+.sharing-invite .sharing-email {
+  flex: 1;
+  min-width: 0;
+}
+.project-sharing-modal .sharing-invite > select {
+  width: 132px;
+  flex: 0 0 132px;
+}
+.project-sharing-modal .sharing-scope {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-meta);
+}
+.project-sharing-modal .sharing-eyebrow {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-3);
+  margin-bottom: var(--s-1);
+}
+.project-sharing-modal .project-members-list li {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--s-2);
+  height: 44px;
+  padding: 0;
+}
+.project-sharing-modal .project-members-list .sharing-person {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs);
+  font-weight: var(--fw-medium);
+  overflow-wrap: normal;
+}
+.sharing-person > span,
+.sharing-person > small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-sharing-modal .sharing-you,
+.project-sharing-modal .sharing-person small {
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-meta);
+  color: var(--text-3);
+}
+.project-sharing-modal .project-members-list li > select {
+  width: auto;
+  max-width: 112px;
+  height: 26px;
+  min-height: 26px;
+  flex: 0 0 auto;
+  font-size: var(--fs-xs);
+  border-color: transparent;
+  background-color: transparent;
+}
+.project-sharing-modal .sharing-lead {
+  flex-shrink: 0;
+  padding-right: var(--s-2);
+  font-size: var(--fs-sm);
+}
+.project-sharing-modal .av {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-circle);
+  background: color-mix(in srgb, var(--c) 17%, var(--surface));
+  color: color-mix(in srgb, var(--c) 55%, var(--text));
+  font-size: calc(var(--space-unit) * 2.6);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+}
+.project-sharing-modal .sharing-general {
+  border-top: 1px solid var(--divider);
+  padding-top: var(--s-3);
+}
+.sharing-general .sharing-eyebrow {
+  margin-bottom: var(--s-2);
+}
+.sharing-access-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2-5);
+}
+.sharing-access-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--r);
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.sharing-access-row > div {
+  min-width: 0;
+  flex: 1;
+}
+.project-sharing-modal .sharing-access-row select {
+  width: auto;
+  max-width: 100%;
+  height: 28px;
+  min-height: 28px;
+  border-color: transparent;
+  padding-left: var(--s-1);
+  font-weight: var(--fw-medium);
+}
+.sharing-access-row p {
+  color: var(--text-3);
+  font-size: var(--fs-meta);
+  margin: 0;
+  padding-left: var(--s-1);
+}
+@media (max-width: 640px) {
+  .ui-sheet:is(.project-editor-modal, .saved-view-modal, .project-sharing-modal) {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    transform: none;
+  }
+  .project-editor-modal .tmpls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from '../../compone
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { projectError } from './ProjectEditor';
+import { Info } from 'lucide-react';
 export type ViewEdit = { projectId: string; view?: SavedView; filters: Json[]; type: string; opener: HTMLElement | null };
 export function SavedViewEditor({
   edit,
@@ -83,36 +84,73 @@ export function SavedViewEditor({
       }}
     >
       <SheetContent
+        className="project-modal saved-view-modal"
         closeLabel={t('Fechar painel', 'Close panel')}
         onCloseAutoFocus={e => {
           e.preventDefault();
           if (!repo.controller.signal.aborted && trigger.current?.isConnected) trigger.current.focus();
         }}
       >
-        <SheetTitle>{edit.view ? t('Renomear visualização', 'Rename view') : t('Salvar visualização', 'Save view')}</SheetTitle>
-        <SheetDescription>{t('Guarde os filtros deste projeto em uma aba nomeada.', 'Keep this project’s filters in a named tab.')}</SheetDescription>
+        <div className="modal-h">
+          <SheetTitle>{edit.view ? t('Renomear visualização', 'Rename view') : t('Salvar visualização', 'Save view')}</SheetTitle>
+        </div>
+        <SheetDescription>{t('Salve os filtros atuais como uma aba deste projeto.', 'Save the current filters as a tab on this project.')}</SheetDescription>
         <form
+          className="project-modal-form"
           onSubmit={e => {
             e.preventDefault();
             void save();
           }}
         >
-          <label className="form-field">
-            {t('Nome da visualização', 'View name')}
-            <Input required maxLength={500} value={name} onChange={e => setName(e.target.value)} />
-          </label>
-          {!edit.view && (
+          <div className="modal-b">
             <label className="form-field">
-              {t('Tipo de visualização', 'View type')}
-              <select value={type} onChange={e => setType(e.target.value)}>
-                {['list', 'board', 'table'].map(type => (
-                  <option key={type} value={type}>
-                    {{ list: t('Lista', 'List'), board: t('Quadro', 'Board'), table: t('Tabela', 'Table') }[type]}
-                  </option>
-                ))}
-              </select>
+              {t('Nome da visualização', 'View name')}
+              <Input
+                required
+                maxLength={500}
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder={t('Ex.: Fila de revisão de design', 'e.g. Design review queue')}
+              />
             </label>
-          )}
+            {!edit.view && (
+              <label className="form-field">
+                {t('Layout', 'Layout')}
+                <select aria-label={t('Tipo de visualização', 'View type')} value={type} onChange={e => setType(e.target.value)}>
+                  {['list', 'board', 'table'].map(type => (
+                    <option key={type} value={type}>
+                      {{ list: t('Lista', 'List'), board: t('Quadro', 'Board'), table: t('Tabela', 'Table') }[type]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {!edit.view && (
+              <div className="saved-filter-summary">
+                {edit.filters.length ? (
+                  <div className="row">
+                    {edit.filters.map((filter, index) => (
+                      <span className="badge" key={index}>
+                        {filter && typeof filter === 'object' && !Array.isArray(filter)
+                          ? `${String(filter.f ?? '')}: ${Array.isArray(filter.v) ? filter.v.join(', ') : ''}`
+                          : String(filter)}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="saved-view-no-filters">
+                    <Info size={14} aria-hidden="true" />
+                    <span>
+                      {t(
+                        'Nenhum filtro ativo. A visualização mostrará todas as tarefas. Você pode adicionar filtros depois de salvar.',
+                        'No filters are active — the view will show all tasks. You can add filters after saving.',
+                      )}
+                    </span>
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
           {conflict && (
             <div role="alert">
               <p>
@@ -153,9 +191,23 @@ export function SavedViewEditor({
               </Button>
             </div>
           )}
-          <Button type="submit" disabled={busy || conflict || !name.trim()}>
-            {t('Salvar visualização', 'Save view')}
-          </Button>
+          <div className="modal-f">
+            <span className="sp" />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => {
+                if (dirty) setDiscard(true);
+                else close();
+              }}
+            >
+              {t('Cancelar', 'Cancel')}
+            </Button>
+            <Button type="submit" disabled={busy || conflict || !name.trim()}>
+              {t('Salvar visualização', 'Save view')}
+            </Button>
+          </div>
         </form>
       </SheetContent>
     </Sheet>

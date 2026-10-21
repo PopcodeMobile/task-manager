@@ -1,0 +1,977 @@
+/* React shell composition restored from the pinned original; all shared values use existing tokens. */
+.work-shell {
+  grid-template-columns: var(--side-w) minmax(0, 1fr);
+  font-size: var(--fs);
+  line-height: var(--lh-body);
+  font-feature-settings: 'ss01', 'cv11';
+}
+.work-shell .work-sidebar {
+  overflow: hidden;
+  user-select: none;
+}
+.work-shell .work-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-half);
+  min-height: 44px;
+  padding: var(--s-2) var(--s-2) var(--s-1);
+}
+.work-shell .workspace-picker {
+  flex: 1;
+  min-width: 0;
+  gap: var(--s-2);
+  padding: calc(var(--space-unit) * 1.25) var(--s-1-5);
+  border-radius: var(--r-sm);
+}
+.work-shell .workspace-picker:hover {
+  background: var(--surface-3);
+}
+.work-shell .workspace-picker .brand-symbol {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-brand);
+  padding: 0;
+  flex-shrink: 0;
+}
+.work-shell .workspace-picker select {
+  font-size: var(--fs);
+  padding: 0;
+  font-weight: var(--fw-semibold);
+  text-overflow: ellipsis;
+}
+.work-shell .workspace-picker .picker-chevrons {
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+.work-shell .sidebar-toggle.ui-button {
+  width: var(--h-sm);
+  height: var(--h-sm);
+  min-height: 0;
+  padding: 0;
+  flex-shrink: 0;
+}
+.work-shell .mobile-close,
+.work-shell .mobile-nav-toggle {
+  display: none;
+}
+.work-shell .work-sidebar nav {
+  padding: var(--s-1) var(--s-2) var(--s-3);
+  scrollbar-width: none;
+  display: block;
+}
+.work-shell .work-sidebar nav::-webkit-scrollbar {
+  display: none;
+}
+.work-shell .work-sidebar nav a,
+.work-shell .work-sidebar-bottom > a,
+.work-shell .account-name,
+.work-shell .sidebar-help .shell-popover-trigger {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-unit) * 2.25);
+  width: 100%;
+  height: var(--side-row);
+  padding: 0 var(--s-2);
+  color: var(--text-2);
+  font-size: var(--fs);
+  font-weight: var(--fw-book);
+  text-decoration: none;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+  text-align: left;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+}
+.work-shell .work-sidebar nav a[aria-current],
+.work-shell .work-sidebar-bottom > a[aria-current] {
+  background: var(--nav-active-bg);
+  color: var(--text);
+  box-shadow: var(--nav-active-shadow);
+  font-weight: var(--fw-medium);
+}
+.work-shell .nav-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.work-shell .work-sidebar svg {
+  color: var(--text-4);
+  flex-shrink: 0;
+}
+.work-shell .work-sidebar a[aria-current] > svg {
+  color: var(--text-2);
+}
+.work-shell .work-sidebar nav a:hover,
+.work-shell .work-sidebar-bottom > a:hover,
+.work-shell .account-name:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.work-shell .nav-group {
+  margin-top: var(--s-3-5);
+}
+.work-shell .nav-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+  padding: 0 var(--s-2);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-label);
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+.work-shell .nav-caption .ui-button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  min-height: 0;
+  opacity: 0;
+}
+.work-shell .nav-group:hover .nav-caption .ui-button,
+.work-shell .nav-caption .ui-button:focus-visible {
+  opacity: 1;
+}
+.work-shell .nav-count {
+  margin-left: auto;
+  font-size: var(--fs-2xs);
+  font-variant-numeric: tabular-nums;
+}
+.work-shell .nav-count.unread {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 var(--s-1);
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: var(--r-full);
+  display: grid;
+  place-items: center;
+  font-weight: var(--fw-semibold);
+}
+.work-shell .sidebar-project-row {
+  position: relative;
+}
+.work-shell .project-nav .project-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: calc(var(--radius-unit) * 2.5);
+  flex-shrink: 0;
+}
+.work-shell .project-nav .project-icon svg {
+  width: 12px;
+  height: 12px;
+  color: inherit;
+}
+.work-shell .project-favorite {
+  color: var(--text-4) !important;
+  margin-left: var(--s-1);
+}
+.work-shell .project-state-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-circle);
+  margin-left: auto;
+  background: var(--gray);
+  flex-shrink: 0;
+}
+.work-shell .project-state-dot[data-status='active'] {
+  background: var(--blue);
+}
+.work-shell .project-state-dot[data-status='risk'] {
+  background: var(--red);
+}
+.work-shell .project-state-dot[data-status='hold'] {
+  background: var(--amber);
+}
+.work-shell .project-state-dot[data-status='complete'] {
+  background: var(--green);
+}
+.work-shell .project-expand.ui-button {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 4px;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  background: var(--bg-side);
+}
+.work-shell .sidebar-project-row:hover .project-expand,
+.work-shell .sidebar-project-row:focus-within .project-expand,
+.work-shell .project-expand:focus-visible {
+  display: inline-flex;
+}
+.work-shell .project-expand[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+.work-shell .project-children {
+  margin-left: var(--s-2);
+  padding-left: var(--s-3-5);
+  border-left: 1px solid var(--border);
+}
+.work-shell .work-sidebar-bottom {
+  padding: var(--s-1-5) var(--s-2) var(--s-2);
+  display: block;
+}
+.work-shell .account-name {
+  height: 36px;
+  color: var(--text);
+  font-weight: var(--fw-medium);
+}
+.work-shell .account-name > svg {
+  margin-left: auto;
+}
+.account-avatar {
+  --sz: 26px;
+  display: inline-grid;
+  place-items: center;
+  width: var(--sz);
+  height: var(--sz);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 17%, var(--surface));
+  border-radius: var(--r-circle);
+  font-size: calc(var(--sz) * 0.4);
+  font-weight: var(--fw-semibold);
+  flex-shrink: 0;
+  line-height: var(--lh-tight);
+}
+.work-shell .account-name .account-avatar {
+  --sz: 22px;
+}
+.work-shell .work-topbar {
+  height: var(--topbar-h);
+  min-height: var(--topbar-h);
+  flex-shrink: 0;
+  gap: var(--s-1-5);
+  padding: 0 var(--s-3) 0 var(--gutter);
+  justify-content: flex-start;
+  position: relative;
+  z-index: 5;
+}
+.work-shell .work-breadcrumb {
+  display: flex;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.work-shell .work-breadcrumb strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.work-shell .work-breadcrumb button {
+  padding: calc(var(--space-unit) * 0.75) 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+.work-shell .work-breadcrumb > span:not(.sr-only) {
+  color: var(--text-4);
+}
+.work-shell .topsearch.ui-button {
+  width: 220px;
+  height: var(--h-sm);
+  min-height: 0;
+  padding: 0 var(--s-1-5) 0 calc(var(--space-unit) * 2.25);
+  gap: var(--s-2);
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  background: var(--sunken);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
+  justify-content: flex-start;
+  flex-shrink: 0;
+}
+.work-shell .topsearch .lbltxt {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.work-shell .topsearch kbd {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.work-shell .topbar-notifications.ui-button {
+  width: var(--h-md);
+  height: var(--h-md);
+  min-height: 0;
+  padding: 0;
+  position: relative;
+}
+.work-shell .notification-dot {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-circle);
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.work-shell .work-status.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  margin: 0;
+}
+.work-shell .work-content {
+  flex: 1;
+  padding: 0;
+  position: relative;
+}
+.work-shell .work-content > .page-heading {
+  padding: var(--s-6) var(--gutter) var(--s-3);
+  margin: 0;
+}
+.work-shell[data-route='agents'] .work-content > :not(.page-heading),
+.work-shell[data-route='integrations'] .work-content > :not(.page-heading) {
+  margin: var(--s-4) var(--gutter);
+}
+.work-shell .work-content > .error-row {
+  margin: var(--s-4) var(--gutter);
+}
+.work-shell .page-heading .ui-button {
+  min-height: 0;
+}
+.shell-popover {
+  position: relative;
+  flex-shrink: 0;
+}
+.shell-popover-trigger.ui-button {
+  min-height: 0;
+  height: var(--h-md);
+  padding: 0 var(--s-2);
+  gap: var(--s-1-5);
+}
+.new-popover .shell-popover-trigger {
+  height: var(--h-sm);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  background: var(--surface);
+  font-size: var(--fs-xs);
+}
+.account-popover .shell-popover-trigger {
+  padding: 0 var(--s-half);
+}
+.shell-popover-content {
+  position: fixed;
+  max-height: min(var(--modal-sm), 70vh);
+  overflow-y: auto;
+  z-index: calc(var(--z-modal) + 2);
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - var(--s-6)));
+  padding: var(--s-1);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+}
+.shell-popover-content [role^='menuitem'] {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: var(--h-md);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--text-2);
+  text-align: left;
+  font-size: var(--fs-sm);
+}
+.shell-popover-content [role^='menuitem']:hover,
+.shell-popover-content [role^='menuitem']:focus-visible {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.sidebar-help-content {
+  width: 260px;
+}
+.account-popover-content {
+  min-width: 240px;
+  padding: var(--s-3);
+}
+.account-popover-content .shell-controls {
+  display: grid;
+  gap: var(--s-2);
+  justify-items: stretch;
+}
+.account-popover-content .shell-controls select {
+  max-width: none;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  height: var(--h-md);
+  padding: 0 var(--s-2);
+}
+.account-popover-content .density-label {
+  display: flex;
+  justify-content: space-between;
+  margin: var(--s-3) 0;
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+.account-popover-content .density-label select {
+  color: var(--text);
+  font-size: var(--fs-xs);
+}
+.work-shell.sidebar-collapsed {
+  grid-template-columns: var(--side-collapsed-w) minmax(0, 1fr);
+}
+.work-shell.sidebar-collapsed .work-sidebar nav,
+.work-shell.sidebar-collapsed .work-sidebar-bottom {
+  display: block;
+}
+.work-shell.sidebar-collapsed .workspace-name,
+.work-shell.sidebar-collapsed .picker-chevrons,
+.work-shell.sidebar-collapsed .nav-text,
+.work-shell.sidebar-collapsed .nav-count,
+.work-shell.sidebar-collapsed .nav-caption,
+.work-shell.sidebar-collapsed .project-state-dot,
+.work-shell.sidebar-collapsed .project-favorite,
+.work-shell.sidebar-collapsed .project-lock,
+.work-shell.sidebar-collapsed .project-children,
+.work-shell.sidebar-collapsed .account-name > svg {
+  display: none;
+}
+.work-shell.sidebar-collapsed .work-brand {
+  flex-direction: column;
+  padding: var(--s-2) var(--s-1);
+}
+.work-shell.sidebar-collapsed .workspace-picker {
+  padding: var(--s-1);
+  flex: initial;
+}
+.work-shell.sidebar-collapsed .work-sidebar nav a,
+.work-shell.sidebar-collapsed .work-sidebar-bottom > a,
+.work-shell.sidebar-collapsed .account-name,
+.work-shell.sidebar-collapsed .sidebar-help .shell-popover-trigger {
+  justify-content: center;
+  padding: 0;
+}
+.work-shell.sidebar-collapsed .nav-group {
+  padding-top: var(--s-2-5);
+  margin-top: var(--s-2-5);
+  border-top: 1px solid var(--border);
+}
+.work-shell .work-bottomnav,
+.navigation-scrim {
+  display: none;
+}
+/* Shared shadcn controls use the original compact dimensions, including portal overlays. */
+.ui-button {
+  height: var(--h-md);
+  min-height: var(--h-md);
+  padding: 0 calc(var(--space-unit) * 2.75);
+  gap: var(--s-1-5);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-compact);
+  white-space: nowrap;
+}
+.ui-button-primary {
+  box-shadow: var(--shadow-button);
+}
+.ui-button-outline {
+  box-shadow: var(--shadow-sm);
+}
+.ui-button-ghost {
+  padding: 0 var(--s-2);
+}
+.ui-input,
+.ui-sheet .ui-input {
+  height: var(--h-md);
+  padding: 0 var(--s-2-5);
+  border-radius: var(--r-sm);
+  font-size: var(--fs);
+}
+.ui-input::placeholder {
+  color: var(--text-3);
+}
+.ui-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+.ui-sheet select {
+  min-height: var(--h-md);
+}
+.react-shell {
+  font-size: var(--fs);
+  line-height: var(--lh-body);
+}
+.react-shell .shell-header {
+  padding: calc(var(--space-unit) * 4.5) var(--s-6);
+}
+.react-shell .auth-content {
+  padding: 6vh var(--s-4) var(--s-10);
+}
+.react-shell .auth-panel {
+  max-width: var(--auth-max);
+}
+.react-shell .brand {
+  font-size: var(--fs-md);
+}
+@media (max-width: 1100px) {
+  .work-shell .grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .work-shell .topsearch.ui-button {
+    width: auto;
+  }
+  .work-shell .topsearch .lbltxt,
+  .work-shell .topsearch kbd {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .work-shell,
+  .work-shell.sidebar-collapsed {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .work-shell .work-sidebar {
+    visibility: hidden;
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--side-mobile-w);
+    z-index: calc(var(--z-modal) + 1);
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-pop);
+  }
+  .work-shell.mobile-navigation-open .work-sidebar {
+    transform: none;
+    visibility: visible;
+  }
+  .work-shell .navigation-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: var(--overlay);
+    border: 0;
+    z-index: var(--z-modal);
+  }
+  .work-shell .mobile-nav-toggle {
+    display: inline-flex;
+    width: var(--h-md);
+    padding: 0;
+  }
+  .work-shell .sidebar-toggle {
+    display: none;
+  }
+  .work-shell .mobile-close {
+    display: inline-flex;
+    padding: 0;
+    width: var(--h-sm);
+  }
+  .work-shell .work-main {
+    min-height: 0;
+  }
+  .work-shell .work-topbar {
+    padding-left: var(--gutter-mobile);
+  }
+  .work-shell .page {
+    padding: var(--s-5) var(--gutter-mobile) var(--s-24);
+  }
+  .work-shell .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .work-shell .stat:nth-child(3) {
+    border-left: 0;
+  }
+  .work-shell .stat:nth-child(n + 3) {
+    border-top: 1px solid var(--border);
+  }
+  .work-shell .set {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .work-shell .set-nav {
+    display: flex;
+    overflow: auto;
+    padding: var(--s-2) var(--s-3);
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .work-shell .set-nav .gh {
+    display: none;
+  }
+  .work-shell .set-nav .sitem {
+    width: auto;
+    flex-shrink: 0;
+  }
+  .work-shell .set-in {
+    padding: var(--s-5) var(--gutter-mobile) var(--s-24);
+  }
+}
+@media (max-width: 640px) {
+  .work-shell .work-topbar {
+    height: var(--topbar-mobile-h);
+    min-height: var(--topbar-mobile-h);
+  }
+  .work-shell .work-breadcrumb {
+    display: flex;
+  }
+  .work-shell .new-popover .shell-popover-trigger > span,
+  .work-shell .new-popover .shell-popover-trigger > svg:last-child {
+    display: none;
+  }
+  .work-shell .work-content {
+    padding-bottom: var(--s-16);
+  }
+  .work-shell .work-bottomnav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 45;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: var(--s-1) var(--s-1-5) calc(var(--s-1) + env(safe-area-inset-bottom, 0));
+  }
+  .work-shell .work-bottomnav button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s-half);
+    padding: calc(var(--space-unit) * 1.25) 0;
+    min-height: 48px;
+    font-size: var(--fs-2xs);
+    color: var(--text-3);
+    border: 0;
+    background: transparent;
+    border-radius: var(--r-sm);
+  }
+  .work-shell .work-bottomnav button[aria-current] {
+    color: var(--text);
+  }
+  .work-shell .ph h1 {
+    font-size: var(--fs-xl);
+  }
+  .work-shell .ph .acts {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .work-shell.sidebar-collapsed .work-brand {
+    flex-direction: row;
+  }
+  .work-shell.sidebar-collapsed .workspace-picker {
+    flex: 1;
+  }
+  .work-shell.sidebar-collapsed .workspace-name,
+  .work-shell.sidebar-collapsed .picker-chevrons,
+  .work-shell.sidebar-collapsed .nav-text,
+  .work-shell.sidebar-collapsed .nav-count,
+  .work-shell.sidebar-collapsed .nav-caption,
+  .work-shell.sidebar-collapsed .project-state-dot,
+  .work-shell.sidebar-collapsed .project-favorite,
+  .work-shell.sidebar-collapsed .project-lock,
+  .work-shell.sidebar-collapsed .project-children,
+  .work-shell.sidebar-collapsed .account-name > svg {
+    display: flex;
+  }
+  .work-shell.sidebar-collapsed .work-sidebar nav a,
+  .work-shell.sidebar-collapsed .work-sidebar-bottom > a,
+  .work-shell.sidebar-collapsed .account-name,
+  .work-shell.sidebar-collapsed .sidebar-help .shell-popover-trigger {
+    justify-content: flex-start;
+    padding: 0 var(--s-2);
+  }
+}
+
+/* Auth mirrors the original narrow card and input-lg scale while retaining real authentication. */
+.react-shell .auth-card {
+  width: 100%;
+  max-width: var(--auth-max);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.react-shell .auth-logo {
+  display: flex;
+  justify-content: center;
+  color: var(--text);
+}
+.react-shell .auth-card h1 {
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-heading);
+  text-align: center;
+  margin: 0;
+}
+.react-shell .auth-card .intro {
+  text-align: center;
+  margin: calc(var(--s-2) * -1) 0 var(--s-1);
+}
+.react-shell .auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.react-shell .auth-card .form-field {
+  margin: 0;
+  gap: var(--s-1-5);
+  font-size: var(--fs-sm);
+}
+.react-shell .auth-card .ui-input {
+  height: var(--h-lg);
+}
+.react-shell .auth-card .login-button {
+  height: var(--h-lg);
+  min-height: var(--h-lg);
+  width: 100%;
+  font-size: var(--fs);
+  margin: 0;
+}
+.react-shell .auth-password-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.react-shell .auth-link.ui-button {
+  color: var(--accent);
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  font-size: var(--fs-sm);
+  background: transparent;
+}
+.react-shell .auth-links {
+  justify-content: center;
+  margin: 0;
+}
+.react-shell .auth-links .ui-button {
+  color: var(--accent);
+}
+.react-shell .auth-card .configuration-note,
+.react-shell .auth-card .error-message,
+.react-shell .auth-card .footnote {
+  margin: 0;
+}
+.work-shell .workspace-picker select {
+  appearance: none;
+}
+
+/* Workspace menu mirrors the original compact popup, using live guarded navigation. */
+.work-shell .workspace-picker {
+  padding: 0;
+}
+.work-shell .workspace-picker .shell-popover-trigger {
+  display: flex;
+  width: 100%;
+  padding: calc(var(--space-unit) * 1.25) var(--s-1-5);
+  height: auto;
+  min-height: 32px;
+  gap: var(--s-2);
+  justify-content: flex-start;
+  color: var(--text);
+}
+.work-shell .workspace-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  font-size: var(--fs);
+  font-weight: var(--fw-semibold);
+}
+.workspace-picker-content {
+  width: 260px;
+}
+.popup-heading {
+  padding: var(--s-1-5) var(--s-2);
+  color: var(--text-3);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-medium);
+}
+.popup-divider {
+  height: 1px;
+  background: var(--border);
+  margin: var(--s-1) calc(var(--s-1) * -1);
+}
+.shell-popover-content [role^='menuitem'] {
+  gap: var(--s-2);
+}
+.workspace-choice-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-sm);
+  flex-shrink: 0;
+  background: var(--brand-bg);
+  color: var(--brand-fg);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-semibold);
+}
+.workspace-choice-mark svg {
+  width: 20px;
+  height: 20px;
+}
+.workspace-picker-content .grow {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.work-shell .sidebar-account-popover .shell-popover-trigger {
+  display: flex;
+  width: 100%;
+  height: 36px;
+  justify-content: flex-start;
+  gap: calc(var(--space-unit) * 2.25);
+  color: var(--text);
+  font-size: var(--fs);
+  font-weight: var(--fw-medium);
+}
+.work-shell .sidebar-account-popover .shell-popover-trigger > svg {
+  margin-left: auto;
+}
+.work-shell.sidebar-collapsed .sidebar-account-popover .shell-popover-trigger {
+  padding: 0;
+  justify-content: center;
+}
+.work-shell.sidebar-collapsed .sidebar-account-popover .shell-popover-trigger > svg {
+  display: none;
+}
+.work-shell.sidebar-collapsed .workspace-picker .shell-popover-trigger {
+  justify-content: center;
+  padding: calc(var(--space-unit) * 1.25) 0;
+}
+@media (max-width: 640px) {
+  .work-shell .topsearch.ui-button {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    width: var(--h-md);
+    justify-content: center;
+  }
+  .work-shell .work-breadcrumb > button,
+  .work-shell .work-breadcrumb > span:not(.sr-only) {
+    display: none;
+  }
+  .work-shell .work-topbar .ui-button {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .work-shell .work-topbar > .account-popover {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .work-shell.sidebar-collapsed .sidebar-account-popover .shell-popover-trigger {
+    padding: 0 var(--s-2);
+    justify-content: flex-start;
+  }
+  .work-shell.sidebar-collapsed .sidebar-account-popover .shell-popover-trigger > svg {
+    display: block;
+  }
+}
+
+/* Small authored controls retain their original density alongside shadcn base controls. */
+.work-shell .seg .ui-button {
+  min-height: 0;
+  height: calc(var(--h-sm) - 2px);
+}
+.work-shell .btn-sm.ui-button,
+.work-shell .ibtn-sm.ui-button {
+  min-height: 0;
+  height: var(--h-sm);
+}
+.work-shell .ibtn-xs.ui-button {
+  min-height: 0;
+  height: var(--h-xs);
+  width: var(--h-xs);
+}
+.work-shell .work-sidebar-bottom .shell-popover-trigger {
+  justify-content: flex-start;
+}
+.work-shell.sidebar-collapsed .work-sidebar-bottom .shell-popover-trigger {
+  justify-content: center;
+}
+@media (max-width: 900px) {
+  .work-shell.sidebar-collapsed .work-sidebar-bottom .shell-popover-trigger {
+    justify-content: flex-start;
+  }
+}
+
+/* Original panel headings inherit normal tracking; only page headings tighten it. */
+.work-shell h2 {
+  letter-spacing: normal;
+}
+
+/* Shared responsive utility also applies to portal overlays, as in the original. */
+@media (max-width: 640px) {
+  .hide-m {
+    display: none !important;
+  }
+}
+
+/* Pinned shell geometry: ghost workspace/account triggers have no button border. */
+.work-shell .workspace-picker .shell-popover-trigger,
+.work-shell .account-popover .shell-popover-trigger {
+  border: 0;
+}
+.work-shell .workspace-name {
+  flex: 0 1 auto;
+}
+.work-shell .workspace-picker .brand-symbol svg {
+  color: var(--brand-fg);
+}
+.work-shell .work-sidebar .lucide,
+.work-shell .work-topbar .lucide {
+  stroke-width: 1.8;
+}
+
+.work-shell .work-sidebar-bottom .account-avatar {
+  --sz: 22px;
+}
+.work-shell .project-lock {
+  margin-left: var(--s-1);
+}
+
+/* Matched workspace task/schedule headers use the original flush-page PH rhythm. */
+.work-shell .workspace-page-heading {
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  align-items: flex-start;
+}
+.work-shell .workspace-page-heading p {
+  font-size: var(--fs);
+}
+.work-shell .workspace-page-heading .acts {
+  margin-left: auto;
+  gap: var(--s-1-5);
+}
+.work-shell .workspace-page-heading .ui-button {
+  height: var(--h-md);
+  min-height: var(--h-md);
+  padding: 0 calc(var(--space-unit) * 2.75);
+  gap: var(--s-1-5);
+  font-size: var(--fs-sm);
+}
+@media (max-width: 640px) {
+  .work-shell .workspace-page-heading .acts {
+    margin-left: 0;
+    width: 100%;
+  }
+}

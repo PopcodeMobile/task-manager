@@ -1,3 +1,4 @@
+import { Gr8rLogo } from '../design/Gr8rMark';
 import { useState, type FormEvent } from 'react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -74,7 +75,10 @@ export function AuthScreen({ t }: { t: Translate }) {
     }
   }
   return (
-    <>
+    <section className="auth-card">
+      <div className="auth-logo">
+        <Gr8rLogo />
+      </div>
       <h1>
         {recovery
           ? t('Escolha uma nova senha', 'Choose a new password')
@@ -131,9 +135,17 @@ export function AuthScreen({ t }: { t: Translate }) {
             </label>
           )}
           {(mode !== 'forgot' || recovery) && (
-            <label className="form-field">
-              {recovery ? t('Nova senha', 'New password') : t('Senha', 'Password')}
+            <div className="form-field">
+              <div className="auth-password-label">
+                <label htmlFor="auth-password">{recovery ? t('Nova senha', 'New password') : t('Senha', 'Password')}</label>
+                {mode === 'login' && !recovery && (
+                  <Button className="auth-link" variant="ghost" type="button" onClick={() => change('forgot')}>
+                    {t('Esqueceu a senha?', 'Forgot password?')}
+                  </Button>
+                )}
+              </div>
               <Input
+                id="auth-password"
                 type="password"
                 autoComplete={mode === 'signup' || recovery ? 'new-password' : 'current-password'}
                 required
@@ -142,7 +154,7 @@ export function AuthScreen({ t }: { t: Translate }) {
                 onChange={e => setPassword(e.target.value)}
                 disabled={busy || !configured}
               />
-            </label>
+            </div>
           )}
           {recovery && (
             <label className="form-field">
@@ -181,9 +193,6 @@ export function AuthScreen({ t }: { t: Translate }) {
           <Button variant="ghost" onClick={() => change('signup')}>
             {t('Criar conta', 'Create account')}
           </Button>
-          <Button variant="ghost" onClick={() => change('forgot')}>
-            {t('Esqueceu a senha?', 'Forgot password?')}
-          </Button>
         </div>
       )}
       {(mode === 'signup' || mode === 'forgot') && !recovery && (
@@ -196,6 +205,6 @@ export function AuthScreen({ t }: { t: Translate }) {
           <a href="/app-local">{t('Continuar neste dispositivo', 'Continue on this device')}</a>
         </p>
       )}
-    </>
+    </section>
   );
 }

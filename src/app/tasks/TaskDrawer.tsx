@@ -1,10 +1,14 @@
+import { Maximize2, Minimize2, Circle, CircleCheck, Star, Link, Calendar, Repeat2, Timer, FileText, Save } from 'lucide-react';
+import { TaskDescriptionEditor } from './TaskDescriptionEditor';
+import { TaskFieldControl, taskDateLabel } from './TaskFieldPopover';
+import { MemberAvatar, projectTone } from '../projects/ProjectVisual';
+import { TaskStatusIcon, TaskPriorityIcon } from './TaskVisual';
 import { taskCreateCommand, knownNonCommitting } from './task-create-command';
 import { prepareTaskAction } from './task-view-model';
 import { TaskCoreActions } from './TaskCoreActions';
 import { TaskExecutionSection } from './TaskExecutionSection';
 import type { WorkspaceRepository } from '../../workspace/repository';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { safeRichText } from '../../core/rich-text.js';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { TaskRelationSection } from './TaskRelationSection';
 import { TaskSubtasksSection } from './TaskSubtasksSection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
@@ -54,8 +58,10 @@ export function TaskDrawer({
   toggleFavorite,
   copyLink,
   graph,
+  quickEdit = false,
 }: {
   task: Task | 'new';
+  quickEdit?: boolean;
   removed?: boolean;
   projects: Project[];
   tasks: Task[];
@@ -81,6 +87,7 @@ export function TaskDrawer({
   copyLink: () => Promise<void>;
   graph: TaskGraph;
 }) {
+  const titleInput = useRef<HTMLTextAreaElement>(null);
   const discussionGuard = useRef<DraftGuard | null>(null);
   const registerDiscussion = useCallback((guard: DraftGuard | null) => {
     discussionGuard.current = guard;
@@ -88,7 +95,8 @@ export function TaskDrawer({
   const [attempt, setAttempt] = useState<{ operation: string; input: Record<string, unknown>; version?: number } | null>(null);
   const unavailable = readOnly || removed;
   const initial = task === 'new' ? null : task;
-  const [newTaskId] = useState(() => crypto.randomUUID());
+  const [newTaskId, setNewTaskId] = useState(() => crypto.randomUUID());
+  const [createMore, setCreateMore] = useState(false);
   const [title, setTitle] = useState(initial?.title ?? ''),
     [description, setDescription] = useState(initial?.description ?? ''),
     [project, setProject] = useState(initial?.projectId ?? (projectId || projects[0]?.id || '')),
@@ -110,12 +118,25 @@ export function TaskDrawer({
     [subDirty, setSubDirty] = useState(false),
     [full, setFull] = useState(prefs.openTasks === 'full');
   const current = task === 'new' ? null : task,
+    centered = !current || quickEdit,
     active = !!current?.reservation?.active && Date.parse(current.reservation.expiresAt) > Date.now();
   const version = current?.version;
   const [editVersion, setEditVersion] = useState(initial?.version);
   const saveButton = useRef<HTMLButtonElement>(null);
   const fingerprint = JSON.stringify([title, description, project, status, priority, due, assignee, start, recurrence, estimate]);
   const savedFingerprint = useRef(fingerprint);
+  useLayoutEffect(() => {
+    const input = titleInput.current;
+    if (!input) return;
+    const size = () => {
+      input.style.height = 'auto';
+      input.style.height = `${input.scrollHeight}px`;
+    };
+    size();
+    const observer = new ResizeObserver(size);
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, [title, full]);
   const dirty = fingerprint !== savedFingerprint.current;
   async function save() {
     if (subDirty) {
@@ -151,7 +172,13 @@ export function TaskDrawer({
       setEditVersion(saved.version);
       setConflict(false);
       registerDraft(null);
-      if (!current) created(saved.id);
+      if (!current && createMore) {
+        setTitle('');
+        setDescription('');
+        setNewTaskId(crypto.randomUUID());
+        savedFingerprint.current = JSON.stringify(['', '', project, status, priority, due, assignee, start, recurrence, estimate]);
+        titleInput.current?.focus();
+      } else if (!current) created(saved.id);
       return true;
     } catch (err) {
       if (knownNonCommitting(err)) setAttempt(null);
@@ -272,408 +299,638 @@ export function TaskDrawer({
         if (!open) close();
       }}
     >
-      <SheetContent className={full ? 'task-full' : undefined} closeLabel={t('Fechar painel', 'Close panel')}>
-        <div className="drawer-eyebrow">{current?.key ?? t('Nova tarefa', 'New task')}</div>
-        <SheetTitle>{current ? t('Detalhes da tarefa', 'Task details') : t('Nova tarefa', 'New task')}</SheetTitle>
-        <SheetDescription>
+      <SheetContent
+        className={`task-drawer ${centered ? 'task-modal' : full ? 'task-full' : ''}`}
+        closeLabel={t('Fechar painel', 'Close panel')}
+        onEscapeKeyDown={event => {
+          if ((event.target as HTMLElement).closest('.task-field-popover')) event.preventDefault();
+        }}
+      >
+        <div className="drawer-h task-drawer-heading">
+          {centered ? (
+            <strong>{current ? t('Editar tarefa', 'Edit task') : t('Nova tarefa', 'New task')}</strong>
+          ) : (
+            <>
+              <span className="drawer-project-label">{projects.find(p => p.id === project)?.name}</span>
+              <span className="faint">/</span>
+              <span className="drawer-eyebrow">{current?.key ?? t('Nova tarefa', 'New task')}</span>
+              <span className="sp" />
+              {current && (
+                <>
+                  <Button
+                    type="button"
+                    className="btn-sm task-complete-trigger"
+                    aria-label={current.status === 'done' ? t('Reabrir tarefa', 'Reopen task') : t('Marcar como concluída', 'Mark complete')}
+                    variant="ghost"
+                    disabled={busy || unavailable || active}
+                    onClick={() => taskAction(current.status === 'done' ? 'update_task' : 'complete_task', current.status === 'done' ? { status: 'todo' } : {})}
+                  >
+                    {current.status === 'done' ? <CircleCheck size={14} /> : <Circle size={14} />}
+                    <span className="hide-m">{current.status === 'done' ? t('Concluída', 'Completed') : t('Marcar como concluída', 'Mark complete')}</span>
+                  </Button>
+                  <Button
+                    type="submit"
+                    form="task-details-form"
+                    ref={saveButton}
+                    variant="ghost"
+                    className="ibtn ibtn-sm"
+                    aria-label={t('Salvar alterações', 'Save changes')}
+                    disabled={busy || unavailable || conflict || !project}
+                  >
+                    <Save size={15} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="ibtn ibtn-sm"
+                    aria-label={favorite ? t('Remover dos favoritos', 'Remove from favorites') : t('Adicionar aos favoritos', 'Add to favorites')}
+                    disabled={busy}
+                    onClick={() => void action(toggleFavorite)}
+                  >
+                    <Star size={15} fill={favorite ? 'currentColor' : 'none'} style={{ color: favorite ? 'var(--amber)' : undefined }} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="ibtn ibtn-sm"
+                    aria-label={t('Copiar link', 'Copy link')}
+                    onClick={() => void action(copyLink)}
+                  >
+                    <Link size={15} />
+                  </Button>
+                </>
+              )}
+              <Button
+                className="ibtn ibtn-sm"
+                variant="ghost"
+                aria-label={full ? t('Minimizar tarefa', 'Minimize task') : t('Maximizar tarefa', 'Maximize task')}
+                aria-pressed={full}
+                onClick={() => setFull(value => !value)}
+              >
+                {full ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              </Button>
+            </>
+          )}
+        </div>
+        <SheetTitle className="sr-only">{current ? t('Detalhes da tarefa', 'Task details') : t('Nova tarefa', 'New task')}</SheetTitle>
+        <SheetDescription className="sr-only">
           {t('Organize a tarefa, acompanhe o agente e registre decisões.', 'Organize the task, supervise its agent and record decisions.')}
         </SheetDescription>
-        <Button variant="ghost" aria-pressed={full} onClick={() => setFull(value => !value)}>
-          {full ? t('Minimizar tarefa', 'Minimize task') : t('Maximizar tarefa', 'Maximize task')}
-        </Button>
-        {removed && (
-          <div role="alert">
-            <p>{t('Esta tarefa foi excluída. Seu rascunho foi mantido para cópia.', 'This task was deleted. Your draft is retained for copying.')}</p>
-            <Button
-              variant="outline"
-              onClick={() => {
-                registerDraft(null);
-                close();
-              }}
-            >
-              {t('Descartar rascunhos e fechar', 'Discard drafts and close')}
-            </Button>
-          </div>
-        )}
-        {attempt && !busy && <p role="status">{t('Confirme a gravação anterior tentando salvar novamente.', 'Save again to confirm the previous write.')}</p>}
-        <form
-          onSubmit={e => {
-            e.preventDefault();
-            void save();
-          }}
-        >
-          <label className="form-field">
-            {t('Título', 'Title')}
-            <Input required maxLength={500} value={title} onChange={e => setTitle(e.target.value)} disabled={unavailable || busy || subDirty || !!attempt} />
-          </label>
-          <div className="drawer-fields">
-            <label className="form-field">
-              {t('Projeto', 'Project')}
-              <select value={project} onChange={e => setProject(e.target.value)} disabled={!!current || unavailable || busy || subDirty || !!attempt} required>
-                {projects.map(p => (
-                  <option value={p.id} key={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="form-field">
-              {t('Status', 'Status')}
-              <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)} disabled={unavailable || busy || subDirty || !!attempt}>
-                {statuses
-                  .filter(s => !current || s !== 'done' || current.status === 'done')
-                  .map(s => (
-                    <option key={s} value={s}>
-                      {statusLabel(s, t)}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label className="form-field">
-              {t('Prioridade', 'Priority')}
-              <select value={priority} onChange={e => setPriority(e.target.value as TaskPriority)} disabled={unavailable || busy || subDirty || !!attempt}>
-                {['none', 'low', 'medium', 'high', 'urgent'].map(p => (
-                  <option key={p} value={p}>
-                    {priorityLabel(p, t)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="form-field">
-              {t('Responsável', 'Assignee')}
-              <select value={assignee} onChange={e => setAssignee(e.target.value)} disabled={unavailable || busy || subDirty || !!attempt}>
-                <option value="">{t('Sem responsável', 'Unassigned')}</option>
-                {members.map(member => (
-                  <option key={member.user_id} value={member.user_id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="form-field">
-              {t('Prazo', 'Due date')}
-              <Input type="date" value={due} onChange={e => setDue(e.target.value)} disabled={unavailable || busy || subDirty || !!attempt} />
-            </label>
-            <label className="form-field">
-              {t('Início', 'Start date')}
-              <Input type="date" value={start} onChange={e => setStart(e.target.value)} disabled={unavailable || busy || subDirty || !!attempt} />
-            </label>
-            <label className="form-field">
-              {t('Recorrência', 'Recurrence')}
-              <select
-                aria-label={t('Recorrência', 'Recurrence')}
-                value={recurrence}
-                onChange={e => setRecurrence(e.target.value as Recurrence | '')}
-                disabled={unavailable || busy || subDirty || !!attempt}
+        <div className="drawer-b">
+          {removed && (
+            <div role="alert">
+              <p>{t('Esta tarefa foi excluída. Seu rascunho foi mantido para cópia.', 'This task was deleted. Your draft is retained for copying.')}</p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  registerDraft(null);
+                  close();
+                }}
               >
-                <option value="">{t('Nenhuma', 'None')}</option>
-                {(['Daily', 'Weekly', 'Every 2 weeks', 'Monthly'] as const).map(r => (
-                  <option key={r} value={r}>
-                    {
+                {t('Descartar rascunhos e fechar', 'Discard drafts and close')}
+              </Button>
+            </div>
+          )}
+          {attempt && !busy && <p role="status">{t('Confirme a gravação anterior tentando salvar novamente.', 'Save again to confirm the previous write.')}</p>}
+          {current?.status === 'done' && !centered && (
+            <div className="task-completed-banner">
+              <CircleCheck size={15} />
+              <span>
+                {t('Concluída.', 'Completed.')}{' '}
+                <Button variant="ghost" disabled={busy || unavailable || active} onClick={() => taskAction('update_task', { status: 'todo' })}>
+                  {t('Reabrir', 'Reopen')}
+                </Button>
+              </span>
+            </div>
+          )}
+          <form
+            id="task-details-form"
+            className={centered ? 'task-modal-form' : undefined}
+            onSubmit={e => {
+              e.preventDefault();
+              void save();
+            }}
+          >
+            <label className="form-field task-drawer-title">
+              <span className="sr-only">{t('Título', 'Title')}</span>
+              <textarea
+                aria-label={t('Título', 'Title')}
+                className={centered ? 'ttl-edit input input-lg' : 'ttl-edit'}
+                placeholder={t('Nome da tarefa', 'Task name')}
+                required
+                ref={titleInput}
+                rows={1}
+                maxLength={500}
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                disabled={unavailable || busy || subDirty || !!attempt}
+              />
+            </label>
+            {centered && <TaskDescriptionEditor value={description} onChange={setDescription} disabled={unavailable || busy || subDirty || !!attempt} t={t} />}
+            <div className="drawer-fields kv">
+              <div className="task-property">
+                <span>
+                  <Circle size={14} />
+                  {t('Status', 'Status')}
+                </span>
+                <TaskFieldControl
+                  triggerLabel={t('Status', 'Status')}
+                  menuLabel={t('Status', 'Status')}
+                  fieldId="drawer:status"
+                  value={status}
+                  disabled={unavailable || busy || subDirty || !!attempt}
+                  onChange={value => setStatus(value as TaskStatus)}
+                  t={t}
+                  choices={statuses
+                    .filter(s => !current || s !== 'done' || current.status === 'done')
+                    .map((id, i) => ({ id, label: statusLabel(id, t), icon: <TaskStatusIcon status={id} />, shortcut: String(i + 1) }))}
+                >
+                  <TaskStatusIcon status={status} />
+                  <span>{statusLabel(status, t)}</span>
+                </TaskFieldControl>
+              </div>
+              <div className="task-property">
+                <span>
+                  <TaskPriorityIcon priority={priority} />
+                  {t('Prioridade', 'Priority')}
+                </span>
+                <TaskFieldControl
+                  triggerLabel={t('Prioridade', 'Priority')}
+                  menuLabel={t('Prioridade', 'Priority')}
+                  fieldId="drawer:priority"
+                  value={priority}
+                  disabled={unavailable || busy || subDirty || !!attempt}
+                  onChange={value => setPriority(value as TaskPriority)}
+                  t={t}
+                  choices={(['urgent', 'high', 'medium', 'low', 'none'] as const).map(id => ({
+                    id,
+                    label: priorityLabel(id, t),
+                    icon: <TaskPriorityIcon priority={id} />,
+                  }))}
+                >
+                  <TaskPriorityIcon priority={priority} />
+                  <span>{priorityLabel(priority, t)}</span>
+                </TaskFieldControl>
+              </div>
+              <div className="task-property">
+                <span>
+                  <MemberAvatar />
+                  {t('Responsável', 'Assignee')}
+                </span>
+                <TaskFieldControl
+                  triggerLabel={t('Responsável', 'Assignee')}
+                  menuLabel={t('Responsável', 'Assignee')}
+                  fieldId="drawer:assignee"
+                  value={assignee}
+                  disabled={unavailable || busy || subDirty || !!attempt}
+                  onChange={setAssignee}
+                  searchLabel={t('Buscar responsáveis', 'Search assignees')}
+                  t={t}
+                  choices={[
+                    { id: '', label: t('Sem responsável', 'Unassigned'), icon: <MemberAvatar /> },
+                    ...members.map(member => ({ id: member.user_id, label: member.name, icon: <MemberAvatar member={member} /> })),
+                    ...(assignee && !members.some(m => m.user_id === assignee) ? [{ id: assignee, label: assignee }] : []),
+                  ]}
+                >
+                  <MemberAvatar member={members.find(member => member.user_id === assignee)} />
+                  <span>{members.find(member => member.user_id === assignee)?.name ?? (assignee || t('Sem responsável', 'Unassigned'))}</span>
+                </TaskFieldControl>
+              </div>
+              <div className="task-property">
+                <span>
+                  <Calendar size={14} />
+                  {t('Prazo', 'Due date')}
+                </span>
+                <TaskFieldControl
+                  triggerLabel={t('Prazo', 'Due date')}
+                  menuLabel={t('Prazo', 'Due date')}
+                  fieldId="drawer:due"
+                  date
+                  value={due}
+                  disabled={unavailable || busy || subDirty || !!attempt}
+                  onChange={setDue}
+                  prefs={prefs}
+                  t={t}
+                >
+                  <Calendar size={13} />
+                  <span>{taskDateLabel(due, t, prefs)}</span>
+                </TaskFieldControl>
+              </div>
+              <div className="task-property">
+                <span>
+                  <Calendar size={14} />
+                  {t('Início', 'Start date')}
+                </span>
+                <TaskFieldControl
+                  triggerLabel={t('Início', 'Start date')}
+                  menuLabel={t('Início', 'Start date')}
+                  fieldId="drawer:start"
+                  date
+                  value={start}
+                  disabled={unavailable || busy || subDirty || !!attempt}
+                  onChange={setStart}
+                  prefs={prefs}
+                  t={t}
+                >
+                  <Calendar size={13} />
+                  <span>{taskDateLabel(start, t, prefs)}</span>
+                </TaskFieldControl>
+              </div>
+              <div className="task-property">
+                <span>
+                  <FileText size={14} />
+                  {t('Projeto', 'Project')}
+                </span>
+                <TaskFieldControl
+                  triggerLabel={t('Projeto', 'Project')}
+                  menuLabel={t('Projeto', 'Project')}
+                  fieldId="drawer:project"
+                  value={project}
+                  disabled={!!current || unavailable || busy || subDirty || !!attempt}
+                  onChange={setProject}
+                  searchLabel={t('Buscar projetos', 'Search projects')}
+                  t={t}
+                  choices={projects.map(p => ({
+                    id: p.id,
+                    label: p.name,
+                    icon: <span className="pdot" style={{ '--c': projectTone(p) } as React.CSSProperties} />,
+                  }))}
+                >
+                  <span
+                    className="pdot"
+                    style={
+                      {
+                        '--c': projects.find(p => p.id === project) ? projectTone(projects.find(p => p.id === project)!) : 'var(--accent)',
+                      } as React.CSSProperties
+                    }
+                  />
+                  <span>{projects.find(p => p.id === project)?.name ?? t('Selecione um projeto', 'Select a project')}</span>
+                </TaskFieldControl>
+              </div>
+              <div className="task-property">
+                <span>
+                  <Repeat2 size={14} />
+                  {t('Recorrência', 'Recurrence')}
+                </span>
+                <TaskFieldControl
+                  triggerLabel={t('Recorrência', 'Recurrence')}
+                  menuLabel={t('Recorrência', 'Recurrence')}
+                  fieldId="drawer:recurrence"
+                  value={recurrence}
+                  disabled={unavailable || busy || subDirty || !!attempt}
+                  onChange={value => setRecurrence(value as Recurrence | '')}
+                  t={t}
+                  choices={[
+                    { id: '', label: t('Não se repete', 'Does not repeat'), icon: <Repeat2 size={14} /> },
+                    ...(['Daily', 'Weekly', 'Every 2 weeks', 'Monthly'] as const).map(id => ({
+                      id,
+                      label: {
+                        Daily: t('Diária', 'Daily'),
+                        Weekly: t('Semanal', 'Weekly'),
+                        'Every 2 weeks': t('A cada 2 semanas', 'Every 2 weeks'),
+                        Monthly: t('Mensal', 'Monthly'),
+                      }[id],
+                      icon: <Repeat2 size={14} />,
+                    })),
+                  ]}
+                >
+                  <Repeat2 size={13} />
+                  <span>
+                    {(
                       {
                         Daily: t('Diária', 'Daily'),
                         Weekly: t('Semanal', 'Weekly'),
                         'Every 2 weeks': t('A cada 2 semanas', 'Every 2 weeks'),
                         Monthly: t('Mensal', 'Monthly'),
-                      }[r]
-                    }
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="form-field">
-              {t('Estimativa', 'Estimate')}
-              <Input value={estimate} maxLength={120} onChange={e => setEstimate(e.target.value)} disabled={unavailable || busy || subDirty || !!attempt} />
-            </label>
-          </div>
-          <label className="form-field">
-            {t('Descrição', 'Description')}
-            <textarea
-              aria-label={t('Descrição', 'Description')}
-              value={description}
-              maxLength={100000}
-              onChange={e => setDescription(e.target.value)}
-              disabled={unavailable || busy || subDirty || !!attempt}
-            />
-          </label>
-          {description && <div className="rich-content" dangerouslySetInnerHTML={{ __html: safeRichText(description) }} />}
-          <Button ref={saveButton} type="submit" disabled={busy || unavailable || conflict || !project}>
-            {current ? t('Salvar alterações', 'Save changes') : t('Criar tarefa', 'Create task')}
-          </Button>
-        </form>
-        {error && (
-          <div>
-            <p role="alert" className="error-message">
-              {error}
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => {
-                const blob = new Blob(
-                  [
-                    JSON.stringify(
-                      {
-                        workspaceId: repo.workspaceId,
-                        exportedAt: new Date().toISOString(),
-                        task: {
-                          id: current?.id ?? newTaskId,
-                          version: editVersion,
-                          title,
-                          description,
-                          projectId: project,
-                          status,
-                          priority,
-                          assigneeUserId: assignee || null,
-                          dueDate: due || null,
-                          startDate: start || null,
-                          recurrence: recurrence || null,
-                          estimate,
-                        },
-                      },
-                      null,
-                      2,
-                    ),
-                  ],
-                  { type: 'application/json' },
-                );
-                const url = URL.createObjectURL(blob),
-                  link = document.createElement('a');
-                link.href = url;
-                link.download = 'task-draft.json';
-                link.click();
-                setTimeout(() => URL.revokeObjectURL(url), 1000);
-              }}
-            >
-              {t('Exportar rascunho da tarefa', 'Export task draft')}
-            </Button>
-          </div>
-        )}
-        {conflict && (
-          <Button
-            variant="outline"
-            disabled={busy}
-            onClick={() =>
-              void action(async () => {
-                const latest = await repo.query<{ data: Task }>('get_task', { id: current!.id }, true);
-                setTitle(latest.data.title);
-                setDescription(latest.data.description);
-                setStatus(latest.data.status);
-                setPriority(latest.data.priority);
-                setDue(latest.data.dueDate ?? '');
-                setStart(latest.data.startDate ?? '');
-                setRecurrence(latest.data.recurrence ?? '');
-                setEstimate(String(latest.data.legacyMetadata.estimate ?? ''));
-                setAssignee(latest.data.assigneeUserId ?? '');
-                setEditVersion(latest.data.version);
-                savedFingerprint.current = JSON.stringify([
-                  latest.data.title,
-                  latest.data.description,
-                  latest.data.projectId,
-                  latest.data.status,
-                  latest.data.priority,
-                  latest.data.dueDate ?? '',
-                  latest.data.assigneeUserId ?? '',
-                  latest.data.startDate ?? '',
-                  latest.data.recurrence ?? '',
-                  String(latest.data.legacyMetadata.estimate ?? ''),
-                ]);
-                await refresh();
-                setConflict(false);
-              })
-            }
-          >
-            {t('Recarregar versão e descartar rascunho', 'Reload version and discard draft')}
-          </Button>
-        )}
-        {current && (
-          <>
-            <TaskExecutionSection
-              current={current}
-              active={active}
-              agent={agent}
-              agents={agents}
-              setAgent={setAgent}
-              readOnly={unavailable}
-              busy={busy}
-              t={t}
-              onAssign={() => taskAction('intervene_task', { action: 'reassign', executorAgentId: agent })}
-              onResume={() => {
-                if (requireSaved()) setConfirm(true);
-              }}
-              onComplete={() => taskAction('complete_task')}
-            />
-            <TaskCoreActions task={current} projects={projects} t={t} disabled={busy || unavailable || active} run={taskAction} />
-            <div className="button-row">
-              <Button variant="outline" disabled={busy} onClick={() => void action(toggleFavorite)}>
-                {favorite ? t('Remover dos favoritos', 'Remove from favorites') : t('Adicionar aos favoritos', 'Add to favorites')}
-              </Button>
-              <Button variant="ghost" onClick={() => void action(copyLink)}>
-                {t('Copiar link', 'Copy link')}
-              </Button>
+                      } as Record<string, string>
+                    )[recurrence] || t('Não se repete', 'Does not repeat')}
+                  </span>
+                </TaskFieldControl>
+              </div>
+              <label className="task-property">
+                <span>
+                  <Timer size={14} />
+                  {t('Estimativa', 'Estimate')}
+                </span>
+                <Input
+                  value={estimate}
+                  placeholder={t('Adicionar estimativa', 'Add estimate')}
+                  maxLength={120}
+                  onChange={e => setEstimate(e.target.value)}
+                  disabled={unavailable || busy || subDirty || !!attempt}
+                />
+              </label>
+              {current && !centered && (
+                <TaskRelationSection
+                  task={current}
+                  tasks={tasks}
+                  labels={details.labels}
+                  links={details.links}
+                  dependencies={details.dependencies}
+                  execute={execute}
+                  action={detailAction}
+                  disabled={busy || unavailable || active || details.loading || !!details.error}
+                  t={t}
+                  open={created}
+                />
+              )}
             </div>
-            {details.error && (
-              <p role="alert">
-                {details.error}
-                <Button variant="outline" onClick={details.retry}>
-                  {t('Tentar novamente', 'Try again')}
-                </Button>
+            {!centered && <TaskDescriptionEditor value={description} onChange={setDescription} disabled={unavailable || busy || subDirty || !!attempt} t={t} />}
+            {centered && (
+              <>
+                <section className="task-modal-section">
+                  <span>{t('Subtarefas', 'Subtasks')}</span>
+                  <p className="permission-note">{t('Salve a tarefa para gerenciar subtarefas.', 'Save the task to manage subtasks.')}</p>
+                </section>
+                <section className="task-modal-section">
+                  <span>{t('Anexos', 'Attachments')}</span>
+                  <p className="task-modal-attachments">
+                    {t(
+                      'Salve a tarefa para vincular metadados de arquivos. Nenhum conteúdo é enviado.',
+                      'Save the task to link file metadata. No content is uploaded.',
+                    )}
+                  </p>
+                </section>
+              </>
+            )}
+          </form>
+          {error && (
+            <div>
+              <p role="alert" className="error-message">
+                {error}
               </p>
-            )}
-            <TaskRelationSection
-              task={current}
-              tasks={tasks}
-              labels={details.labels}
-              links={details.links}
-              dependencies={details.dependencies}
-              execute={execute}
-              action={detailAction}
-              disabled={busy || unavailable || active || details.loading || !!details.error}
-              t={t}
-              open={created}
-            />
-            <TaskSubtasksSection
-              task={current}
-              subtasks={details.subtasks}
-              members={members}
-              execute={execute}
-              action={(run, parent) => detailAction(run, parent, true)}
-              registerDirty={setSubDirty}
-              canOpen={requireSaved}
-              disabled={busy || unavailable || active || details.loading || !!details.error}
-              t={t}
-              open={id => {
-                registerDraft(null);
-                created(id);
-              }}
-            />
-            <TaskAttachmentsSection
-              task={current}
-              files={details.files}
-              attachments={details.attachments}
-              execute={execute}
-              action={detailAction}
-              disabled={busy || unavailable || active || details.loading || !!details.error}
-              t={t}
-            />
-            <TaskDiscussionSection
-              registerDraft={registerDiscussion}
-              task={current}
-              more={details.more}
-              loadMore={details.loadMore}
-              comments={details.comments}
-              reactions={details.reactions}
-              events={details.events}
-              history={details.history}
-              members={members}
-              agents={agents}
-              actorId={details.actorId}
-              admin={repo.mode === 'cloud' && admin}
-              execute={execute}
-              action={detailAction}
-              disabled={busy || unavailable || details.loading || !!details.error}
-              t={t}
-            />
-            {!!sharedFiles.length && (
-              <section className="drawer-section">
-                <p>{t('Desvincule os arquivos nas tarefas relacionadas antes de excluir:', 'Unlink files in related tasks before deleting:')}</p>
-                {sharedFiles.map(link => (
-                  <Button key={`${link.taskId}:${link.fileId}`} variant="ghost" onClick={() => created(link.taskId)}>
-                    {tasks.find(task => task.id === link.taskId)?.title ?? link.taskId}
-                  </Button>
-                ))}
-              </section>
-            )}
-            <section className="drawer-section">
               <Button
-                variant="destructive"
-                disabled={busy || unavailable || active}
+                variant="outline"
                 onClick={() => {
-                  if (requireSaved()) {
-                    if (prefs.confirmDel === false && !incoming.length && !sharedFiles.length && !details.loading && !details.error)
-                      void action(async () => {
-                        await execute('delete_task', { id: current.id }, version);
-                        registerDraft(null);
-                        close();
-                      });
-                    else setDeleteConfirm(true);
-                  }
+                  const blob = new Blob(
+                    [
+                      JSON.stringify(
+                        {
+                          workspaceId: repo.workspaceId,
+                          exportedAt: new Date().toISOString(),
+                          task: {
+                            id: current?.id ?? newTaskId,
+                            version: editVersion,
+                            title,
+                            description,
+                            projectId: project,
+                            status,
+                            priority,
+                            assigneeUserId: assignee || null,
+                            dueDate: due || null,
+                            startDate: start || null,
+                            recurrence: recurrence || null,
+                            estimate,
+                          },
+                        },
+                        null,
+                        2,
+                      ),
+                    ],
+                    { type: 'application/json' },
+                  );
+                  const url = URL.createObjectURL(blob),
+                    link = document.createElement('a');
+                  link.href = url;
+                  link.download = 'task-draft.json';
+                  link.click();
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
                 }}
               >
-                {t('Excluir tarefa', 'Delete task')}
+                {t('Exportar rascunho da tarefa', 'Export task draft')}
               </Button>
-              <p className="permission-note">
-                {t(
-                  'Relações com tarefas que continuam no workspace precisam ser desvinculadas antes da exclusão.',
-                  'Relations with tasks remaining in the workspace must be unlinked before deletion.',
-                )}
-              </p>
-            </section>
-            <AlertDialog open={deleteConfirm} onOpenChange={setDeleteConfirm}>
-              <AlertDialogContent>
-                <AlertDialogTitle>{t('Excluir esta tarefa?', 'Delete this task?')}</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {incoming.length
-                    ? t(
-                        'Abra as tarefas relacionadas e desvincule as dependências antes de excluir.',
-                        'Open the related tasks and unlink their dependencies before deleting.',
-                      )
-                    : t(
-                        'A tarefa e seus comentários serão excluídos. Esta ação não pode ser desfeita.',
-                        'The task and its comments will be deleted. This action cannot be undone.',
-                      )}
-                </AlertDialogDescription>
-                <div className="button-row">
-                  <AlertDialogCancel asChild>
-                    <Button variant="outline">{t('Cancelar', 'Cancel')}</Button>
-                  </AlertDialogCancel>
-                  <AlertDialogAction asChild>
-                    <Button
-                      variant="destructive"
-                      disabled={!!incoming.length || !!sharedFiles.length || details.loading || !!details.error}
-                      onClick={() =>
+            </div>
+          )}
+          {conflict && (
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() =>
+                void action(async () => {
+                  const latest = await repo.query<{ data: Task }>('get_task', { id: current!.id }, true);
+                  setTitle(latest.data.title);
+                  setDescription(latest.data.description);
+                  setStatus(latest.data.status);
+                  setPriority(latest.data.priority);
+                  setDue(latest.data.dueDate ?? '');
+                  setStart(latest.data.startDate ?? '');
+                  setRecurrence(latest.data.recurrence ?? '');
+                  setEstimate(String(latest.data.legacyMetadata.estimate ?? ''));
+                  setAssignee(latest.data.assigneeUserId ?? '');
+                  setEditVersion(latest.data.version);
+                  savedFingerprint.current = JSON.stringify([
+                    latest.data.title,
+                    latest.data.description,
+                    latest.data.projectId,
+                    latest.data.status,
+                    latest.data.priority,
+                    latest.data.dueDate ?? '',
+                    latest.data.assigneeUserId ?? '',
+                    latest.data.startDate ?? '',
+                    latest.data.recurrence ?? '',
+                    String(latest.data.legacyMetadata.estimate ?? ''),
+                  ]);
+                  await refresh();
+                  setConflict(false);
+                })
+              }
+            >
+              {t('Recarregar versão e descartar rascunho', 'Reload version and discard draft')}
+            </Button>
+          )}
+          {current && !centered && (
+            <>
+              {details.error && (
+                <p role="alert">
+                  {details.error}
+                  <Button variant="outline" onClick={details.retry}>
+                    {t('Tentar novamente', 'Try again')}
+                  </Button>
+                </p>
+              )}
+              <TaskSubtasksSection
+                task={current}
+                subtasks={details.subtasks}
+                members={members}
+                execute={execute}
+                action={(run, parent) => detailAction(run, parent, true)}
+                registerDirty={setSubDirty}
+                canOpen={requireSaved}
+                disabled={busy || unavailable || active || details.loading || !!details.error}
+                t={t}
+                open={id => {
+                  registerDraft(null);
+                  created(id);
+                }}
+              />
+              <TaskAttachmentsSection
+                task={current}
+                files={details.files}
+                attachments={details.attachments}
+                execute={execute}
+                action={detailAction}
+                disabled={busy || unavailable || active || details.loading || !!details.error}
+                t={t}
+              />
+              <TaskDiscussionSection
+                registerDraft={registerDiscussion}
+                task={current}
+                more={details.more}
+                loadMore={details.loadMore}
+                comments={details.comments}
+                reactions={details.reactions}
+                events={details.events}
+                history={details.history}
+                members={members}
+                agents={agents}
+                actorId={details.actorId}
+                admin={repo.mode === 'cloud' && admin}
+                execute={execute}
+                action={detailAction}
+                disabled={busy || unavailable || details.loading || !!details.error}
+                t={t}
+              />
+              <details className="drawer-extra-actions" open={active || !!current.executorAgentId || undefined}>
+                <summary>
+                  {t('Ações da tarefa e agente', 'Task actions and agent')}
+                  {active ? ` · ${t('Execução reservada', 'Execution reserved')}` : ''}
+                </summary>{' '}
+                <TaskExecutionSection
+                  current={current}
+                  active={active}
+                  agent={agent}
+                  agents={agents}
+                  setAgent={setAgent}
+                  readOnly={unavailable}
+                  busy={busy}
+                  t={t}
+                  onAssign={() => taskAction('intervene_task', { action: 'reassign', executorAgentId: agent })}
+                  onResume={() => {
+                    if (requireSaved()) setConfirm(true);
+                  }}
+                  onComplete={() => taskAction('complete_task')}
+                />
+                <TaskCoreActions task={current} projects={projects} t={t} disabled={busy || unavailable || active} run={taskAction} />
+              </details>
+              {!!sharedFiles.length && (
+                <section className="drawer-section">
+                  <p>{t('Desvincule os arquivos nas tarefas relacionadas antes de excluir:', 'Unlink files in related tasks before deleting:')}</p>
+                  {sharedFiles.map(link => (
+                    <Button key={`${link.taskId}:${link.fileId}`} variant="ghost" onClick={() => created(link.taskId)}>
+                      {tasks.find(task => task.id === link.taskId)?.title ?? link.taskId}
+                    </Button>
+                  ))}
+                </section>
+              )}
+              <section className="drawer-section">
+                <Button
+                  variant="destructive"
+                  disabled={busy || unavailable || active}
+                  onClick={() => {
+                    if (requireSaved()) {
+                      if (prefs.confirmDel === false && !incoming.length && !sharedFiles.length && !details.loading && !details.error)
                         void action(async () => {
                           await execute('delete_task', { id: current.id }, version);
                           registerDraft(null);
                           close();
-                        })
-                      }
-                    >
-                      {t('Confirmar exclusão', 'Confirm deletion')}
-                    </Button>
-                  </AlertDialogAction>
-                </div>
-              </AlertDialogContent>
-            </AlertDialog>
-            <AlertDialog open={confirm} onOpenChange={setConfirm}>
-              <AlertDialogContent>
-                <AlertDialogTitle>{t('Retomar controle humano?', 'Resume human control?')}</AlertDialogTitle>
-                <AlertDialogDescription>
+                        });
+                      else setDeleteConfirm(true);
+                    }
+                  }}
+                >
+                  {t('Excluir tarefa', 'Delete task')}
+                </Button>
+                <p className="permission-note">
                   {t(
-                    'A reserva do agente será encerrada. A tarefa volta ao controle humano e a intervenção fica registrada na atividade.',
-                    'The agent reservation will end. The task returns to human control and the intervention is recorded in activity.',
+                    'Relações com tarefas que continuam no workspace precisam ser desvinculadas antes da exclusão.',
+                    'Relations with tasks remaining in the workspace must be unlinked before deletion.',
                   )}
-                </AlertDialogDescription>
-                <div className="button-row">
-                  <AlertDialogCancel asChild>
-                    <Button variant="outline">{t('Cancelar', 'Cancel')}</Button>
-                  </AlertDialogCancel>
-                  <AlertDialogAction asChild>
-                    <Button
-                      onClick={() =>
-                        void action(async () => {
-                          if (!requireSaved()) return;
-                          await execute('intervene_task', { id: current.id, action: 'release' }, editVersion);
-                          setAgent('');
-                        })
-                      }
-                    >
-                      {t('Confirmar retomada', 'Confirm resume')}
-                    </Button>
-                  </AlertDialogAction>
-                </div>
-              </AlertDialogContent>
-            </AlertDialog>
-          </>
+                </p>
+              </section>
+              <AlertDialog open={deleteConfirm} onOpenChange={setDeleteConfirm}>
+                <AlertDialogContent>
+                  <AlertDialogTitle>{t('Excluir esta tarefa?', 'Delete this task?')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {incoming.length
+                      ? t(
+                          'Abra as tarefas relacionadas e desvincule as dependências antes de excluir.',
+                          'Open the related tasks and unlink their dependencies before deleting.',
+                        )
+                      : t(
+                          'A tarefa e seus comentários serão excluídos. Esta ação não pode ser desfeita.',
+                          'The task and its comments will be deleted. This action cannot be undone.',
+                        )}
+                  </AlertDialogDescription>
+                  <div className="button-row">
+                    <AlertDialogCancel asChild>
+                      <Button variant="outline">{t('Cancelar', 'Cancel')}</Button>
+                    </AlertDialogCancel>
+                    <AlertDialogAction asChild>
+                      <Button
+                        variant="destructive"
+                        disabled={!!incoming.length || !!sharedFiles.length || details.loading || !!details.error}
+                        onClick={() =>
+                          void action(async () => {
+                            await execute('delete_task', { id: current.id }, version);
+                            registerDraft(null);
+                            close();
+                          })
+                        }
+                      >
+                        {t('Confirmar exclusão', 'Confirm deletion')}
+                      </Button>
+                    </AlertDialogAction>
+                  </div>
+                </AlertDialogContent>
+              </AlertDialog>
+              <AlertDialog open={confirm} onOpenChange={setConfirm}>
+                <AlertDialogContent>
+                  <AlertDialogTitle>{t('Retomar controle humano?', 'Resume human control?')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t(
+                      'A reserva do agente será encerrada. A tarefa volta ao controle humano e a intervenção fica registrada na atividade.',
+                      'The agent reservation will end. The task returns to human control and the intervention is recorded in activity.',
+                    )}
+                  </AlertDialogDescription>
+                  <div className="button-row">
+                    <AlertDialogCancel asChild>
+                      <Button variant="outline">{t('Cancelar', 'Cancel')}</Button>
+                    </AlertDialogCancel>
+                    <AlertDialogAction asChild>
+                      <Button
+                        onClick={() =>
+                          void action(async () => {
+                            if (!requireSaved()) return;
+                            await execute('intervene_task', { id: current.id, action: 'release' }, editVersion);
+                            setAgent('');
+                          })
+                        }
+                      >
+                        {t('Confirmar retomada', 'Confirm resume')}
+                      </Button>
+                    </AlertDialogAction>
+                  </div>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
+        </div>
+        {centered && (
+          <div className="task-modal-footer">
+            {!current && (
+              <label className="row">
+                <input type="checkbox" checked={createMore} disabled={busy || !!attempt} onChange={event => setCreateMore(event.target.checked)} />
+                {t('Criar outra', 'Create more')}
+              </label>
+            )}
+            <span className="sp" />
+            <Button variant="outline" disabled={busy} onClick={close}>
+              {t('Cancelar', 'Cancel')}
+            </Button>
+            <Button ref={saveButton} type="submit" form="task-details-form" disabled={busy || unavailable || conflict || !project}>
+              {current ? t('Salvar alterações', 'Save changes') : t('Criar tarefa', 'Create task')}
+            </Button>
+          </div>
         )}
       </SheetContent>
     </Sheet>

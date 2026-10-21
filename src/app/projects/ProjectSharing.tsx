@@ -7,10 +7,13 @@ import type { Execute } from './ProjectsPage';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
+import { MemberAvatar } from './ProjectVisual';
 import { projectError } from './ProjectEditor';
+import { Building2, Link2, Lock } from 'lucide-react';
 const permissions = ['Can view', 'Can comment', 'Can edit', 'Full access'];
 export function ProjectSharing({
   project,
+  projectUrl,
   snapshot,
   repo,
   execute,
@@ -20,6 +23,7 @@ export function ProjectSharing({
   readOnly,
 }: {
   project: Project;
+  projectUrl: string;
   snapshot: Snapshot;
   repo: WorkspaceRepository;
   execute: Execute;
@@ -70,38 +74,89 @@ export function ProjectSharing({
       }}
     >
       <SheetContent
+        className="project-modal project-sharing-modal"
         closeLabel={t('Fechar painel', 'Close panel')}
         onCloseAutoFocus={e => {
           e.preventDefault();
           if (!repo.controller.signal.aborted && trigger.current?.isConnected) trigger.current.focus();
         }}
       >
-        <SheetTitle>{t('Membros do projeto', 'Project members')}</SheetTitle>
-        <SheetDescription>
-          {repo.mode === 'local'
-            ? t(
-                'Demonstração local. Nenhum e-mail é enviado; permissões e acesso ficam neste dispositivo.',
-                'Local demonstration. No email is sent; permissions and access stay on this device.',
-              )
-            : t(
-                'Selecione pessoas que já pertencem à organização. Esta lista não altera permissões de acesso; convites e privacidade por projeto não estão disponíveis.',
-                'Select existing workspace members. This list does not change access permissions; invitations and project privacy are unavailable.',
-              )}
-        </SheetDescription>
-        <ul className="project-members-list">
-          {snapshot.members
-            .filter(m => members.includes(m.user_id))
-            .map(member => (
-              <li key={member.user_id}>
-                <span>
-                  {member.name}
-                  <small>{member.email}</small>
-                </span>
-                {member.user_id === project.leadUserId ? (
-                  <small>{t('Líder', 'Lead')}</small>
-                ) : (
-                  <>
-                    {repo.mode === 'local' && (
+        <div className="modal-h">
+          <SheetTitle className="sr-only">{t('Membros do projeto', 'Project members')}</SheetTitle>
+          <div className="sharing-title" aria-hidden="true">
+            {t('Compartilhar', 'Share')} “{project.name}”
+          </div>
+        </div>
+        <div className="modal-b">
+          {repo.mode === 'local' && (
+            <form
+              className="sharing-invite"
+              onSubmit={e => {
+                e.preventDefault();
+                void run('local_project_sharing', { email: email.trim(), permission });
+              }}
+            >
+              <label className="sharing-email">
+                <span className="sr-only">{t('E-mail da demonstração', 'Demo email')}</span>
+                <Input
+                  type="email"
+                  placeholder={t('Adicionar pessoa por e-mail', 'Add people by email')}
+                  required
+                  maxLength={254}
+                  value={email}
+                  disabled={busy || readOnly}
+                  onChange={e => setEmail(e.target.value)}
+                />
+              </label>
+              <select
+                aria-label={t('Permissão local', 'Local permission')}
+                value={permission}
+                disabled={busy || readOnly}
+                onChange={e => setPermission(e.target.value)}
+              >
+                {permissions.map(p => (
+                  <option key={p} value={p}>
+                    {label(p)}
+                  </option>
+                ))}
+              </select>
+              <Button aria-label={t('Adicionar convite local', 'Add local invitation')} disabled={busy || readOnly} type="submit">
+                {t('Convidar', 'Invite')}
+              </Button>
+            </form>
+          )}
+          <SheetDescription className="sharing-scope">
+            {repo.mode === 'local'
+              ? t(
+                  'Demonstração local. Nenhum e-mail é enviado; permissões e acesso ficam neste dispositivo.',
+                  'Local demonstration. No email is sent; permissions and access stay on this device.',
+                )
+              : t(
+                  'Selecione membros existentes. Esta lista não altera permissões; convites e privacidade por projeto não estão disponíveis.',
+                  'Select existing members. This list does not change permissions; invitations and project privacy are unavailable.',
+                )}
+          </SheetDescription>
+          <div>
+            <div className="sharing-eyebrow">{t('Pessoas com acesso', 'People with access')}</div>
+            <ul className="project-members-list">
+              {snapshot.members
+                .filter(m => members.includes(m.user_id))
+                .map(member => (
+                  <li key={member.user_id}>
+                    <MemberAvatar member={member} size="md" />
+                    <span className="sharing-person">
+                      <span>
+                        {member.name}
+                        {member.user_id === snapshot.actorId && <span className="sharing-you"> {t('(você)', '(you)')}</span>}
+                      </span>
+                      <small>
+                        {member.email}
+                        {member.user_id === project.leadUserId && ' · ' + t('Líder do projeto', 'Project lead')}
+                      </small>
+                    </span>
+                    {member.user_id === project.leadUserId ? (
+                      <small className="sharing-lead">{t('Acesso total', 'Full access')}</small>
+                    ) : repo.mode === 'local' ? (
                       <select
                         disabled={busy || readOnly}
                         aria-label={t('Permissão de ', 'Permission for ') + member.name}
@@ -109,87 +164,106 @@ export function ProjectSharing({
                           (project.legacyMetadata.perms as Record<string, string> | undefined)?.[member.user_id] ??
                             (member.role === 'guest' ? 'Can comment' : 'Can edit'),
                         )}
-                        onChange={e => void run('local_project_sharing', { userId: member.user_id, permission: e.target.value })}
+                        onChange={e =>
+                          void run(e.target.value === '__remove' ? 'remove_project_member' : 'local_project_sharing', {
+                            userId: member.user_id,
+                            ...(e.target.value === '__remove' ? {} : { permission: e.target.value }),
+                          })
+                        }
                       >
                         {permissions.map(p => (
                           <option key={p} value={p}>
                             {label(p)}
                           </option>
                         ))}
+                        <option value="__remove">{t('Remover acesso', 'Remove access')}</option>
                       </select>
+                    ) : (
+                      <Button variant="ghost" disabled={busy || readOnly} onClick={() => void run('remove_project_member', { userId: member.user_id })}>
+                        {t('Remover', 'Remove')}
+                      </Button>
                     )}
-                    <Button variant="ghost" disabled={busy || readOnly} onClick={() => void run('remove_project_member', { userId: member.user_id })}>
-                      {t('Remover', 'Remove')}
-                    </Button>
-                  </>
-                )}
-              </li>
-            ))}
-        </ul>
-        <label className="form-field">
-          {t('Adicionar membro existente', 'Add existing member')}
-          <select
-            value=""
-            disabled={busy || readOnly}
-            onChange={e => {
-              if (e.target.value) void run('set_project_member', { userId: e.target.value });
-            }}
-          >
-            <option value="">{t('Selecionar pessoa', 'Select person')}</option>
-            {snapshot.members
-              .filter(m => !members.includes(m.user_id))
-              .map(m => (
-                <option key={m.user_id} value={m.user_id}>
-                  {m.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        {repo.mode === 'local' && (
-          <>
-            <form
-              onSubmit={e => {
-                e.preventDefault();
-                void run('local_project_sharing', { email: email.trim(), permission });
+                  </li>
+                ))}
+            </ul>
+          </div>
+          <label className="sharing-existing form-field">
+            <span className="sr-only">{t('Adicionar membro existente', 'Add existing member')}</span>
+            <select
+              value=""
+              disabled={busy || readOnly}
+              onChange={e => {
+                if (e.target.value) void run('set_project_member', { userId: e.target.value });
               }}
             >
-              <label className="form-field">
-                {t('E-mail da demonstração', 'Demo email')}
-                <Input type="email" required maxLength={254} value={email} disabled={busy || readOnly} onChange={e => setEmail(e.target.value)} />
-              </label>
-              <label className="form-field">
-                {t('Permissão local', 'Local permission')}
-                <select value={permission} onChange={e => setPermission(e.target.value)}>
-                  {permissions.map(p => (
-                    <option key={p} value={p}>
-                      {label(p)}
+              <option value="">{t('Adicionar membro existente', 'Add existing member')}</option>
+              {snapshot.members
+                .filter(m => !members.includes(m.user_id))
+                .map(m => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {m.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {repo.mode === 'local' && (
+            <div className="sharing-general">
+              <div className="sharing-eyebrow">{t('Acesso geral', 'General access')}</div>
+              <div className="sharing-access-row">
+                <span className="sharing-access-icon">{project.legacyMetadata.access === 'private' ? <Lock size={14} /> : <Building2 size={14} />}</span>
+                <div>
+                  <select
+                    aria-label={t('Acesso geral local', 'Local general access')}
+                    disabled={busy || readOnly}
+                    value={String(project.legacyMetadata.access ?? 'workspace')}
+                    onChange={e => void run('local_project_sharing', { access: e.target.value })}
+                  >
+                    <option value="workspace">
+                      {t('Todos em', 'Everyone at')} {t('esta organização', 'this workspace')}
                     </option>
-                  ))}
-                </select>
-              </label>
-              <Button disabled={busy || readOnly} type="submit">
-                {t('Adicionar convite local', 'Add local invitation')}
-              </Button>
-            </form>
-            <label className="form-field">
-              {t('Acesso geral local', 'Local general access')}
-              <select
-                disabled={busy || readOnly}
-                value={String(project.legacyMetadata.access ?? 'workspace')}
-                onChange={e => void run('local_project_sharing', { access: e.target.value })}
-              >
-                <option value="workspace">{t('Toda a organização', 'Everyone in workspace')}</option>
-                <option value="private">{t('Somente convidados', 'Only invited people')}</option>
-              </select>
-            </label>
-          </>
-        )}
-        {notice && <p role="status">{notice}</p>}
-        {error && (
-          <p role="alert" className="error-message">
-            {error}
-          </p>
-        )}
+                    <option value="private">{t('Somente convidados', 'Only people invited')}</option>
+                  </select>
+                  <p>
+                    {project.legacyMetadata.access === 'private'
+                      ? t('Somente as pessoas acima podem abrir este projeto local.', 'Only people listed above can open this local project.')
+                      : t('Qualquer pessoa deste espaço local pode visualizar e comentar.', 'Anyone in this local workspace can view and comment.')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {notice && <p role="status">{notice}</p>}
+          {error && (
+            <p role="alert" className="error-message">
+              {error}
+            </p>
+          )}
+        </div>
+        <div className="modal-f">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              void navigator.clipboard
+                .writeText(projectUrl)
+                .then(() => setNotice(t('Link copiado', 'Link copied')))
+                .catch(() => setError(t('Não foi possível copiar o link.', 'Could not copy the link.')));
+            }}
+          >
+            <Link2 size={14} aria-hidden="true" />
+            {t('Copiar link', 'Copy link')}
+          </Button>
+          <span className="sp" />
+          <Button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              if (!busy) close();
+            }}
+          >
+            {t('Concluir', 'Done')}
+          </Button>
+        </div>
       </SheetContent>
     </Sheet>
   );

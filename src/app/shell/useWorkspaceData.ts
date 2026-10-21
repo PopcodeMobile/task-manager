@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type {
   Task,
   Project,
@@ -199,8 +199,14 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
     },
     [repo, workspaceId, t],
   );
-  useEffect(() => {
+  useLayoutEffect(() => {
     repo.activate();
+    return () => {
+      repo.dispose();
+      idempotency.current.clear();
+    };
+  }, [repo]);
+  useEffect(() => {
     eventWatermark.current = undefined;
     setSnapshot(emptySnapshot);
     setSnapshotScope('');
@@ -208,10 +214,6 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
     setError('');
     setSearch('');
     if (currentId) void refresh(true);
-    return () => {
-      repo.dispose();
-      idempotency.current.clear();
-    };
   }, [repo, currentId]);
   useEffect(() => {
     if (!currentId || loading) return;

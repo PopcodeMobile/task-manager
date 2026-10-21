@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { setLanguage, createWorkspace, switchWorkspace } from './visible-controls.js';
 import { seed } from '../../src/data/seed.js';
 const data = seed();
 async function prepare(page, value = data) {
@@ -39,11 +40,17 @@ test('final entry reaches every named route and eight project views in both loca
   ];
   expect(routes).toHaveLength(21);
   for (const lang of ['pt-BR', 'en']) {
-    await page.locator('#language').selectOption(lang);
+    await setLanguage(page, lang);
     for (const route of routes) {
       await page.goto('/app-local/w/w1/' + route);
-      await expect(page.locator('#work-content h1')).toBeVisible();
-      await expect(page.locator('#work-content')).not.toContainText(/Page not found|Página não encontrada|Loading work/);
+      if (route === 'search') {
+        await expect(page.locator('#work-content h1')).toHaveText(lang === 'en' ? 'Search' : 'Busca');
+        await expect(page.getByRole('textbox', { name: lang === 'en' ? 'Search workspace' : 'Buscar no espaço', exact: true })).toBeVisible();
+      } else await expect(page.locator('#work-content h1')).toBeVisible();
+      if (route === 'states') {
+        await expect(page.locator('#work-content h1')).toHaveText(lang === 'en' ? 'System states' : 'Estados do sistema');
+        await expect(page.getByRole('heading', { name: lang === 'en' ? 'No projects yet' : 'Nenhum projeto ainda', exact: true })).toBeVisible();
+      } else await expect(page.locator('#work-content')).not.toContainText(/Page not found|Página não encontrada|Loading work/);
       await expect(page.locator('html')).toHaveAttribute('lang', lang);
     }
     for (const tab of ['overview', 'board', 'list', 'table', 'calendar', 'timeline', 'files', 'activity']) {
@@ -64,7 +71,7 @@ test('language persistence retains literal task titles after create and reload',
   await page.getByRole('button', { name: 'Create task', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
-  await page.locator('#language').selectOption('pt-BR');
+  await setLanguage(page, 'pt-BR');
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
   await expect(page.getByRole('button', { name: /Home$/ })).toBeVisible();
@@ -75,7 +82,7 @@ test('new workspace is empty, selected after reload and isolated from the origin
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
   const title = data.tasks[0].title;
   await expect(page.getByRole('button', { name: title })).toBeVisible();
-  await page.getByRole('button', { name: 'Create workspace', exact: true }).last().click();
+  await createWorkspace(page);
   await page.getByLabel('Workspace name').fill('Organização B');
   await page.getByRole('dialog').getByRole('button', { name: 'Create workspace', exact: true }).click();
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
@@ -83,7 +90,7 @@ test('new workspace is empty, selected after reload and isolated from the origin
   await page.reload();
   await expect(page.locator('.work-breadcrumb')).toContainText('Organização B');
   await expect(page.getByRole('button', { name: title })).toHaveCount(0);
-  await page.getByLabel('Workspace', { exact: true }).selectOption('w1');
+  await switchWorkspace(page, 'w1');
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
   await expect(page.getByRole('button', { name: title })).toBeVisible();
 });
@@ -91,6 +98,7 @@ test('new workspace is empty, selected after reload and isolated from the origin
 test('visible rich description retains formatting and strips executable markup', async ({ page }) => {
   await prepare(page);
   await page.goto('/app-local/w/w1/tasks?task=' + data.tasks[0].id);
+  await page.getByRole('button', { name: 'Edit description', exact: true }).click();
   await page
     .getByRole('textbox', { name: 'Description', exact: true })
     .fill('<b>Title</b><img src=x onerror=alert(1)><a href="javascript:alert(1)" data-a="delWorkspace">bad</a><script>alert(1)</script>');

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { directoryMemberButton } from './visible-controls.js';
 import { seed } from '../../src/data/seed.js';
 const name = '<img src=x onerror="window.__literalXss=1"> & <team>',
   description = '<script>window.__literalXss=1</script> literal';
@@ -45,7 +46,7 @@ test('team markup stays literal through editor reload duplicate validation and p
   await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue(name);
   await page.keyboard.press('Escape');
   await page.goto('/app-local/w/w1/projects');
-  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await page.locator('#work-content').getByRole('button', { name: 'New project', exact: true }).click();
   await expect(dialog.getByRole('combobox', { name: 'Team', exact: true }).locator('option').filter({ hasText: name })).toHaveText(name);
   await dialog.getByLabel('Name', { exact: true }).fill('Project ' + name);
   await dialog.getByRole('textbox', { name: 'Description', exact: true }).fill(description);
@@ -53,9 +54,11 @@ test('team markup stays literal through editor reload duplicate validation and p
   await dialog.getByRole('button', { name: 'Save project', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Project ' + name, exact: true })).toBeVisible();
   await textOnly(page);
-  // Final collapsed navigation is hidden; reopening preserves the literal project label.
+  // Collapsed navigation keeps named icon links; reopening preserves the literal project label.
   await page.getByRole('button', { name: /sidebar|barra lateral/i }).click();
-  await expect(page.locator('.work-sidebar nav')).not.toBeVisible();
+  await expect(page.locator('.work-sidebar nav')).toBeVisible();
+  expect((await page.locator('.work-sidebar').boundingBox()).width).toBe(52);
+  await expect(page.locator('.work-sidebar').getByRole('link', { name: 'Project ' + name, exact: true })).toHaveAccessibleName('Project ' + name);
   await textOnly(page);
   await page.getByRole('button', { name: /sidebar|barra lateral/i }).click();
   await expect(page.locator('.work-sidebar').getByRole('link', { name: 'Project ' + name, exact: true })).toBeVisible();
@@ -64,21 +67,24 @@ test('team markup stays literal through editor reload duplicate validation and p
 test('local profile and attachment metadata remain literal after persistence and preview', async ({ page }) => {
   await prepare(page);
   await page.goto('/app-local/w/w1/settings?sec=profile');
-  await page.getByLabel('Name', { exact: true }).fill(name);
-  await page.getByLabel('Job title', { exact: true }).fill(description);
+  await page.getByLabel('Full name', { exact: true }).fill(name);
+  await page.getByLabel('Title', { exact: true }).fill(description);
   await page.getByRole('button', { name: 'Save profile', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel('Name', { exact: true })).toHaveValue(name);
-  await expect(page.getByLabel('Job title', { exact: true })).toHaveValue(description);
+  await expect(page.getByLabel('Full name', { exact: true })).toHaveValue(name);
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue(description);
   await page.goto('/app-local/w/w1/member?id=m1');
   await expect(page.getByRole('heading', { name, exact: true }).last()).toBeVisible();
   await textOnly(page);
   await page.goto('/app-local/w/w1/members');
-  await expect(page.locator('#work-content').getByRole('button', { name, exact: true })).toBeVisible();
+  await expect(directoryMemberButton(page, name)).toBeVisible();
   await textOnly(page);
   await page.goto('/app-local/w/w1/files');
-  await page.locator('#work-content').getByRole('button', { name, exact: true }).click();
+  await page
+    .locator('#work-content')
+    .getByRole('button', { name: 'Preview file: ' + name, exact: true })
+    .click();
   await expect(page.getByRole('dialog').getByRole('heading', { name, exact: true })).toBeVisible();
   await textOnly(page);
 });

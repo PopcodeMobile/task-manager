@@ -1,9 +1,44 @@
 import { test, expect } from '@playwright/test';
+import {
+  setLanguage,
+  toggleTheme,
+  createWorkspace,
+  switchWorkspace,
+  expectWorkspaceSelected,
+  openWorkspaceRoute,
+  chooseVisibleOption,
+  editDescriptionSource,
+  chooseTaskDate,
+  expectTaskDate,
+  openAccount,
+  renameFileMetadata,
+  settingSelect,
+  teamMemberChoice,
+  directoryMemberButton,
+} from './visible-controls.js';
 import { seed } from '../../src/data/seed.js';
 const data = { ...seed(), preservedGraphMetadata: { literal: '<kept>', nested: ['unknown'] } };
 const firstTask = { ...data.tasks[0], preservedTaskMetadata: { original: 'Home <literal>', nested: { value: 17 } } };
 data.tasks[0] = firstTask;
 const firstTitle = data.tasks[0].title;
+async function openLocalDrawerActions(page: import('@playwright/test').Page) {
+  const actions = page.getByRole('dialog').locator('details.drawer-extra-actions');
+  if (!(await actions.locator(':scope[open]').count())) await actions.locator(':scope > summary').click();
+}
+async function selectLocalVisibleTasks(page: import('@playwright/test').Page) {
+  const checkbox = page.getByRole('checkbox', { name: 'Select all visible tasks', exact: true });
+  if (await checkbox.isVisible()) await checkbox.check();
+  else {
+    await page.getByRole('button', { name: 'Filters', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Filters', exact: true }).getByRole('checkbox', { name: 'Select all visible tasks', exact: true }).check();
+    await page.keyboard.press('Escape');
+  }
+}
+async function chooseMetadataFiles(page: import('@playwright/test').Page, files: { name: string; mimeType: string; buffer: Buffer }[]) {
+  const opening = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Add metadata', exact: true }).click();
+  await (await opening).setFiles(files);
+}
 async function prepare(page: import('@playwright/test').Page, collapsed = false) {
   await page.addInitScript(
     value => {
@@ -20,6 +55,21 @@ async function prepare(page: import('@playwright/test').Page, collapsed = false)
     },
     { data, collapsed },
   );
+}
+async function prepareNativeWorkspaceHistory(page: import('@playwright/test').Page, route: 'Tasks' | 'Calendar') {
+  await switchWorkspace(page, 'w2');
+  await expect(page).toHaveURL(/\/w\/w2\/home$/);
+  await switchWorkspace(page, 'w1');
+  await expect(page).toHaveURL(/\/w\/w1\/home$/);
+  await page.getByRole('link', { name: route, exact: true }).click();
+}
+async function traverseWorkspaceHistoryDuringDrag(page: import('@playwright/test').Page) {
+  // Native drag suppresses page keyboard/mouse input (HTML 6.11.5). Browser Back
+  // still navigates; unmount may cancel the drag, which is recorded separately.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/w\/w1\/home$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/w\/w2\/home$/);
 }
 test('local entry edits existing browser graph, creates/comments, switches blank workspace and reloads', async ({ page }) => {
   await prepare(page);
@@ -45,7 +95,7 @@ test('local entry edits existing browser graph, creates/comments, switches blank
   await page.getByRole('heading', { name: 'Task details', exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: '/tmp/task6a-desktop-dark-en.png', fullPage: true });
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
-  await page.getByRole('button', { name: 'Create workspace', exact: true }).last().click();
+  await createWorkspace(page);
   await page.getByLabel('Workspace name').fill('Local second');
   await page.getByRole('dialog').getByRole('button', { name: 'Create workspace', exact: true }).click();
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
@@ -53,7 +103,7 @@ test('local entry edits existing browser graph, creates/comments, switches blank
   await page.reload();
   await expect(page.locator('.work-breadcrumb')).toContainText('Local second');
   await expect(page.getByRole('button', { name: 'Local created' })).toHaveCount(0);
-  await page.getByLabel('Workspace', { exact: true }).selectOption(data.workspaces[0].id);
+  await switchWorkspace(page, data.workspaces[0].id);
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
   await page.getByRole('button', { name: 'Local created' }).click();
   await expect(page.locator('article.comment .rich-content').filter({ hasText: 'Saved from this device' })).toBeVisible();
@@ -73,16 +123,16 @@ test('local entry edits existing browser graph, creates/comments, switches blank
       .filter(key => key !== 'workspaces')
       .sort(),
   );
-  await page.getByRole('link', { name: 'Integrations', exact: true }).click();
+  await openWorkspaceRoute(page, 'Integrations');
   await expect(page.getByText('OAuth, agents and webhooks require a cloud workspace.', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /connect|retry delivery/i })).toHaveCount(0);
-  await page.getByLabel('Language', { exact: true }).selectOption('pt-BR');
-  await page.getByRole('button', { name: 'Alternar tema' }).click();
+  await setLanguage(page, 'pt-BR');
+  await toggleTheme(page);
   await page.screenshot({ path: '/tmp/task6a-desktop-light-pt.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: '/tmp/task6a-mobile-light-pt.png', fullPage: true });
-  await page.getByRole('button', { name: 'Alternar tema' }).click();
-  await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+  await toggleTheme(page);
+  await setLanguage(page, 'en');
   await page.screenshot({ path: '/tmp/task6a-mobile-dark-en.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -131,7 +181,7 @@ test('stored system theme follows media changes and a pre-auth locale survives r
   }, data);
   await page.emulateMedia({ colorScheme: 'light' });
   await page.goto('/login');
-  await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+  await setLanguage(page, 'en');
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Sign in to continue' })).toBeVisible();
   await page.getByRole('link', { name: 'Continue on this device' }).click();
@@ -146,7 +196,7 @@ test('fresh secondary-workspace deep link preserves selection and migrates origi
   const originalId = data.workspaces[0].id,
     selectedId = data.workspaces[1].id;
   await page.goto(`/app-local/w/${selectedId}/tasks`);
-  await expect(page.getByLabel('Workspace', { exact: true })).toHaveValue(selectedId);
+  await expectWorkspaceSelected(page, data.workspaces[1].name);
   await expect(page.getByText('No tasks here yet')).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.preferences.local')!)))
@@ -157,8 +207,8 @@ test('fresh secondary-workspace deep link preserves selection and migrates origi
       activeWorkspace: selectedId,
     });
   await page.reload();
-  await expect(page.getByLabel('Workspace', { exact: true })).toHaveValue(selectedId);
-  await page.getByLabel('Workspace', { exact: true }).selectOption(originalId);
+  await expectWorkspaceSelected(page, data.workspaces[1].name);
+  await switchWorkspace(page, originalId);
   await expect(page).toHaveURL(/\/home$/);
   await page.goto(`/app-local/w/${originalId}/tasks`);
   await expect(page.getByRole('button', { name: firstTitle })).toBeVisible();
@@ -168,41 +218,50 @@ test('dirty completion requires explicit save and preserves effective fields aft
   await prepare(page);
   await page.goto('/app-local/w/w1/tasks');
   await page.getByRole('button', { name: data.tasks.find(task => task.status !== 'done')!.title }).click();
-  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).not.toHaveValue('done');
+  await expect(page.getByRole('button', { name: 'Status', exact: true })).not.toContainText('Done');
+  await openLocalDrawerActions(page);
   await expect(page.getByRole('button', { name: 'Complete task', exact: true })).toBeEnabled();
-  await page.getByRole('textbox', { name: 'Description', exact: true }).fill('<p>Effective draft</p><img src=x onerror=alert(1)>');
-  await page.getByLabel('Due date', { exact: true }).fill('2026-11-12');
+  await (await editDescriptionSource(page)).fill('<p>Effective draft</p><img src=x onerror=alert(1)>');
+  await chooseTaskDate(page, 'Due date', '2026-11-12');
+  await openLocalDrawerActions(page);
   await page.getByRole('button', { name: 'Complete task', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Save changes before this action');
   await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeFocused();
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
+  await openLocalDrawerActions(page);
   await page.getByRole('button', { name: 'Complete task', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
+  await expect(page.getByRole('button', { name: 'Status', exact: true })).toContainText('Done');
   await page.reload();
-  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
-  await expect(page.getByLabel('Due date', { exact: true })).toHaveValue('2026-11-12');
-  await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue('<p>Effective draft</p><img src=x onerror=alert(1)>');
+  await expect(page.getByRole('button', { name: 'Status', exact: true })).toContainText('Done');
+  await expectTaskDate(page, 'Due date', '2026-11-12');
+  await expect(await editDescriptionSource(page)).toHaveValue('<p>Effective draft</p><img src=x onerror=alert(1)>');
+  await page.getByRole('button', { name: 'Preview description', exact: true }).click();
+  await expect(page.locator('.task-description-preview')).toBeVisible();
   await expect(page.locator('.rich-content [onerror]')).toHaveCount(0);
 });
 test('task table filters, inline edits, columns, collapse and workspace/view preferences survive reload', async ({ page }) => {
   await prepare(page);
   await page.goto('/app-local/w/w1/tasks');
-  await page.getByRole('link', { name: 'Table', exact: true }).click();
+  await page.locator('#work-content').getByRole('link', { name: 'Table', exact: true }).click();
   const rowTask = data.tasks.find(task => task.status !== 'done')!;
   await page.getByRole('textbox', { name: 'Search tasks', exact: true }).fill(rowTask.title);
   await expect(page.getByRole('button', { name: rowTask.title })).toHaveCount(1);
   const taskRow = page.locator('tbody tr').filter({ has: page.getByRole('button', { name: rowTask.title }) });
   const compactHeight = (await taskRow.boundingBox())!.height;
+  await openAccount(page);
   await page.getByRole('combobox', { name: 'Density', exact: true }).selectOption('comfortable');
+  await page.keyboard.press('Escape');
   await expect.poll(async () => (await taskRow.boundingBox())!.height).toBeGreaterThan(compactHeight);
+  await openAccount(page);
   await page.getByRole('combobox', { name: 'Density', exact: true }).selectOption('compact');
+  await page.keyboard.press('Escape');
   await expect.poll(async () => (await taskRow.boundingBox())!.height).toBe(compactHeight);
-  await page.getByRole('combobox', { name: 'Group', exact: true }).selectOption('none');
-  await page.getByRole('combobox', { name: 'Priority: ' + rowTask.key, exact: true }).selectOption('urgent');
-  await expect(page.getByRole('combobox', { name: 'Priority: ' + rowTask.key, exact: true })).toHaveValue('urgent');
-  await page.getByRole('combobox', { name: 'Assignee: ' + rowTask.key, exact: true }).selectOption('m2');
-  await page.getByLabel('Due date: ' + rowTask.key, { exact: true }).fill('2026-11-20');
+  await chooseVisibleOption(page, 'Group', 'None');
+  await chooseVisibleOption(page, 'Change priority: ' + rowTask.key, 'Urgent');
+  await expect(page.getByRole('button', { name: 'Change priority: ' + rowTask.key, exact: true })).toContainText('Urgent');
+  await chooseVisibleOption(page, 'Change assignee: ' + rowTask.key, data.members.find(member => member.id === 'm2')!.name);
+  await chooseTaskDate(page, 'Change due date: ' + rowTask.key, '2026-11-20');
   await page.getByText('Columns', { exact: true }).click();
   await page.getByRole('checkbox', { name: 'Show column: Start date', exact: true }).check();
   const width = page.getByRole('slider', { name: 'Width: Start date', exact: true });
@@ -210,7 +269,7 @@ test('task table filters, inline edits, columns, collapse and workspace/view pre
   await width.press('End');
   await page.getByText('Columns', { exact: true }).click();
   await expect.poll(async () => Math.round((await page.getByRole('columnheader', { name: 'Start date', exact: true }).boundingBox())!.width)).toBe(800);
-  await page.getByLabel('Start date: ' + rowTask.key, { exact: true }).fill('2026-11-18');
+  await chooseTaskDate(page, 'Change start date: ' + rowTask.key, '2026-11-18');
   await page.getByRole('button', { name: 'Rename: ' + rowTask.key, exact: true }).click();
   await page.getByRole('textbox', { name: 'Rename task', exact: true }).fill('Table <literal>');
   await page.getByRole('textbox', { name: 'Rename task', exact: true }).press('Enter');
@@ -218,30 +277,37 @@ test('task table filters, inline edits, columns, collapse and workspace/view pre
   await expect(page.getByRole('button', { name: 'Table <literal>' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('textbox', { name: 'Search tasks', exact: true })).toHaveValue('Table <literal>');
-  await expect(page.getByLabel('Start date: ' + rowTask.key, { exact: true })).toHaveValue('2026-11-18');
-  await expect(page.getByRole('combobox', { name: 'Assignee: ' + rowTask.key, exact: true })).toHaveValue('m2');
+  await expectTaskDate(page, 'Change start date: ' + rowTask.key, '2026-11-18');
+  await expect(page.getByRole('button', { name: 'Change assignee: ' + rowTask.key, exact: true })).toContainText(
+    data.members.find(member => member.id === 'm2')!.name,
+  );
   await page.getByText('Columns', { exact: true }).click();
   await expect(width).toHaveValue('800');
   await page.getByText('Columns', { exact: true }).click();
-  await page.getByRole('button', { name: /All tasks 1/ }).click();
+  await expect(page.locator('.grow-row')).toHaveCount(0);
+  await chooseVisibleOption(page, 'Group', 'Status');
+  const groupName =
+    ({ backlog: 'Backlog', todo: 'To do', progress: 'In progress', review: 'In review', done: 'Done' } as Record<string, string>)[rowTask.status] + ' 1';
+  const groupToggle = page.locator('#work-content').getByRole('button', { name: groupName, exact: true });
+  await groupToggle.click();
   await page.reload();
-  await expect(page.getByRole('button', { name: /All tasks 1/ })).toHaveAttribute('aria-expanded', 'false');
-  await page.getByRole('button', { name: /All tasks 1/ }).click();
+  await expect(groupToggle).toHaveAttribute('aria-expanded', 'false');
+  await groupToggle.click();
   await page.screenshot({ path: '/tmp/task6b1-table-desktop-dark-en.png', fullPage: true });
-  await page.getByRole('link', { name: 'List', exact: true }).click();
+  await page.locator('#work-content').getByRole('link', { name: 'List', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Search tasks', exact: true })).toHaveValue('');
-  await page.getByRole('link', { name: 'Table', exact: true }).click();
+  await page.locator('#work-content').getByRole('link', { name: 'Table', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Search tasks', exact: true })).toHaveValue('Table <literal>');
-  await page.getByLabel('Workspace', { exact: true }).selectOption(data.workspaces[1].id);
+  await switchWorkspace(page, data.workspaces[1].id);
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Search tasks', exact: true })).toHaveValue('');
-  await page.getByLabel('Workspace', { exact: true }).selectOption(data.workspaces[0].id);
+  await switchWorkspace(page, data.workspaces[0].id);
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
-  await page.getByRole('link', { name: 'Table', exact: true }).click();
+  await page.locator('#work-content').getByRole('link', { name: 'Table', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Search tasks', exact: true })).toHaveValue('Table <literal>');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByLabel('Language', { exact: true }).selectOption('pt-BR');
-  await page.getByRole('button', { name: 'Alternar tema' }).click();
+  await setLanguage(page, 'pt-BR');
+  await toggleTheme(page);
   await expect(page.getByRole('button', { name: 'Table <literal>' })).toBeVisible();
   await page.screenshot({ path: '/tmp/task6b1-table-mobile-light-pt.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -252,29 +318,30 @@ test('board drag preserves manual order and recurring completion, column menus a
   const title = 'Recurring board <literal>';
   await page.getByRole('button', { name: 'New task', exact: true }).click();
   await page.getByLabel('Title', { exact: true }).fill(title);
-  await page.getByLabel('Due date', { exact: true }).fill('2026-11-20');
-  await page.getByRole('combobox', { name: 'Recurrence', exact: true }).selectOption('Weekly');
+  await chooseTaskDate(page, 'Due date', '2026-11-20');
+  await chooseVisibleOption(page, 'Recurrence', 'Weekly');
   await page.getByRole('button', { name: 'Create task', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
-  await page.getByRole('link', { name: 'Board', exact: true }).click();
+  await page.locator('#work-content').getByRole('link', { name: 'Board', exact: true }).click();
   await page.getByRole('textbox', { name: 'Search tasks', exact: true }).fill(title);
   const card = page.locator('.task-card').filter({ has: page.getByRole('button', { name: title }) });
   await card.dragTo(page.locator('[data-task-group="progress"]'));
   await expect(page.locator('[data-task-group="progress"]').getByRole('button', { name: title })).toBeVisible();
   await page.reload();
   await expect(page.locator('[data-task-group="progress"]').getByRole('button', { name: title })).toBeVisible();
+  await page.locator('[data-task-group="done"]').scrollIntoViewIfNeeded();
   await card.dragTo(page.locator('[data-task-group="done"]'));
   await expect(page.locator('[data-task-group="done"]').getByRole('button', { name: title })).toBeVisible();
   await expect(page.locator('[data-task-group="todo"]').getByRole('button', { name: title })).toBeVisible();
   await page.locator('[data-task-group="todo"]').getByRole('button', { name: title }).click();
-  await expect(page.getByLabel('Due date', { exact: true })).toHaveValue('2026-11-27');
+  await expectTaskDate(page, 'Due date', '2026-11-27');
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   const todo = page.locator('[data-task-group="todo"]');
   await todo.getByLabel('Column options: To do', { exact: true }).click();
   await todo.getByRole('button', { name: 'Complete column', exact: true }).click();
   await expect(todo.getByRole('button', { name: title })).toHaveCount(1); // recurring completion creates the next instance
-  await page.getByRole('checkbox', { name: 'Select all visible tasks', exact: true }).check();
+  await selectLocalVisibleTasks(page);
   await page.getByRole('combobox', { name: 'Bulk priority', exact: true }).selectOption('high');
   await expect(page.getByRole('combobox', { name: 'Bulk priority', exact: true })).toHaveCount(0);
   await page.reload();
@@ -302,7 +369,7 @@ test('bulk bounds expose all 101 selected and never apply a partial mutation', a
     localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en' } }));
   }, many);
   await page.goto('/app-local/w/w1/tasks');
-  await page.getByRole('checkbox', { name: 'Select all visible tasks', exact: true }).check();
+  await selectLocalVisibleTasks(page);
   await expect(page.getByRole('alert')).toContainText('More than 100 tasks selected');
   await expect(page.getByRole('combobox', { name: 'Bulk priority', exact: true })).toBeDisabled();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.revision)).toBe(0);
@@ -310,9 +377,9 @@ test('bulk bounds expose all 101 selected and never apply a partial mutation', a
   await page.getByRole('checkbox', { name: 'Select: Bound 0', exact: true }).check();
   await page.getByRole('checkbox', { name: 'Select: Bound 100', exact: true }).check();
   await page.getByRole('combobox', { name: 'Bulk priority', exact: true }).selectOption('urgent');
-  await expect(page.getByRole('combobox', { name: 'Priority: BOUND-100', exact: true })).toHaveValue('urgent');
+  await expect(page.getByRole('button', { name: 'Change priority: BOUND-100', exact: true })).toContainText('Urgent');
   await page.reload();
-  await expect(page.getByRole('combobox', { name: 'Priority: BOUND-0', exact: true })).toHaveValue('urgent');
+  await expect(page.getByRole('button', { name: 'Change priority: BOUND-0', exact: true })).toContainText('Urgent');
 });
 test('dirty move duplicate archive require save and preserve saved fields', async ({ page }) => {
   await prepare(page);
@@ -323,22 +390,27 @@ test('dirty move duplicate archive require save and preserve saved fields', asyn
   for (const action of ['Move task', 'Duplicate task', 'Archive task']) {
     const beforeTask = new URL(page.url()).searchParams.get('task');
     if (action === 'Archive task') archivedURL = page.url();
-    await page.getByRole('textbox', { name: 'Description', exact: true }).fill(action + ' description');
+    await (await editDescriptionSource(page)).fill(action + ' description');
+    await openLocalDrawerActions(page);
     if (action === 'Move task') await page.getByRole('combobox', { name: 'Destination project', exact: true }).selectOption('p2');
+    await openLocalDrawerActions(page);
     await page.getByRole('button', { name: action, exact: true }).click();
     await expect(page.getByRole('alert')).toContainText('Save changes before this action');
     await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeFocused();
     await page.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
+    await openLocalDrawerActions(page);
     await page.getByRole('button', { name: action, exact: true }).click();
     if (action === 'Duplicate task') {
       await expect.poll(() => new URL(page.url()).searchParams.get('task')).not.toBe(beforeTask);
-      await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue(initial.status);
+      await expect(page.getByRole('button', { name: 'Status', exact: true })).toContainText(
+        ({ backlog: 'Backlog', todo: 'To do', progress: 'In progress', review: 'In review', done: 'Done' } as Record<string, string>)[initial.status],
+      );
     }
     if (action !== 'Archive task') {
-      await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue(action + ' description');
+      await expect(await editDescriptionSource(page)).toHaveValue(action + ' description');
       await page.reload();
-      await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue(action + ' description');
+      await expect(await editDescriptionSource(page)).toHaveValue(action + ' description');
     }
   }
   await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toHaveCount(0);
@@ -349,6 +421,7 @@ test('dirty move duplicate archive require save and preserve saved fields', asyn
   );
   expect(archived).toHaveLength(1);
   await page.goto(archivedURL);
+  await openLocalDrawerActions(page);
   await page.getByRole('button', { name: 'Restore task', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toHaveCount(0);
   await page.reload();
@@ -404,30 +477,41 @@ test('multivalue filters and negation persist; list drag changes group and keybo
     if (!localStorage.getItem('gr8r.v2')) localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en' } }));
   }, scoped);
   await page.goto('/app-local/w/w1/tasks');
-  await page.getByText('Filters (0)', { exact: true }).click();
-  await page.getByRole('button', { name: 'Add filter', exact: true }).click();
+  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Filters', exact: true }).getByRole('button', { name: 'Add filter: Status', exact: true }).click();
   await page.getByRole('checkbox', { name: 'To do', exact: true }).check();
   await page.getByRole('checkbox', { name: 'In review', exact: true }).check();
-  await page.getByRole('button', { name: 'Add filter', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Filter field 2', exact: true }).selectOption('priority');
+  await page.getByRole('dialog', { name: 'Filters', exact: true }).getByRole('button', { name: 'Add filter: Priority', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Filter field 2', exact: true })).toHaveValue('priority');
   await page.getByRole('checkbox', { name: 'High', exact: true }).check();
   await expect(page.getByRole('button', { name: 'Filter alpha' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Filter beta' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Filter gamma' })).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Filter operator 1', exact: true }).selectOption('not');
   await expect(page.getByRole('button', { name: 'Filter alpha' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Filter values 1', exact: true }).click();
   await page.getByRole('checkbox', { name: 'In review', exact: true }).uncheck();
   await expect(page.getByRole('button', { name: 'Filter beta' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Filter beta' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Filter alpha' })).toHaveCount(0);
-  await page.getByText('Filters (2)', { exact: true }).click();
+  const persistedFilters = page.getByRole('button', { name: 'Filters', exact: true });
+  await expect(persistedFilters).toHaveText('Filter (2)');
+  await persistedFilters.click();
   await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Group', exact: true }).selectOption('priority');
+  await page.keyboard.press('Escape');
+  await chooseVisibleOption(page, 'Group', 'Priority');
   const alpha = page.getByRole('button', { name: 'Drag task: FILTER-1', exact: true });
+  await alpha.focus();
+  await expect(alpha).toBeFocused();
+  await expect(alpha).toHaveCSS('pointer-events', 'auto');
   await alpha.dragTo(page.locator('[data-task-group="low"] .task-group-heading'));
   await expect(page.locator('[data-task-group="low"]').getByRole('button', { name: 'Filter alpha' })).toBeVisible();
-  await page.getByRole('button', { name: 'Move up: FILTER-1', exact: true }).click();
+  const moveUp = page.getByRole('button', { name: 'Move up: FILTER-1', exact: true });
+  await moveUp.focus();
+  await expect(moveUp).toBeFocused();
+  await expect(moveUp).toHaveCSS('pointer-events', 'auto');
+  await moveUp.click();
   await expect(page.getByRole('button', { name: 'Move up: FILTER-1', exact: true })).toBeDisabled();
   await page.getByRole('checkbox', { name: 'Select: Filter alpha', exact: true }).check();
   await page.getByRole('button', { name: 'Delete selected', exact: true }).click();
@@ -452,6 +536,7 @@ test('a native task drag cannot mutate an identical ID after changing workspace'
     },
     { task: initial, project: data.projects.find(p => p.id === initial.project)! },
   );
+  await prepareNativeWorkspaceHistory(page, 'Tasks');
   const events: { type: string; scope: string }[] = [];
   page.on('console', message => {
     if (message.text().startsWith('task6b1-drag:')) events.push(JSON.parse(message.text().slice('task6b1-drag:'.length)));
@@ -477,12 +562,11 @@ test('a native task drag cannot mutate an identical ID after changing workspace'
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 18, box.y + box.height / 2 + 10, { steps: 5 });
   await expect.poll(() => events.filter(e => e.type === 'dragstart').length).toBe(1);
-  await page.getByRole('combobox', { name: 'Workspace', exact: true }).selectOption('w2');
-  await expect(page).toHaveURL(/\/home$/);
+  await traverseWorkspaceHistoryDuringDrag(page);
   await page.getByRole('button', { name: 'Other workspace task', exact: true }).first().hover();
   await page.mouse.up();
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Status: ' + initial.key, exact: true })).toHaveValue('todo');
+  await expect(page.getByRole('button', { name: 'Change status: ' + initial.key, exact: true })).toContainText('To do');
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w2.revision)).toBe(0);
   if (!events.some(e => e.type === 'drop'))
     test.info().annotations.push({
@@ -509,6 +593,8 @@ test('task context menu supports right click, keyboard focus and guarded core ac
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('menuitem', { name: 'Open task', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Quick edit', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
   await expect(menu.getByRole('menuitem', { name: 'Complete task', exact: true })).toBeFocused();
   await page.keyboard.press('End');
   await expect(menu.getByRole('menuitem', { name: 'Delete task…', exact: true })).toBeFocused();
@@ -520,14 +606,16 @@ test('task context menu supports right click, keyboard focus and guarded core ac
   await trigger.press('Shift+F10');
   await expect(menu).toBeVisible();
   await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Quick edit', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('combobox', { name: 'Status: ' + initial.key, exact: true })).toHaveValue('done');
+  await expect(page.getByRole('button', { name: 'Change status: ' + initial.key, exact: true })).toContainText('Done');
   await page.getByRole('button', { name: 'Task actions: ' + initial.key, exact: true }).click();
   await menu.getByRole('menuitem', { name: 'Duplicate task', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toBeVisible();
   const cloneId = new URL(page.url()).searchParams.get('task');
   expect(cloneId).not.toBe(initial.id);
-  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
+  await expect(page.getByRole('button', { name: 'Status', exact: true })).toContainText('Done');
   const cloneKey = await page.locator('.drawer-eyebrow').textContent();
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   await page.getByRole('button', { name: 'Task actions: ' + cloneKey, exact: true }).click();
@@ -541,8 +629,8 @@ test('task context menu supports right click, keyboard focus and guarded core ac
   await expect(page.getByRole('alertdialog')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Task actions: ' + cloneKey, exact: true })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole('combobox', { name: 'Status: ' + initial.key, exact: true })).toHaveValue('done');
-  await page.getByRole('link', { name: 'Board', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Change status: ' + initial.key, exact: true })).toContainText('Done');
+  await page.locator('#work-content').getByRole('link', { name: 'Board', exact: true }).click();
   const card = page.locator('.task-card').filter({ has: page.getByRole('button', { name: initial.title }) });
   await card.click({ button: 'right', position: { x: 5, y: 5 } });
   await expect(menu).toBeVisible();
@@ -564,13 +652,13 @@ test('task context menu is invalidated across workspaces even when text IDs matc
   );
   await page.getByRole('button', { name: initial.title }).click({ button: 'right' });
   await expect(page.getByRole('menu', { name: 'Task actions', exact: true })).toBeVisible();
-  await page.getByRole('combobox', { name: 'Workspace', exact: true }).selectOption('w2');
+  await switchWorkspace(page, 'w2');
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Menu in another workspace' })).toBeVisible();
   await expect(page.getByRole('menu', { name: 'Task actions', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Menu in another workspace' }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Complete task', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Status: ' + initial.key, exact: true })).toHaveValue('done');
+  await expect(page.getByRole('button', { name: 'Change status: ' + initial.key, exact: true })).toContainText('Done');
   const records = await page.evaluate(id => {
     const state = JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!);
     return {
@@ -580,8 +668,8 @@ test('task context menu is invalidated across workspaces even when text IDs matc
   }, initial.id);
   expect(records).toEqual({ first: initial.status, second: 'done' });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('pt-BR');
-  await page.getByRole('button', { name: 'Alternar tema' }).click();
+  await setLanguage(page, 'pt-BR');
+  await toggleTheme(page);
   await page.getByRole('button', { name: 'Ações da tarefa: ' + initial.key, exact: true }).click();
   const mobileMenu = page.getByRole('menu', { name: 'Ações da tarefa', exact: true });
   await expect(mobileMenu).toBeVisible();
@@ -605,8 +693,9 @@ test.describe('local calendar boundary', () => {
       localStorage.setItem('gr8r.v2', JSON.stringify(legacy));
     });
     await page.goto('/app-local/w/w1/tasks');
-    await page.getByRole('combobox', { name: 'Group', exact: true }).selectOption('due');
+    await chooseVisibleOption(page, 'Group', 'Due date');
     const today = page.locator('[data-task-group="today"]');
+    await today.getByRole('button', { name: 'Add task in group: today', exact: true }).click();
     await today.getByRole('combobox', { name: 'New task project: today', exact: true }).selectOption('p1');
     await today.getByRole('textbox', { name: 'New task in group: today', exact: true }).fill('Created on local Today');
     await today.getByRole('button', { name: 'Add to group: today', exact: true }).click();
@@ -621,7 +710,7 @@ test.describe('local calendar boundary', () => {
     await page.reload();
     await expect(today.getByRole('button', { name: 'Created on local Today' })).toBeVisible();
     await page.getByRole('button', { name: 'Created on local Today' }).click();
-    await expect(page.getByLabel('Due date', { exact: true })).toHaveValue('2026-10-20');
+    await expectTaskDate(page, 'Due date', '2026-10-20');
   });
 });
 test('failed task view preferences show an explicit retry and retain stored bytes and unknown metadata', async ({ page }) => {
@@ -638,7 +727,7 @@ test('failed task view preferences show an explicit retry and retain stored byte
     localStorage.setItem(key, broken);
     return { repaired, broken };
   }, firstTitle);
-  await page.getByRole('link', { name: 'Table', exact: true }).click();
+  await page.locator('#work-content').getByRole('link', { name: 'Table', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveText('Could not load view preferences. Your stored data was kept. Try again.');
   const retry = page.getByRole('button', { name: 'Try again', exact: true });
   await expect(retry).toBeEnabled();
@@ -664,10 +753,12 @@ test('group composer creates in the hydrated default project and preserves an ex
   await prepare(page);
   await page.goto('/app-local/w/w1/tasks');
   const group = page.locator('[data-task-group="todo"]');
+  await group.getByRole('button', { name: 'Add task in group: todo', exact: true }).click();
   await expect(group.getByRole('combobox', { name: 'New task project: todo', exact: true })).toHaveValue('p1');
   await group.getByRole('textbox', { name: 'New task in group: todo', exact: true }).fill('Created with hydrated project');
   await group.getByRole('button', { name: 'Add to group: todo', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Created with hydrated project' })).toBeVisible();
+  await group.getByRole('button', { name: 'Add task in group: todo', exact: true }).click();
   await group.getByRole('combobox', { name: 'New task project: todo', exact: true }).selectOption('p2');
   await group.getByRole('textbox', { name: 'New task in group: todo', exact: true }).fill('Created with explicit project');
   await group.getByRole('button', { name: 'Add to group: todo', exact: true }).click();
@@ -679,6 +770,7 @@ test('group composer creates in the hydrated default project and preserves an ex
     );
   });
   expect(projects).toEqual(['p1', 'p2']);
+  await group.getByRole('button', { name: 'Add task in group: todo', exact: true }).click();
   await expect(group.getByRole('combobox', { name: 'New task project: todo', exact: true })).toHaveValue('p2');
 });
 
@@ -687,11 +779,19 @@ test('task details compose labels, subtask promotion, metadata, discussion and p
   await prepare(page);
   await page.goto('/app-local/w/' + data.workspaces[0].id + '/tasks');
   await page.getByRole('button', { name: firstTitle }).click();
-  await expect(page.getByRole('heading', { name: 'Labels', exact: true })).toBeVisible();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Change labels: ' + data.tasks[0].key, exact: true })
+    .click();
+  const labels = page.getByRole('menu', { name: 'Labels', exact: true });
+  await expect(labels).toBeVisible();
   await page.getByLabel('New label', { exact: true }).fill('Details <literal>');
   await page.getByRole('button', { name: 'Create and apply label', exact: true }).click();
-  await expect(page.getByRole('dialog').getByLabel('Label: Details <literal>', { exact: true })).toBeChecked();
-  await page.getByLabel('Description', { exact: true }).fill('Dirty description');
+  await expect(labels.getByRole('menuitemcheckbox', { name: 'Details <literal>', exact: true })).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await expect(labels).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Task details', exact: true })).toBeVisible();
+  await (await editDescriptionSource(page)).fill('Dirty description');
   await page.getByLabel('New subtask', { exact: true }).fill('Promote detail');
   await page.getByRole('button', { name: 'Add subtask', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Save changes before');
@@ -717,8 +817,9 @@ test('task details compose labels, subtask promotion, metadata, discussion and p
     )
     .toBe(1);
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Promote detail');
-  await expect(page.getByLabel('Description', { exact: true })).toHaveValue('Promoted notes');
-  await expect(page.getByLabel('Due date', { exact: true })).toHaveValue('2026-10-25');
+  await expect(await editDescriptionSource(page)).toHaveValue('Promoted notes');
+  await expectTaskDate(page, 'Due date', '2026-10-25');
+  await page.getByRole('dialog').locator('.attachment-metadata-actions > summary').click();
   await page.getByLabel('Metadata name', { exact: true }).fill('Only metadata.pdf');
   await page.getByRole('button', { name: 'Add metadata', exact: true }).click();
   await expect(page.getByText('Only metadata.pdf', { exact: true })).toBeVisible();
@@ -794,29 +895,46 @@ test('canonical detail controls reject cycles and keep unsafe literal metadata s
   const comment = drawer.locator('article.comment').filter({ hasText: 'Rich comment' });
   await expect(comment.locator('strong')).toHaveText('<img src=x> literal author');
   await expect(comment.getByRole('button', { name: 'React: 👍', exact: true })).toHaveAttribute('title', '<img src=x> literal author');
-  await drawer.getByLabel('Label: <img src=x> literal label', { exact: true }).click();
-  await expect(drawer.getByLabel('Label: <img src=x> literal label', { exact: true })).toBeChecked();
-  await drawer.getByLabel('Add dependency', { exact: true }).selectOption(data.tasks[1].id);
-  await drawer.getByRole('button', { name: 'Link task', exact: true }).click();
+  await drawer.getByRole('button', { name: 'Change labels: ' + data.tasks[0].key, exact: true }).click();
+  const literalLabel = page
+    .getByRole('menu', { name: 'Labels', exact: true })
+    .getByRole('menuitemcheckbox', { name: '<img src=x> literal label', exact: true });
+  await literalLabel.click();
+  await expect(literalLabel).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu', { name: 'Labels', exact: true })).toHaveCount(0);
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole('button', { name: 'Change dependencies: ' + data.tasks[0].key, exact: true }).click();
+  await page
+    .getByRole('menu', { name: 'Dependencies', exact: true })
+    .getByRole('menuitemcheckbox', { name: data.tasks[1].key + ' ' + data.tasks[1].title, exact: true })
+    .click();
+  await page.keyboard.press('Escape');
   await expect(drawer.getByRole('alert')).toBeVisible();
   const deps = await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.tasks[0].deps);
   expect(deps).toEqual([]);
   await drawer.getByRole('button', { name: 'Close panel', exact: true }).click();
-  await page.getByRole('link', { name: 'Table', exact: true }).click();
+  await page.locator('#work-content').getByRole('link', { name: 'Table', exact: true }).click();
   const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: /literal task/ }) });
-  await row.locator('[data-task-column=labels] summary').click();
-  await expect(row.getByLabel('Label: <img src=x> literal label', { exact: true })).toBeChecked();
-  await row.getByLabel('Label: <img src=x> literal label', { exact: true }).click();
-  await expect(row.getByLabel('Label: <img src=x> literal label', { exact: true })).not.toBeChecked();
+  await row.getByRole('button', { name: 'Change labels: ' + data.tasks[0].key, exact: true }).click();
+  await expect(literalLabel).toHaveAttribute('aria-checked', 'true');
+  await literalLabel.click();
+  await expect(literalLabel).toHaveAttribute('aria-checked', 'false');
+  await page.keyboard.press('Escape');
   await page.reload();
   await page.getByRole('button', { name: /literal task/ }).click();
-  await expect(page.getByRole('dialog').getByLabel('Label: <img src=x> literal label', { exact: true })).not.toBeChecked();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Change labels: ' + data.tasks[0].key, exact: true })
+    .click();
+  await expect(literalLabel).toHaveAttribute('aria-checked', 'false');
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
-  await page.getByLabel('Language', { exact: true }).selectOption('pt-BR');
-  await page.getByRole('button', { name: 'Alternar tema', exact: true }).click();
+  await setLanguage(page, 'pt-BR');
+  await toggleTheme(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: /literal task/ }).click();
-  await expect(page.getByRole('heading', { name: 'Etiquetas', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Alterar etiquetas: ' + data.tasks[0].key, exact: true })).toBeVisible();
   await page.getByRole('heading', { name: 'Anexos', exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: '/tmp/task6b2-mobile-light-pt.png', fullPage: false });
   const bounds = await page.getByRole('dialog').boundingBox();
@@ -836,7 +954,7 @@ test('detailed table completes subtasks and explicitly links and unlinks canonic
     localStorage.setItem('gr8r.v2', JSON.stringify(saved));
   });
   await page.goto('/app-local/w/w1/tasks');
-  await page.getByRole('link', { name: 'Table', exact: true }).click();
+  await page.locator('#work-content').getByRole('link', { name: 'Table', exact: true }).click();
   const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: parent.title }) });
   await row.locator('[data-task-column=title] summary').click();
   const child = row.getByLabel(parent.subtasks[0].title, { exact: true });
@@ -845,15 +963,18 @@ test('detailed table completes subtasks and explicitly links and unlinks canonic
   await page.getByText('Columns', { exact: true }).click();
   await page.getByLabel('Show column: Dependencies', { exact: true }).check();
   await page.getByText('Columns', { exact: true }).click();
-  await row.locator('[data-task-column=deps] summary').click();
-  const dependency = row.getByLabel(target.title, { exact: true });
+  await row.getByRole('button', { name: 'Change dependencies: ' + parent.key, exact: true }).click();
+  const dependency = page
+    .getByRole('menu', { name: 'Dependencies', exact: true })
+    .getByRole('menuitemcheckbox', { name: target.key + ' ' + target.title, exact: true });
   await dependency.click();
-  await expect(dependency).toBeChecked();
+  await expect(dependency).toHaveAttribute('aria-checked', 'true');
   await page.reload();
-  await row.locator('[data-task-column=deps] summary').click();
-  await expect(dependency).toBeChecked();
+  await row.getByRole('button', { name: 'Change dependencies: ' + parent.key, exact: true }).click();
+  await expect(dependency).toHaveAttribute('aria-checked', 'true');
   await dependency.click();
-  await expect(dependency).not.toBeChecked();
+  await expect(dependency).toHaveAttribute('aria-checked', 'false');
+  await page.keyboard.press('Escape');
   const stored = await page.evaluate(
     id => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.tasks.find((task: { id: string }) => task.id === id),
     parent.id,
@@ -877,7 +998,7 @@ test('late personal menu failure cannot publish an error in a different workspac
   await page.goto('/app-local/w/w1/tasks');
   await page.getByRole('button', { name: firstTitle }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Copy link', exact: true }).click();
-  await page.getByLabel('Workspace', { exact: true }).selectOption('w2');
+  await switchWorkspace(page, 'w2');
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
   await expect(page.locator('.work-breadcrumb')).toContainText('Pessoal');
   await page.evaluate(() => window.dispatchEvent(new Event('reject-clipboard')));
@@ -934,8 +1055,8 @@ test('shared calendar and timeline create on date, preserve duration on native d
     .getByRole('button', { name: /Add task on/ })
     .click();
   await page.getByLabel('Title', { exact: true }).fill('Schedule <literal>');
-  await expect(page.getByLabel('Due date', { exact: true })).toHaveValue(day!);
-  await page.getByLabel('Start date', { exact: true }).fill(day!);
+  await expectTaskDate(page, 'Due date', day!);
+  await chooseTaskDate(page, 'Start date', day!);
   await page.getByRole('button', { name: 'Create task', exact: true }).click();
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   const next = await page.locator('[data-calendar-day]').nth(17).getAttribute('data-calendar-day');
@@ -943,15 +1064,15 @@ test('shared calendar and timeline create on date, preserve duration on native d
   await expect(page.locator(`[data-calendar-day="${next}"]`).getByRole('button', { name: 'Schedule <literal>', exact: true })).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: 'Schedule <literal>', exact: true }).click();
-  await expect(page.getByLabel('Due date', { exact: true })).toHaveValue(next!);
-  await expect(page.getByLabel('Start date', { exact: true })).toHaveValue(next!);
+  await expectTaskDate(page, 'Due date', next!);
+  await expectTaskDate(page, 'Start date', next!);
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   await expect(page).toHaveURL(/\/calendar/);
   await page.getByRole('button', { name: 'Week', exact: true }).click();
   await expect(page.locator('[data-calendar-day]')).toHaveCount(7);
-  await page.getByRole('link', { name: 'Timeline', exact: true }).click();
+  await page.getByRole('link', { name: 'Timeline', exact: true }).and(page.locator('a[href="/app-local/w/w1/timeline"]')).click();
   await page.getByRole('button', { name: 'Today', exact: true }).click();
-  const bar = page.locator('[data-schedule-bar]').filter({ hasText: 'Schedule <literal>' });
+  const bar = page.getByRole('button', { name: 'Schedule <literal>', exact: true }).and(page.locator('[data-schedule-bar]'));
   await page.locator('.schedule-timeline').hover();
   await page.mouse.wheel(-10000, 0);
   await expect.poll(() => page.locator('.schedule-timeline').evaluate(node => node.scrollLeft)).toBe(0);
@@ -990,7 +1111,7 @@ test('shared files filter preview rename duplicate unlink delete preserve metada
     if (!localStorage.getItem('gr8r.v2')) localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en', theme: 'dark' } }));
   }, fixture);
   await page.goto('/app-local/w/w1/tasks');
-  await page.getByRole('link', { name: 'Files', exact: true }).click();
+  await openWorkspaceRoute(page, 'Files');
   const source = data.files[0];
   await page.getByLabel('Search files', { exact: true }).fill(source.name);
   await page.locator(`[data-file-id="${source.id}"]`).getByRole('button', { name: source.name, exact: true }).click();
@@ -999,10 +1120,11 @@ test('shared files filter preview rename duplicate unlink delete preserve metada
   await page.getByRole('button', { name: 'Copy link', exact: true }).click();
   await expect(page.getByRole('dialog').getByRole('status')).toHaveText('Link copied');
   expect(new URL(await page.evaluate(() => navigator.clipboard.readText())).searchParams.get('file')).toBe(source.id);
-  await page.getByLabel('File name', { exact: true }).fill('<literal> renamed.pdf');
-  await page.getByRole('button', { name: 'Rename file', exact: true }).click();
+  await renameFileMetadata(page, source.name, '<literal> renamed.pdf');
   await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toContainText('<literal> renamed.pdf');
-  await page.getByRole('button', { name: 'Duplicate', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'File options: <literal> renamed.pdf', exact: true }).click();
+  await page.getByRole('menu', { name: 'File options', exact: true }).getByRole('menuitem', { name: 'Duplicate', exact: true }).click();
   await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toContainText('<literal> renamed copy.pdf');
   const clonedMetadata = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.files.find((f: { name: string }) => f.name === '<literal> renamed copy.pdf'),
@@ -1018,7 +1140,9 @@ test('shared files filter preview rename duplicate unlink delete preserve metada
   await page.reload();
   await expect(page.getByLabel('Search files', { exact: true })).toHaveValue('<literal>');
   await page.getByRole('button', { name: '<literal> renamed copy.pdf', exact: true }).click();
-  await page.getByRole('button', { name: 'Delete file', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'File options: <literal> renamed copy.pdf', exact: true }).click();
+  await page.getByRole('menu', { name: 'File options', exact: true }).getByRole('menuitem', { name: 'Delete', exact: true }).click();
   await page.getByRole('button', { name: 'Confirm deletion', exact: true }).click();
   await expect(page.getByRole('button', { name: '<literal> renamed copy.pdf', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '<literal> renamed.pdf', exact: true })).toBeVisible();
@@ -1067,23 +1191,25 @@ test('calendar overflow event details preferences and files beyond cursor stay l
   await expect(page.getByLabel('Search tasks', { exact: true })).toHaveValue('Overflow task');
   await page.locator(`[data-calendar-day="${today}"]`).getByRole('button', { name: /more/ }).click();
   await page.getByRole('button', { name: '09:30 <unsafe> last event', exact: true }).click();
-  await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('<unsafe> last event');
-  await expect(page.getByRole('dialog')).toContainText(today);
-  await expect(page.getByRole('dialog').locator('unsafe')).toHaveCount(0);
+  const eventDetails = page.getByRole('dialog', { name: 'Event details', exact: true });
+  await expect(eventDetails).toBeVisible();
+  await expect(eventDetails.locator('header strong')).toHaveText('<unsafe> last event');
+  await expect(eventDetails).toContainText(today);
+  await expect(eventDetails.locator('unsafe')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   const nextMonth = await page.locator('.schedule-controls h2').textContent();
   await page.reload();
   await expect(page.locator('.schedule-controls h2')).toHaveText(nextMonth!);
   await page.getByRole('button', { name: 'Today', exact: true }).click();
-  await page.getByRole('link', { name: 'Files', exact: true }).click();
+  await openWorkspaceRoute(page, 'Files');
   await expect(page.locator('[data-file-id]')).toHaveCount(105); // 103 global + two canonical embedded-only records
   await page.getByLabel('Search files', { exact: true }).fill('File 102');
   await page.getByRole('button', { name: 'File 102.pdf', exact: true }).click();
   await page.keyboard.press('Escape');
   await page.getByRole('link', { name: 'Calendar', exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByLabel('Language', { exact: true }).selectOption('pt-BR');
+  await setLanguage(page, 'pt-BR');
   await page.getByRole('button', { name: 'Semana', exact: true }).click();
   await expect(page.locator('[data-calendar-day]')).toHaveCount(7);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
@@ -1104,7 +1230,7 @@ test('native schedule drag cannot cross workspace lifetime even with the same ta
     },
     { task: initial, project: data.projects.find(p => p.id === initial.project)! },
   );
-  await page.getByRole('link', { name: 'Calendar', exact: true }).click();
+  await prepareNativeWorkspaceHistory(page, 'Calendar');
   await page.getByRole('button', { name: 'Week', exact: true }).click();
   // The fixture task can lie outside this week; date navigation is through the rendered controls.
   await page.getByRole('button', { name: 'Month', exact: true }).click();
@@ -1124,19 +1250,18 @@ test('native schedule drag cannot cross workspace lifetime even with the same ta
         type === 'drop',
       );
   });
-  const handle = page.getByRole('button', { name: initial.title, exact: true });
+  const handle = page.locator(`[data-calendar-day="${initial.due}"]`).getByRole('button', { name: initial.title });
   await handle.scrollIntoViewIfNeeded();
   const box = (await handle.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width / 2 + 18, box.y + box.height / 2 + 10, { steps: 5 });
   await expect.poll(() => events.filter(event => event.type === 'dragstart').length).toBe(1);
-  await page.getByRole('combobox', { name: 'Workspace', exact: true }).selectOption('w2');
-  await expect(page).toHaveURL(/\/home$/);
+  await traverseWorkspaceHistoryDuringDrag(page);
   await page.getByRole('button', { name: 'Other schedule', exact: true }).first().hover();
   await page.mouse.up();
   await page.getByRole('link', { name: 'Calendar', exact: true }).click();
-  await expect(page.locator(`[data-calendar-day="${initial.due}"]`).getByRole('button', { name: 'Other schedule', exact: true })).toBeVisible();
+  await expect(page.locator(`[data-calendar-day="${initial.due}"]`).getByRole('button', { name: 'Other schedule' })).toBeVisible();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w2.revision)).toBe(0);
   if (!events.some(event => event.type === 'drop'))
     test
@@ -1162,10 +1287,13 @@ test('local file selection simulates metadata atomically and shared surfaces res
   const input = page.getByLabel('Select files for metadata simulation', { exact: true });
   await expect(input).toHaveCount(1);
   const before = await page.evaluate(() => localStorage.getItem('gr8r.workspaces.v1'));
-  await input.setInputFiles(Array.from({ length: 101 }, (_, i) => ({ name: `Too many ${i}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('x') })));
+  await chooseMetadataFiles(
+    page,
+    Array.from({ length: 101 }, (_, i) => ({ name: `Too many ${i}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('x') })),
+  );
   await expect(page.getByRole('alert')).toContainText('100');
   expect(await page.evaluate(() => localStorage.getItem('gr8r.workspaces.v1'))).toBe(before);
-  await input.setInputFiles([{ name: 'Selected <literal>.pdf', mimeType: 'application/pdf', buffer: Buffer.from('metadata-only') }]);
+  await chooseMetadataFiles(page, [{ name: 'Selected <literal>.pdf', mimeType: 'application/pdf', buffer: Buffer.from('metadata-only') }]);
   await page.getByRole('button', { name: 'Add selected metadata', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Selected <literal>.pdf', exact: true })).toBeVisible();
   await page.reload();
@@ -1177,8 +1305,7 @@ test('local file selection simulates metadata atomically and shared surfaces res
   expect(stored.file.by).toBe(stored.actor);
   expect(stored.file.size).toBe('13 B');
   await page.getByRole('button', { name: 'Selected <literal>.pdf', exact: true }).click();
-  await page.getByLabel('File name', { exact: true }).fill('Scoped renamed.pdf');
-  await page.getByRole('button', { name: 'Rename file', exact: true }).click();
+  await renameFileMetadata(page, 'Selected <literal>.pdf', 'Scoped renamed.pdf');
   await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Scoped renamed.pdf');
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   const transfer = await page.evaluateHandle(() => {
@@ -1213,11 +1340,11 @@ for (const panel of ['event', 'overflow', 'overflow event'] as const) {
         const nested = page.getByRole('dialog').getByRole('button', { name: '09:00 Focus event 2', exact: true });
         await nested.focus();
         await page.keyboard.press('Enter');
-        await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Focus event 2');
+        await expect(page.getByRole('dialog').locator('header > strong')).toHaveText('Focus event 2');
       }
       if (dismiss === 'Escape') await page.keyboard.press('Escape');
       else {
-        await page.getByRole('button', { name: 'Close panel', exact: true }).focus();
+        await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).focus();
         await page.keyboard.press('Enter');
       }
       await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -1225,11 +1352,15 @@ for (const panel of ['event', 'overflow', 'overflow event'] as const) {
     }
     if (panel === 'overflow') {
       await page.keyboard.press('Enter');
-      const task = page.getByRole('dialog').getByRole('button', { name: 'Focus task', exact: true });
+      const task = page.getByRole('dialog').getByRole('button', { name: /^Focus task(?: |$)/ });
       await task.focus();
       await page.keyboard.press('Enter');
       await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Task details');
-      await expect(page.getByRole('button', { name: 'Maximize task', exact: true })).toBeFocused();
+      for (const name of ['Reopen task', 'Save changes', 'Add to favorites', 'Copy link', 'Maximize task']) {
+        await expect(page.getByRole('button', { name, exact: true })).toBeFocused();
+        await page.keyboard.press('Tab');
+      }
+      await expect(page.locator('.task-completed-banner').getByRole('button', { name: 'Reopen', exact: true })).toBeFocused();
       await page.keyboard.press('Tab');
       await expect(page.getByLabel('Title', { exact: true })).toBeFocused();
     }
@@ -1249,16 +1380,19 @@ test('project workflows templates eight tabs saved views and keyboard persist lo
   await page.goto('/app-local/w/w1/tasks');
   await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Projects', exact: true }).click();
-  const opener = page.getByRole('button', { name: 'New project', exact: true });
+  const opener = page.locator('#work-content').getByRole('button', { name: 'New project', exact: true });
   await opener.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('combobox', { name: 'Template', exact: true })).toBeVisible();
+  await expect(page.getByRole('radiogroup', { name: 'Template', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(opener).toBeFocused();
   await opener.click();
   await page.getByLabel('Name', { exact: true }).fill('Home <project>');
   await page.getByLabel('Description', { exact: true }).fill('<img src=x onerror=alert(1)> literal project');
-  await page.getByRole('combobox', { name: 'Template', exact: true }).selectOption('software');
+  await page
+    .getByRole('radiogroup', { name: 'Template', exact: true })
+    .getByRole('radio', { name: /^Software Development/ })
+    .click();
   await page.getByRole('button', { name: 'Save project', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Home <project>', exact: true })).toBeVisible();
   for (const tab of ['Overview', 'Board', 'List', 'Table', 'Calendar', 'Timeline', 'Files', 'Activity']) {
@@ -1268,23 +1402,26 @@ test('project workflows templates eight tabs saved views and keyboard persist lo
   await page.getByRole('navigation', { name: 'Project tabs' }).getByRole('link', { name: 'Overview', exact: true }).click();
   await expect(page.getByText('<img src=x onerror=alert(1)> literal project', { exact: true })).toBeVisible();
   await expect(page.locator('.project-overview img')).toHaveCount(0);
-  await page.getByRole('link', { name: 'List', exact: true }).click();
-  await expect(page.getByRole('button', { name: /HOM-1 Technical spec/ })).toBeVisible();
-  await page.locator('.view-options summary').filter({ hasText: 'Filters' }).click();
-  await page.getByRole('button', { name: 'Add filter', exact: true }).click();
-  await page.getByLabel('Filter field 1', { exact: true }).selectOption('priority');
+  await page.locator('#work-content').getByRole('link', { name: 'List', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Technical spec', exact: true }).filter({ hasText: 'HOM-1' })).toBeVisible();
+  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Filters', exact: true }).getByRole('button', { name: 'Add filter: Priority', exact: true }).click();
+  await expect(page.getByLabel('Filter field 1', { exact: true })).toHaveValue('priority');
   await page.getByRole('group', { name: 'Filter values 1', exact: true }).getByRole('checkbox', { name: 'High', exact: true }).check();
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Save view', exact: true }).click();
   await page.getByLabel('View name', { exact: true }).fill('High <view>');
   await page.getByRole('button', { name: 'Save view', exact: true }).last().click();
   await expect(page.locator('.project-tabs [aria-current="page"]')).toHaveText('High <view>');
   await page.reload();
-  await expect(page.getByRole('button', { name: /HOM-1 Technical spec/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /HOM-4 Write tests/ })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Rename view', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Technical spec', exact: true }).filter({ hasText: 'HOM-1' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Write tests', exact: true }).filter({ hasText: 'HOM-4' })).toHaveCount(0);
+  await page.getByRole('link', { name: 'High <view>', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Rename view', exact: true }).click();
   await page.getByLabel('View name', { exact: true }).fill('High renamed');
   await page.getByRole('button', { name: 'Save view', exact: true }).last().click();
-  await page.getByRole('button', { name: 'Delete view', exact: true }).click();
+  await page.getByRole('link', { name: 'High renamed', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Delete view', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete view', exact: true }).click();
   await expect(page.locator('.project-tabs [aria-current="page"]')).toHaveText('List');
   await page.reload();
@@ -1313,6 +1450,7 @@ test('project editing members favorites sidebar ordering archive and full graph 
   await page.addInitScript(() => {
     if (localStorage.getItem('gr8r.workspaces.v1')) return;
     const raw = JSON.parse(localStorage.getItem('gr8r.v2')!);
+    raw.data.projects.find((project: { id: string }) => project.id === 'p1').fav = false;
     const task = raw.data.tasks[0];
     task.title = 'Graph literal';
     task.status = 'done';
@@ -1333,17 +1471,18 @@ test('project editing members favorites sidebar ordering archive and full graph 
   await page.getByLabel('Name', { exact: true }).fill('Project <edited>');
   await page.getByRole('combobox', { name: 'Lead', exact: true }).selectOption('m8');
   await page.getByRole('combobox', { name: 'Team', exact: true }).selectOption('eng');
-  await page.getByRole('combobox', { name: 'Icon', exact: true }).selectOption('heart');
-  await page.getByRole('combobox', { name: 'Color', exact: true }).selectOption('teal');
+  await page.getByRole('radiogroup', { name: 'Icon', exact: true }).getByRole('radio', { name: 'heart', exact: true }).click();
+  await page.getByRole('radiogroup', { name: 'Color', exact: true }).getByRole('radio', { name: 'teal', exact: true }).click();
   await page.getByRole('button', { name: 'Save project', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeFocused();
   await page.getByRole('button', { name: 'Favorite project Project <edited>', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Favorite project Project <edited>', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('combobox', { name: 'Project status', exact: true }).selectOption('risk');
-  await page.getByRole('button', { name: /^Members \(/ }).click();
+  await page.locator('.project-members-trigger').click();
   await expect(page.getByRole('dialog')).toContainText('Local demonstration');
   const memberRow = page.getByRole('dialog').locator('li').filter({ hasText: 'João Pereira' });
-  await memberRow.getByRole('button', { name: 'Remove', exact: true }).click();
+  await memberRow.getByRole('combobox', { name: 'Permission for João Pereira', exact: true }).selectOption('__remove');
+  await expect(memberRow).toHaveCount(0);
   await page.getByRole('combobox', { name: 'Add existing member', exact: true }).selectOption('m3');
   await page.getByLabel('Demo email', { exact: true }).fill('demo-project@example.test');
   await page.getByRole('combobox', { name: 'Local permission', exact: true }).selectOption('Can view');
@@ -1355,6 +1494,7 @@ test('project editing members favorites sidebar ordering archive and full graph 
   await expect(page.getByRole('dialog').locator('.rich-content b').filter({ hasText: 'Graph rich' })).toBeVisible();
   await expect(page.getByRole('dialog').locator('[onerror],script')).toHaveCount(0);
   await page.getByRole('button', { name: 'Add to favorites', exact: true }).click();
+  await openLocalDrawerActions(page);
   await page.getByRole('button', { name: 'Duplicate task', exact: true }).click();
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Graph literal (copy)');
   const individual = new URL(page.url()).searchParams.get('task');
@@ -1409,17 +1549,21 @@ test('project editing members favorites sidebar ordering archive and full graph 
   await card.getByRole('button', { name: 'Archive project', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Archive project', exact: true }).click();
   await expect(card).toHaveCount(0);
+  await page.getByLabel('More project filters', { exact: true }).click();
   await page.getByRole('checkbox', { name: 'Archived', exact: true }).check();
+  await page.getByLabel('More project filters', { exact: true }).click();
   await expect(card).toBeVisible();
   await card.locator('summary').click();
   await card.getByRole('button', { name: 'Restore project', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Restore project', exact: true }).click();
   await expect(card).toHaveCount(0);
+  await page.getByLabel('More project filters', { exact: true }).click();
   await page.getByRole('checkbox', { name: 'Archived', exact: true }).uncheck();
+  await page.getByLabel('More project filters', { exact: true }).click();
   await expect(card).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('pt-BR');
-  await page.getByRole('button', { name: /Alternar tema|Toggle theme/ }).click();
+  await setLanguage(page, 'pt-BR');
+  await toggleTheme(page);
   await page.screenshot({ path: '/tmp/task6b4-projects-mobile-pt-light.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -1438,13 +1582,14 @@ test('project and saved view conflicts preserve drafts after external update or 
   await page.getByRole('button', { name: 'Save project', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByText('Retained project draft', { exact: true })).toBeVisible();
-  await page.getByRole('link', { name: 'List', exact: true }).click();
+  await page.locator('#work-content').getByRole('link', { name: 'List', exact: true }).click();
   await page.getByRole('button', { name: 'Save view', exact: true }).click();
   await page.getByLabel('View name', { exact: true }).fill('CAS view');
   await page.getByRole('dialog').getByRole('button', { name: 'Save view', exact: true }).click();
   await expect(page.locator('.project-tabs [aria-current]')).toHaveText('CAS view');
   const id = new URL(page.url()).searchParams.get('tab')!.slice(2);
-  await page.getByRole('button', { name: 'Rename view', exact: true }).click();
+  await page.locator('.project-tabs [aria-current="page"]').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Rename view', exact: true }).click();
   await page.getByLabel('View name', { exact: true }).fill('Retained view draft');
   await projectLocalCommand(page, 'update_view', { id, name: 'External view' }, 1);
   await page.getByRole('dialog').getByRole('button', { name: 'Save view', exact: true }).click();
@@ -1537,7 +1682,7 @@ test('project overview status navigation activity and personal view keys remain 
   await page.screenshot({ path: '/tmp/task6b4-overview-dark-en.png', fullPage: true });
   const complete = page
     .locator('.project-overview')
-    .getByRole('button', { name: /^Complete / })
+    .getByRole('checkbox', { name: /^Complete / })
     .first();
   const taskName = (await complete.getAttribute('aria-label'))!.slice('Complete '.length);
   await complete.click();
@@ -1555,21 +1700,29 @@ test('project overview status navigation activity and personal view keys remain 
   await page.getByLabel('Search tasks', { exact: true }).fill('No matches saved');
   await page.reload();
   await expect(page.getByLabel('Search tasks', { exact: true })).toHaveValue('No matches saved');
-  await page.getByRole('link', { name: 'List', exact: true }).click();
+  await page.locator('#work-content').getByRole('link', { name: 'List', exact: true }).click();
   await expect(page.getByLabel('Search tasks', { exact: true })).toHaveValue('');
   await expect(page.locator('.view-filter-chips')).toContainText('Done');
   await page.getByRole('link', { name: 'Activity', exact: true }).last().click();
   await expect(page.locator('.project-activity')).toContainText('completed the task');
   const other = data.tasks.find(task => task.project !== 'p1')!;
-  await expect(page.locator('.project-activity').getByRole('button', { name: other.title, exact: true })).toHaveCount(0);
+  await expect(page.locator('.project-activity').getByRole('link', { name: other.title, exact: true })).toHaveCount(0);
   await page.goto('/app-local/w/w1/project?project=p2&tab=list');
   await expect(page.locator('.view-filter-chips')).toHaveCount(0);
   await expect(page.getByLabel('Search tasks', { exact: true })).toHaveValue('');
   await page.goto('/app-local/w/w1/project?project=p1&tab=overview');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('combobox', { name: 'Language', exact: true }).selectOption('pt-BR');
-  await page.getByRole('button', { name: /Alternar tema|Toggle theme/ }).click();
-  expect((await page.locator('.project-heading h1').boundingBox())!.width).toBeGreaterThan(200);
+  await setLanguage(page, 'pt-BR');
+  await toggleTheme(page);
+  const heading = page.locator('.project-heading h1');
+  await expect(heading).toBeVisible();
+  const titleBox = (await heading.boundingBox())!,
+    headerBox = (await page.locator('.project-heading').boundingBox())!,
+    lineHeight = await heading.evaluate(node => parseFloat(getComputedStyle(node).lineHeight));
+  expect(titleBox.height).toBeLessThanOrEqual(lineHeight + 1);
+  expect(titleBox.x).toBeGreaterThanOrEqual(headerBox.x);
+  expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(headerBox.x + headerBox.width);
+
   await page.screenshot({ path: '/tmp/task6b4-overview-mobile-pt.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -1631,10 +1784,11 @@ test('project saved board view context menu supports keyboard rename delete and 
   await page.getByRole('menuitem', { name: 'Delete view', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(tab).toBeFocused();
-  await page.getByRole('button', { name: 'Rename view', exact: true }).click();
+  await page.locator('.project-tabs [aria-current="page"]').click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Rename view', exact: true }).click();
   await page.getByLabel('View name', { exact: true }).fill('Board renamed');
   await page.getByRole('dialog').getByRole('button', { name: 'Save view', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Rename view', exact: true })).toBeFocused();
+  await expect(page.getByRole('link', { name: 'Board renamed', exact: true })).toBeFocused();
   await page.reload();
   await expect(page.locator('.project-tabs [aria-current]')).toHaveText('Board renamed');
   await expect(page.locator('.task-board')).toBeVisible();
@@ -1643,11 +1797,11 @@ test('project saved board view context menu supports keyboard rename delete and 
 test('project collection table has aligned labeled cells and persists layout', async ({ page }) => {
   await prepare(page);
   await page.goto('/app-local/w/w1/projects');
-  await page.getByRole('combobox', { name: 'Project layout', exact: true }).selectOption('table');
+  await page.getByRole('tablist', { name: 'Layout', exact: true }).getByRole('tab', { name: 'Table', exact: true }).click();
   const table = page.getByRole('table', { name: 'Project collection' });
   await expect(table.getByRole('columnheader', { name: 'Project', exact: true })).toBeVisible();
   await expect(table.getByRole('columnheader', { name: 'Status', exact: true })).toBeVisible();
-  await expect(table.getByRole('row').filter({ hasText: data.projects[0].name }).getByRole('cell')).toHaveCount(6);
+  await expect(table.getByRole('row').filter({ hasText: data.projects[0].name }).getByRole('cell')).toHaveCount(10);
   await page.reload();
   await expect(page.getByRole('table', { name: 'Project collection' })).toBeVisible();
 });
@@ -1655,7 +1809,7 @@ test('project collection table has aligned labeled cells and persists layout', a
 async function copyRecoveryFixture(page: import('@playwright/test').Page) {
   await prepare(page);
   await page.goto('/app-local/w/w1/projects');
-  await expect(page.getByRole('button', { name: 'New project', exact: true })).toBeEnabled();
+  await expect(page.locator('#work-content').getByRole('button', { name: 'New project', exact: true })).toBeEnabled();
   await projectLocalCommand(page, 'create_project', { id: 'recovery-project', name: 'Recovery source', key: 'REC', status: 'planning' });
   await projectLocalCommand(page, 'create_task', { id: 'recovery-task', projectId: 'recovery-project', title: 'Recovery task' });
   await projectLocalCommand(page, 'create_task', { id: 'remaining-task', projectId: 'recovery-project', title: 'Remaining task' });
@@ -1758,35 +1912,35 @@ test('remaining routes teams members profile settings persist and canonical memb
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Name', { exact: true }).fill('Home <team>');
   await dialog.getByLabel('Description', { exact: true }).fill('Literal description');
-  await dialog.getByLabel(data.members[0].name, { exact: true }).check();
+  await teamMemberChoice(page, data.members[0].name).check();
   await dialog.getByRole('button', { name: 'Save team', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Home <team>', exact: true }).last()).toBeVisible();
   await page.reload();
-  await expect(page.locator('#work-content').getByRole('button', { name: data.members[0].name, exact: true })).toBeVisible();
+  await expect(page.locator('.team-person button').filter({ has: page.getByText(data.members[0].name, { exact: true }) })).toBeVisible();
   await page.getByRole('button', { name: 'Edit team', exact: true }).click();
-  await page.getByRole('dialog').getByLabel(data.members[0].name, { exact: true }).uncheck();
+  await teamMemberChoice(page, data.members[0].name).uncheck();
   await page.getByRole('button', { name: 'Save team', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.reload();
-  await expect(page.locator('#work-content').getByRole('button', { name: data.members[0].name, exact: true })).toHaveCount(0);
+  await expect(page.locator('.team-person button').filter({ has: page.getByText(data.members[0].name, { exact: true }) })).toHaveCount(0);
   await page.getByRole('button', { name: 'Edit team', exact: true }).click();
   await page.getByRole('button', { name: 'Delete team', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.goto('/app-local/w/w1/settings?sec=profile');
-  await page.getByLabel('Name', { exact: true }).fill('Literal Home');
-  await page.getByLabel('Job title', { exact: true }).fill('Engineer');
+  await page.getByLabel('Full name', { exact: true }).fill('Literal Home');
+  await page.getByLabel('Title', { exact: true }).fill('Engineer');
   await page.getByRole('button', { name: 'Save profile', exact: true }).click();
   await expect(page.getByRole('status', { exact: false }).filter({ hasText: 'Saved' })).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Literal Home');
+  await expect(page.getByLabel('Full name', { exact: true })).toHaveValue('Literal Home');
   await page.goto('/app-local/w/w1/members');
   await page.getByLabel('Search people').fill('Literal Home');
-  await page.locator('#work-content').getByRole('button', { name: 'Literal Home', exact: true }).click();
+  await directoryMemberButton(page, 'Literal Home').click();
   await expect(page.getByRole('heading', { name: 'Literal Home', exact: true }).last()).toBeVisible();
   await page.getByRole('button', { name: 'Assign task', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Assignee', exact: true })).toHaveValue(data.me);
+  await expect(page.getByRole('button', { name: 'Assignee', exact: true })).toContainText('Literal Home');
   await page.getByLabel('Title', { exact: true }).fill('Assigned from profile');
   await page.getByRole('button', { name: 'Create task', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toBeVisible();
@@ -1795,10 +1949,22 @@ test('remaining routes teams members profile settings persist and canonical memb
   await page.getByRole('button', { name: 'Invite member', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Email', { exact: true }).fill('remaining-demo@example.test');
   await page.getByRole('button', { name: 'Create local invitation', exact: true }).click();
-  const invited = page.locator('article.panel-row').filter({ hasText: 'remaining-demo@example.test' });
+  const invited = page.locator('.people-table tbody tr').filter({ hasText: 'remaining-demo@example.test' });
   await expect(invited).toBeVisible();
+  await invited.getByLabel('Member options', { exact: true }).click();
   await invited.getByRole('combobox', { name: 'Local role', exact: true }).selectOption('Guest');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.members.find(
+            (member: { email: string; role: string }) => member.email === 'remaining-demo@example.test',
+          )?.role,
+      ),
+    )
+    .toBe('Guest');
   await page.reload();
+  await invited.getByLabel('Member options', { exact: true }).click();
   await expect(invited.getByRole('combobox', { name: 'Local role', exact: true })).toHaveValue('Guest');
   await invited.getByRole('button', { name: 'Resend local invitation', exact: true }).click();
   await invited.getByRole('button', { name: 'Remove', exact: true }).click();
@@ -1809,18 +1975,21 @@ test('remaining routes teams members profile settings persist and canonical memb
 });
 test('remaining routes preferences apply full drawer project defaults Saturday theme and mobile catalogue focus', async ({ page }) => {
   await prepareRemaining(page, 'settings?sec=preferences');
-  await page.getByRole('combobox', { name: 'Open tasks in', exact: true }).selectOption('full');
-  await page.getByRole('combobox', { name: 'Open on launch', exact: true }).selectOption('inbox');
+  await settingSelect(page, 'Open tasks in').selectOption('full');
+  await settingSelect(page, 'Open on launch').selectOption('inbox');
   await page.reload();
-  await expect(page.getByRole('combobox', { name: 'Open tasks in', exact: true })).toHaveValue('full');
+  await expect(settingSelect(page, 'Open tasks in')).toHaveValue('full');
   await page.goto('/app-local/w/w1/settings?sec=projects');
-  await page.getByRole('combobox', { name: 'Default project view', exact: true }).selectOption('table');
+  await settingSelect(page, 'Default project view').selectOption('table');
   await page.locator('.project-nav').first().click();
   await expect(page).toHaveURL(/tab=table/);
   await page.getByRole('link', { name: 'Projects', exact: true }).click();
-  await page.getByRole('button', { name: 'New project', exact: true }).click();
+  await page.locator('#work-content').getByRole('button', { name: 'New project', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Default tab template');
-  await page.getByRole('combobox', { name: 'Template', exact: true }).selectOption('software');
+  await page
+    .getByRole('radiogroup', { name: 'Template', exact: true })
+    .getByRole('radio', { name: /^Software Development/ })
+    .click();
   await page.getByRole('button', { name: 'Save project', exact: true }).click();
   await expect(page).toHaveURL(/tab=table/);
   await page.goto('/app-local/w/w1/tasks');
@@ -1836,23 +2005,27 @@ test('remaining routes preferences apply full drawer project defaults Saturday t
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   await expect(page).toHaveURL(/\/tasks$/);
   await page.goto('/app-local/w/w1/settings?sec=datetime');
-  await expect(page.getByRole('combobox', { name: 'Time zone', exact: true })).toHaveValue('Unknown/Preserved');
-  await page.getByRole('combobox', { name: 'Week starts on', exact: true }).selectOption('6');
-  await page.getByRole('combobox', { name: 'Date format', exact: true }).selectOption('d/M');
+  await expect(settingSelect(page, 'Time zone')).toHaveValue('Unknown/Preserved');
+  await settingSelect(page, 'Start week on').selectOption('6');
+  await settingSelect(page, 'Date format').selectOption('d/M');
   await page.goto('/app-local/w/w1/calendar');
   await expect(page.locator('.schedule-weekday').first()).toContainText(/Sat/);
   await page.goto('/app-local/w/w1/settings?sec=appearance');
-  await page.getByRole('combobox', { name: 'Motion', exact: true }).selectOption('reduce');
-  await page.getByRole('combobox', { name: 'Sidebar density', exact: true }).selectOption('compact');
-  await page.getByRole('combobox', { name: 'Theme', exact: true }).selectOption('dark');
-  await page.getByRole('combobox', { name: 'Accent color', exact: true }).selectOption('teal');
+  await settingSelect(page, 'Motion').selectOption('reduce');
+  await page
+    .locator('.srow')
+    .filter({ has: page.getByText('Sidebar density', { exact: true }) })
+    .getByRole('button', { name: 'Compact', exact: true })
+    .click();
+  await page.getByRole('radiogroup', { name: 'Theme', exact: true }).getByRole('radio', { name: 'Dark', exact: true }).click();
+  await page.getByRole('radiogroup', { name: 'Accent color', exact: true }).getByRole('radio', { name: 'teal', exact: true }).click();
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduce');
   await expect(page.locator('html')).toHaveAttribute('data-side', 'compact');
   await expect(page.locator('html')).toHaveAttribute('data-accent', 'teal');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app-local/w/w1/system');
-  const opener = page.getByRole('button', { name: 'Open sample modal', exact: true });
+  const opener = page.getByRole('button', { name: 'Modal', exact: true });
   await opener.click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
@@ -1865,22 +2038,28 @@ test('remaining routes preferences apply full drawer project defaults Saturday t
 });
 test('remaining routes inbox read reply favorites search archive and 404 visible workflows', async ({ page }) => {
   await prepareRemaining(page, 'inbox');
-  await page.getByRole('button', { name: /Comments \(/, exact: false }).click();
-  await page.getByRole('button', { name: /commented on Solicitações/ }).click();
-  await page.getByLabel('Comment', { exact: true }).fill('Unique remaining reply');
-  await page.getByRole('button', { name: 'Post comment', exact: true }).click();
+  await page.getByRole('tab', { name: /^Comments(?:\s|$)/ }).click();
+  const notification = page
+    .locator('article.nrow')
+    .filter({ has: page.getByText('Solicitações de permissão need legal review — drafting now.', { exact: true }) });
+  await notification.locator('button.inline-link').click();
+  await page.getByLabel('Reply', { exact: true }).fill('Unique remaining reply');
+  await page.getByRole('button', { name: 'Reply', exact: true }).click();
   await expect(page.locator('.comment .rich-content').filter({ hasText: 'Unique remaining reply' })).toBeVisible();
-  await page.getByRole('button', { name: 'Mark unread', exact: true }).first().click();
-  await page.getByLabel(/Unread only/).check();
-  await expect(page.getByRole('button', { name: /commented on Solicitações/ })).toBeVisible();
+  await notification.getByRole('button', { name: 'Mark unread', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Unread', exact: true }).check();
+  await expect(notification.locator('button.inline-link')).toBeVisible();
   await page.getByRole('button', { name: 'Mark all as read', exact: true }).click();
   await expect(page.getByText('No notifications.', { exact: true })).toBeVisible();
   await page.reload();
-  await page.getByLabel(/Unread only/).check();
+  await page.getByRole('checkbox', { name: 'Unread', exact: true }).check();
   await expect(page.getByText('No notifications.', { exact: true })).toBeVisible();
   await page.goto('/app-local/w/w1/search');
   await page.getByLabel('Search workspace', { exact: true }).fill('Unique remaining reply');
-  await page.getByRole('button', { name: 'Unique remaining reply', exact: true }).click();
+  await page
+    .locator('.search-comment button')
+    .filter({ has: page.getByText('Unique remaining reply', { exact: true }) })
+    .click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   await expect(page).toHaveURL(/\/search$/);
@@ -1897,14 +2076,15 @@ test('remaining routes inbox read reply favorites search archive and 404 visible
   await page.goto('/app-local/w/w1/favorites');
   await expect(page.getByRole('button', { name: new RegExp(firstTitle + '$') })).toBeVisible();
   await page.getByRole('button', { name: new RegExp(firstTitle + '$') }).click();
+  await openLocalDrawerActions(page);
   await page.getByRole('button', { name: 'Archive task', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.goto('/app-local/w/w1/archive');
-  const row = page.locator('.panel-row').filter({ hasText: firstTitle });
+  const row = page.locator('article.archive-row').filter({ hasText: firstTitle });
   await row.getByRole('button', { name: 'Restore', exact: true }).click();
   await expect(row).toHaveCount(0);
   await page.reload();
-  await expect(page.locator('.panel-row').filter({ hasText: firstTitle })).toHaveCount(0);
+  await expect(page.locator('article.archive-row').filter({ hasText: firstTitle })).toHaveCount(0);
   await page.goto('/app-local/w/w1/unknown');
   await expect(page.getByRole('heading', { name: 'Page not found', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Go to Home', exact: true }).click();
@@ -1947,7 +2127,7 @@ test('remaining all registered routes plus fallback eight project tabs auth and 
     await expect(page.locator('.project-tabs').getByRole('link', { name: new RegExp('^' + tab + '$', 'i') })).toHaveAttribute('aria-current', 'page');
   }
   await page.goto('/app-local/w/w1/home');
-  await page.getByLabel('Language', { exact: true }).selectOption('pt-BR');
+  await setLanguage(page, 'pt-BR');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: '/tmp/task6c-home-mobile-pt.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -1963,26 +2143,32 @@ test('remaining all registered routes plus fallback eight project tabs auth and 
 test('remaining home and my tasks create complete filters palette scopes and local demo settings preserve workspace', async ({ page }) => {
   await prepareRemaining(page, 'mytasks');
   await page.getByRole('button', { name: 'Add task in this group', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Assignee', exact: true })).toHaveValue(data.me);
-  await expect(page.getByLabel('Due date', { exact: true })).not.toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Assignee', exact: true })).toContainText(data.members.find(member => member.id === data.me)!.name);
+  await page.getByRole('button', { name: 'Due date', exact: true }).click();
+  await expect(page.locator('[data-date-choice][aria-pressed=true]')).toHaveCount(1);
+  await page.keyboard.press('Escape');
   await page.getByLabel('Title', { exact: true }).fill('Remaining Today task');
   await page.getByRole('button', { name: 'Create task', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
   await expect(page).toHaveURL(/\/mytasks$/);
-  await page.getByRole('textbox', { name: 'New task in group: todo', exact: true }).fill('Inline assigned today');
-  await page.getByRole('button', { name: 'Add to group: todo', exact: true }).click();
+  await page.getByRole('button', { name: 'Add task in group: today', exact: true }).click();
+  await page.getByRole('textbox', { name: 'New task in group: today', exact: true }).fill('Inline assigned today');
+  await page.getByRole('button', { name: 'Add to group: today', exact: true }).click();
   await expect(page.getByRole('button', { name: /Inline assigned today$/ })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: /Inline assigned today$/ })).toBeVisible();
   await page.goto('/app-local/w/w1/home');
-  const row = page.locator('.panel-row').filter({ hasText: 'Remaining Today task' }).first();
+  const row = page.locator('.mini').filter({ hasText: 'Remaining Today task' }).first();
   await row.getByRole('checkbox').click();
   await expect(row).toHaveCount(0);
-  await page.getByRole('button', { name: /Completed$/ }).click();
+  await page
+    .locator('.stats')
+    .getByRole('button', { name: /^Completed\b/ })
+    .click();
   await expect(page).toHaveURL(/filter=done/);
   await expect(page.getByRole('button', { name: /Remaining Today task$/ })).toBeVisible();
-  const opener = page.getByRole('button', { name: 'Open commands', exact: true });
+  const opener = page.getByRole('button', { name: 'Search and commands', exact: true });
   await opener.click();
   await page.getByLabel('Search commands').press('Tab');
   await page.getByRole('combobox', { name: 'Search category', exact: true }).selectOption('task');
@@ -1994,20 +2180,26 @@ test('remaining home and my tasks create complete filters palette scopes and loc
   await page.keyboard.press('Escape');
   await expect(opener).toBeFocused();
   await page.goto('/app-local/w/w1/settings?sec=notif-email');
-  await page.getByRole('checkbox', { name: 'Daily digest', exact: true }).check();
+  await page.getByRole('checkbox', { name: /^Daily digest\b/ }).check();
   await page.reload();
-  await expect(page.getByRole('checkbox', { name: 'Daily digest', exact: true })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /^Daily digest\b/ })).toBeChecked();
   await page.goto('/app-local/w/w1/settings?sec=2fa');
+  await page.getByRole('button', { name: 'Set up demo two-factor authentication', exact: true }).click();
   await page.getByLabel('Demo code (6 digits)', { exact: true }).fill('123456');
   await page.getByRole('button', { name: 'Enable demo', exact: true }).click();
   await expect(page.getByText('Enabled in demo', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByText('Enabled in demo', { exact: true })).toBeVisible();
   await page.goto('/app-local/w/w1/settings?sec=plan');
-  await page.getByRole('button', { name: 'Business', exact: true }).click();
+  await page.getByRole('button', { name: 'Select sample Business', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Business', exact: true })).toBeDisabled();
+  await expect(
+    page
+      .locator('.plan')
+      .filter({ has: page.getByText('Business', { exact: true }) })
+      .getByRole('button', { name: 'Current plan', exact: true }),
+  ).toBeDisabled();
   await page.goto('/app-local/w/w1/settings?sec=workspace');
   await page.getByRole('button', { name: 'Reset demo data', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -2026,12 +2218,20 @@ test('6c fix inbox drafts stay with their task across failed send navigation and
     if (!localStorage.getItem('gr8r.v2')) localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en' } }));
   }, fixture);
   await page.goto('/app-local/w/w1/inbox');
-  await page.getByRole('button', { name: /^Conversation A/ }).click();
+  await page
+    .locator('article.nrow')
+    .filter({ has: page.getByText('Conversation A', { exact: true }) })
+    .locator('button.inline-link')
+    .click();
   const preview = page.getByRole('region', { name: 'Selected conversation' });
-  await preview.getByRole('textbox', { name: 'Comment', exact: true }).fill('Draft belongs to A');
-  await page.getByRole('button', { name: /^Conversation B/ }).click();
-  await expect(preview.getByRole('heading', { name: 'Conversation A', exact: true })).toBeVisible();
-  await expect(preview.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('Draft belongs to A');
+  await preview.getByRole('textbox', { name: 'Reply', exact: true }).fill('Draft belongs to A');
+  await page
+    .locator('article.nrow')
+    .filter({ has: page.getByText('Conversation B', { exact: true }) })
+    .locator('button.inline-link')
+    .click();
+  await expect(preview.getByRole('heading', { name: fixture.tasks[0].title, exact: true })).toBeVisible();
+  await expect(preview.getByRole('textbox', { name: 'Reply', exact: true })).toHaveValue('Draft belongs to A');
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Home', exact: true }).click();
   await expect(page).toHaveURL(/\/inbox$/);
   await page.evaluate(() => {
@@ -2044,25 +2244,38 @@ test('6c fix inbox drafts stay with their task across failed send navigation and
       return original.call(this, key, value);
     };
   });
-  await preview.getByRole('button', { name: 'Post comment', exact: true }).click();
+  await preview.getByRole('button', { name: 'Reply', exact: true }).click();
   await expect(page.getByRole('alert').first()).toBeVisible();
-  await expect(preview.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('Draft belongs to A');
-  await page.getByRole('button', { name: /^Conversation B/ }).click();
-  await expect(preview.getByRole('heading', { name: 'Conversation A', exact: true })).toBeVisible();
-  await preview.getByRole('button', { name: 'Post comment', exact: true }).click();
+  await expect(preview.getByRole('textbox', { name: 'Reply', exact: true })).toHaveValue('Draft belongs to A');
+  await page
+    .locator('article.nrow')
+    .filter({ has: page.getByText('Conversation B', { exact: true }) })
+    .locator('button.inline-link')
+    .click();
+  await expect(preview.getByRole('heading', { name: fixture.tasks[0].title, exact: true })).toBeVisible();
+  await preview.getByRole('button', { name: 'Reply', exact: true }).click();
   await expect(preview.locator('.rich-content').filter({ hasText: 'Draft belongs to A' })).toHaveCount(1);
-  await expect(preview.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('');
-  await page.getByRole('button', { name: /^Conversation B/ }).click();
-  await expect(preview.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('');
-  await preview.getByRole('textbox', { name: 'Comment', exact: true }).fill('Discard only B');
+  await expect(preview.getByRole('textbox', { name: 'Reply', exact: true })).toHaveValue('');
+  await page
+    .locator('article.nrow')
+    .filter({ has: page.getByText('Conversation B', { exact: true }) })
+    .locator('button.inline-link')
+    .click();
+  await expect(preview.getByRole('textbox', { name: 'Reply', exact: true })).toHaveValue('');
+  await preview.getByRole('textbox', { name: 'Reply', exact: true }).fill('Discard only B');
   await preview.getByRole('button', { name: 'Discard reply draft', exact: true }).click();
-  await expect(preview.getByRole('textbox', { name: 'Comment', exact: true })).toHaveValue('');
+  await expect(preview.getByRole('textbox', { name: 'Reply', exact: true })).toHaveValue('');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: '/tmp/task6c-fix1-inbox-mobile.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await preview.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(preview).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /^Conversation A/ })).toBeVisible();
+  await expect(
+    page
+      .locator('article.nrow')
+      .filter({ has: page.getByText('Conversation A', { exact: true }) })
+      .locator('button.inline-link'),
+  ).toBeVisible();
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.comments.filter((c: { text: string }) => c.text === 'Draft belongs to A'),
   );
@@ -2083,7 +2296,7 @@ test.describe('6c fix local calendar boundary', () => {
       if (!localStorage.getItem('gr8r.v2')) localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en', tz: 'Unknown/StoreOnly' } }));
     }, fixture);
     await page.goto('/app-local/w/w1/home');
-    const overdue = page.getByRole('button', { name: /Overdue$/ });
+    const overdue = page.locator('.stats').getByRole('button', { name: /^Overdue\b/ });
     await expect(overdue).toContainText('1');
     await overdue.click();
     await expect(page.getByRole('button', { name: /Yesterday overdue$/ })).toBeVisible();
@@ -2120,7 +2333,10 @@ test('6c fix project creation requests reopen mounted collection and project wit
 
 test('6c evidence overview workload and milestone links preserve destination', async ({ page }) => {
   await prepareRemaining(page, 'overview');
-  await page.locator('#work-content .panel-row').getByRole('button', { name: data.members[0].name, exact: true }).click();
+  await page
+    .locator('button.workload-row')
+    .filter({ has: page.getByText(data.members[0].name.split(' ')[0], { exact: true }).and(page.locator('.workload-name')) })
+    .click();
   await expect(page).toHaveURL(/\/member\?id=m1$/);
   await expect(page.getByRole('heading', { name: data.members[0].name, exact: true, level: 1 })).toBeVisible();
   await page.goBack();
@@ -2141,14 +2357,7 @@ test('6c evidence states controls simulate safely and restore keyboard focus', a
   await expect(page.getByRole('status').filter({ hasText: 'Loading demonstration...' })).toHaveAttribute('aria-busy', 'true');
   await page.getByRole('button', { name: 'Stop loading', exact: true }).click();
   await expect(page.getByText('Loading demonstration...', { exact: true })).toHaveCount(0);
-  const modal = page.getByRole('button', { name: 'Open sample modal', exact: true });
-  await modal.click();
-  await page.getByRole('button', { name: 'Finish example', exact: true }).click();
-  await expect(modal).toBeFocused();
-  await modal.click();
-  await page.keyboard.press('Escape');
-  await expect(modal).toBeFocused();
-  const confirmation = page.getByRole('button', { name: 'Open confirmation', exact: true });
+  const confirmation = page.getByRole('button', { name: 'Delete project', exact: true });
   await confirmation.click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(confirmation).toBeFocused();
@@ -2156,13 +2365,26 @@ test('6c evidence states controls simulate safely and restore keyboard focus', a
   await page.getByRole('button', { name: 'Confirm example', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Example confirmed.' })).toBeVisible();
   await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
-  await page.getByRole('button', { name: 'Show message', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Demonstration message.' })).toBeVisible();
+  await page
+    .locator('article.panel')
+    .filter({ has: page.getByRole('heading', { name: "You're offline", exact: true }) })
+    .getByRole('button', { name: 'Try again', exact: true })
+    .click();
+  await expect(page.getByRole('status').filter({ hasText: 'Sample retry. No network request was made.' })).toBeVisible();
   await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
-  await content.getByRole('button', { name: 'Open commands', exact: true }).click();
+  await page.goto('/app-local/w/w1/system');
+  const modal = page.getByRole('button', { name: 'Modal', exact: true });
+  await modal.click();
+  await page.getByRole('button', { name: 'Finish example', exact: true }).click();
+  await expect(modal).toBeFocused();
+  await modal.click();
+  await page.keyboard.press('Escape');
+  await expect(modal).toBeFocused();
+  await page.getByRole('button', { name: 'Search and commands', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
   expect(await page.evaluate(() => localStorage.getItem('gr8r.workspaces.v1'))).toBe(before);
+  await page.goto('/app-local/w/w1/states');
   await page.getByRole('button', { name: 'Open 404 example', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Page not found', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Go to Home', exact: true }).click();
@@ -2190,6 +2412,7 @@ test('6c evidence project and task favorites star unstar and survive reload', as
   await page.reload();
   await expect(page.locator('#work-content').getByRole('button', { name: fixture.projects[0].name, exact: true })).toBeVisible();
   await expect(page.locator('#work-content').getByRole('button', { name: firstTitle, exact: true })).toBeVisible();
+  await page.locator('details.favorite-project-options').getByLabel('Project options', { exact: true }).click();
   await page.getByRole('button', { name: 'Remove favorite', exact: true }).click();
   await page.locator('#work-content').getByRole('button', { name: firstTitle, exact: true }).click();
   await page.getByRole('button', { name: 'Remove from favorites', exact: true }).click();
@@ -2216,26 +2439,26 @@ test('6c evidence activity category and actor filters retain historical literals
   await page.goto('/app-local/w/w1/activity');
   await expect(page.locator('.activity-feed')).toContainText('updated the workspace');
   const rows = page.locator('#work-content .panel-row');
-  for (const [value, text] of [
-    ['status', 'status literal <kept>'],
-    ['comments', 'comment literal <kept>'],
-    ['projects', 'project literal <kept>'],
+  for (const [category, text] of [
+    ['Status changes', 'status literal <kept>'],
+    ['Comments', 'comment literal <kept>'],
+    ['Projects', 'project literal <kept>'],
   ]) {
-    await page.getByRole('combobox', { name: 'Type', exact: true }).selectOption(value);
+    await page.locator('.activity-toolbar').getByRole('button', { name: category, exact: true }).click();
     await expect(rows).toHaveCount(1);
     await expect(rows).toContainText(text);
   }
-  await page.getByRole('combobox', { name: 'Type', exact: true }).selectOption('all');
+  await page.locator('.activity-toolbar').getByRole('button', { name: 'All', exact: true }).click();
   await expect(rows).toHaveCount(3);
   await page.getByRole('combobox', { name: 'Person', exact: true }).selectOption('m2');
   await expect(rows).toHaveCount(1);
   await expect(rows).toContainText('comment literal <kept>');
   await page.getByRole('combobox', { name: 'Person', exact: true }).selectOption('');
-  await page.getByLabel('Language', { exact: true }).selectOption('pt-BR');
+  await setLanguage(page, 'pt-BR');
   await expect(page.locator('.activity-feed')).toContainText('alterou o espaço de trabalho');
   await expect(rows.filter({ hasText: 'comment literal <kept>' })).toBeVisible();
   await page.goto('/app-local/w/w1/system');
-  await expect(page.getByRole('combobox', { name: 'Tema', exact: true }).locator('option')).toHaveText(['Claro', 'Escuro', 'Sistema']);
+  await expect(page.locator('.catalogue-page > .ph .acts .seg').getByRole('button')).toHaveText(['Claro', 'Escuro', 'Sistema']);
 });
 
 test('6c fix2 deleted team preserves visible draft through polling and explicit discard releases navigation', async ({ page, context }) => {
@@ -2297,13 +2520,13 @@ test('6c fix2 reset refreshes settings baseline and discovery while external wor
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.ws.name)).toBe(data.ws.name);
   await page.getByLabel('Workspace name', { exact: true }).fill('Renamed after reset');
   await page.getByRole('button', { name: 'Save workspace', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Workspace', exact: true }).locator('option:checked')).toHaveText('Renamed after reset');
+  await expectWorkspaceSelected(page, 'Renamed after reset');
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.getByLabel('Workspace name', { exact: true }).fill('Retained stale workspace draft');
   await other.reload();
   await other.getByLabel('Workspace name', { exact: true }).fill('External winner');
   await other.getByRole('button', { name: 'Save workspace', exact: true }).click();
-  await expect(other.getByRole('combobox', { name: 'Workspace', exact: true }).locator('option:checked')).toHaveText('External winner');
+  await expectWorkspaceSelected(other, 'External winner');
   await page.getByRole('button', { name: 'Save workspace', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('draft was kept');
   await expect(page.getByLabel('Workspace name', { exact: true })).toHaveValue('Retained stale workspace draft');
@@ -2316,17 +2539,18 @@ test('final fix completed group inline and drawer creation remain atomic complet
   await page.goto('/login');
   await page.getByRole('link', { name: /Continue on this device|Continuar neste dispositivo/ }).click();
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
+  await page.getByRole('button', { name: 'Add task in group: done', exact: true }).click();
   await page.getByRole('textbox', { name: 'New task in group: done', exact: true }).fill('Created completed inline');
   await page.getByRole('button', { name: 'Add to group: done', exact: true }).click();
   await expect(page.getByRole('button', { name: /Created completed inline/ })).toBeVisible();
   await page.getByRole('link', { name: 'My tasks', exact: true }).click();
   await page.getByRole('button', { name: /^Completed/ }).click();
   await page.getByRole('button', { name: 'Add task in this group', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
+  await expect(page.getByRole('button', { name: 'Status', exact: true })).toContainText('Done');
   await page.getByLabel('Title', { exact: true }).fill('Created completed drawer');
   await page.getByRole('button', { name: 'Create task', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
+  await expect(page.getByRole('button', { name: 'Status', exact: true })).toContainText('Done');
   const rows = await page.evaluate(() =>
     Object.values(JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records as Record<string, { data: { tasks: { title: string; status: string }[] } }>)
       .flatMap((r: { data: { tasks: { title: string; status: string }[] } }) => r.data.tasks)
@@ -2357,7 +2581,7 @@ test('final fix discussion and search expose later pages without declaring parti
   await page.getByRole('button', { name: 'Load more history', exact: true }).click();
   await expect(page.locator('article.comment .rich-content').filter({ hasText: 'Needle final page' })).toBeVisible();
   await page.getByRole('button', { name: 'Close panel', exact: true }).click();
-  await page.getByRole('link', { name: 'Search', exact: true }).click();
+  await openWorkspaceRoute(page, 'Search');
   await page.getByRole('textbox', { name: 'Search workspace' }).fill('Needle final page');
   await expect(page.getByText('No results.', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Load more comments', exact: true }).click();

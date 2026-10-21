@@ -1,0 +1,9 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({
+  testDir: './tests/browser',
+  testMatch: /design-(foundation|panel|work|project-overlays)\.spec\.ts/,
+  outputDir: '/tmp/task-manager-design-results',
+  workers: 1,
+  timeout: 30000,
+  use: { baseURL: 'http://127.0.0.1:5185', viewport: { width: 1440, height: 1000 }, trace: 'retain-on-failure' },
+});

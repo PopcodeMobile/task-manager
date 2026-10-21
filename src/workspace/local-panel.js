@@ -309,6 +309,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
             tfa: !!data.tfa,
             plan: data.plan ?? 'Free',
             invoices: structuredClone(data.invoices ?? []),
+            recentSearches: structuredClone(data.recentSearches ?? []),
           };
         });
       if (name === 'get_local_actor')

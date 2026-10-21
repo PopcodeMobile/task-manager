@@ -5,8 +5,21 @@ import ts from 'typescript';
 import { affectedCollections } from '../src/app/shell/refresh-dependencies.ts';
 function harness(path, imports = {}, effectsEnabled = false) {
   const slots = [],
+    layoutEffects = [],
     effects = [];
   let index = 0;
+  function registerEffect(fn, deps, queue) {
+    const i = index++;
+    if (!effectsEnabled) return;
+    const old = slots[i];
+    if (!old || deps.some((v, j) => v !== old.deps[j])) {
+      old?.cleanup?.();
+      slots[i] = { deps };
+      queue.push(() => {
+        slots[i].cleanup = fn();
+      });
+    }
+  }
   const react = {
     useState(initial) {
       const i = index++;
@@ -27,16 +40,10 @@ function harness(path, imports = {}, effectsEnabled = false) {
       return fn;
     },
     useEffect(fn, deps) {
-      const i = index++;
-      if (!effectsEnabled) return;
-      const old = slots[i];
-      if (!old || deps.some((v, j) => v !== old.deps[j])) {
-        old?.cleanup?.();
-        slots[i] = { deps };
-        effects.push(() => {
-          slots[i].cleanup = fn();
-        });
-      }
+      registerEffect(fn, deps, effects);
+    },
+    useLayoutEffect(fn, deps) {
+      registerEffect(fn, deps, layoutEffects);
     },
   };
   const source = ts.transpileModule(readFileSync(path, 'utf8'), {
@@ -49,6 +56,7 @@ function harness(path, imports = {}, effectsEnabled = false) {
     render(name, ...args) {
       index = 0;
       const result = exports[name](...args);
+      for (const effect of layoutEffects.splice(0)) effect();
       for (const effect of effects.splice(0)) effect();
       return result;
     },

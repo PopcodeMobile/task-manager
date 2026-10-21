@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
+import { openAccount } from './visible-controls.js';
 
 test.describe('final-entry live cloud lifecycle', () => {
   test.skip(!process.env.TEST_SUPABASE_SERVICE_ROLE_KEY, 'Requires private dedicated local Auth/DB credentials.');
@@ -39,7 +40,7 @@ test.describe('final-entry live cloud lifecycle', () => {
     await page.getByRole('link', { name: 'Tasks', exact: true }).click();
     await expect(page.getByText('No tasks here yet')).toBeVisible();
     await page.getByRole('link', { name: 'Projects', exact: true }).click();
-    await page.getByRole('button', { name: 'New project', exact: true }).click();
+    await page.locator('#work-content').getByRole('button', { name: 'New project', exact: true }).click();
     await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Cloud project');
     await page.getByRole('button', { name: 'Save project', exact: true }).click();
     await page.locator('.project-tabs').getByRole('link', { name: 'Board', exact: true }).click();
@@ -51,6 +52,7 @@ test.describe('final-entry live cloud lifecycle', () => {
     await page.reload();
     await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Cloud browser task');
     await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+    await openAccount(page);
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
     await expect(page.getByText('Cloud browser task', { exact: true })).toHaveCount(0);

@@ -1,3 +1,4 @@
+import { Gr8rLogo } from './design/Gr8rMark';
 import { supervisionCatalogs } from '../locales/supervision.js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../components/ui/button';
@@ -146,10 +147,7 @@ function AppearanceApp({ identityKey, local }: { identityKey: string; local: boo
     <div className="react-shell">
       <header className="shell-header">
         <a className="brand" href="/app" aria-label="Gr8r Studio">
-          <span className="brand-symbol" aria-hidden="true">
-            g.
-          </span>
-          Gr8r Studio
+          <Gr8rLogo height={22} />
         </a>
         <div className="shell-controls">{controls}</div>
       </header>

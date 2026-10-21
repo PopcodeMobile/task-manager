@@ -126,7 +126,7 @@ test('residual contextual history pages actual sources, keeps pending context vi
   assert.ok(
     nodes(tree)
       .find(n => n.type === 'feed')
-      .props.events.some(e => e.operation === 'Later match'),
+      .props.history.some(entry => entry.verb === 'Later match'),
   );
   assert.equal(calls.at(-1).cursor, 'next');
   assert.equal(nodes(tree).filter(n => n.type === 'button').length, 0);

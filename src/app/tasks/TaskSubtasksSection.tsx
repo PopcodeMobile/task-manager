@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Task, Subtask } from '../../domain/contracts';
 import type { Member } from '../../workspace/normalized';
@@ -43,7 +44,7 @@ export function TaskSubtasksSection({
   const current = live ?? selected;
   const removed = !!selected && !live;
   return (
-    <section className="drawer-section">
+    <section className="drawer-section task-subtasks-section">
       <h3>{t('Subtarefas', 'Subtasks')}</h3>
       {subtasks.map(s => (
         <div key={s.id} className="subtask-row">
@@ -67,7 +68,7 @@ export function TaskSubtasksSection({
         </div>
       ))}
       <form
-        className="inline-form"
+        className="inline-form task-subtask-add"
         onSubmit={e => {
           e.preventDefault();
           void action(async () => {
@@ -79,14 +80,15 @@ export function TaskSubtasksSection({
       >
         <Input
           aria-label={t('Nova subtarefa', 'New subtask')}
+          placeholder={t('Adicionar uma subtarefa', 'Add a subtask')}
           required
           maxLength={500}
           value={title}
           onChange={e => setTitle(e.target.value)}
           disabled={disabled || editing}
         />
-        <Button type="submit" variant="outline" disabled={disabled || editing}>
-          {t('Adicionar subtarefa', 'Add subtask')}
+        <Button type="submit" variant="ghost" aria-label={t('Adicionar subtarefa', 'Add subtask')} disabled={disabled || editing}>
+          <Plus size={14} />
         </Button>
       </form>
       {current && (

@@ -47,7 +47,9 @@ test('runtime geometry and user-owned color values are permitted', () => {
 });
 
 test('foundation overrides reach the supported React button, drawer and sidebar styles', async () => {
-  const components = await readFile('src/app/styles.css', 'utf8');
+  const entry = await readFile('src/app/styles.css', 'utf8');
+  assert.match(entry, /@import ['"]\.\/design\/base\.css['"]/);
+  const components = await readFile('src/app/design/base.css', 'utf8');
   const shell = await readFile('src/app/shell/workspace.css', 'utf8');
   const preferences = await readFile('src/app/panel/panel.css', 'utf8');
   assert.ok(dependencyChain(declaration(components, '.ui-button', 'gap'), '--space-unit'));

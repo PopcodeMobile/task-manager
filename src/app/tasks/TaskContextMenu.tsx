@@ -32,7 +32,7 @@ export function TaskContextMenu({
   readOnly: boolean;
   signal: AbortSignal;
   close: (restoreFocus?: boolean) => void;
-  open: (id: string) => void;
+  open: (id: string, options?: { quick?: boolean }) => void;
   extraActions?: ExtraTaskMenuAction[];
 }) {
   const menu = useRef<HTMLDivElement>(null),
@@ -137,6 +137,14 @@ export function TaskContextMenu({
             () => {
               close(false);
               open(task.id);
+            },
+            busy,
+          )}
+          {item(
+            t('Edição rápida', 'Quick edit'),
+            () => {
+              close(false);
+              open(task.id, { quick: true });
             },
             busy,
           )}

@@ -1,8 +1,32 @@
 import { useTaskDetails } from '../shell/useWorkspaceData';
+import { fileTone, FileTypeIcon } from '../files/FilesView';
 import { usePagedCollection } from '../shell/usePagedCollection';
 import type { Comment, ActivityEntry } from '../../domain/contracts';
 import type { DomainEvent } from '../../workspace/normalized';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  Plus,
+  Search,
+  MailOpen,
+  CheckCheck,
+  Settings2,
+  Mail,
+  Clock,
+  AtSign,
+  UserPlus,
+  MessageSquare,
+  RefreshCw,
+  TriangleAlert,
+  Archive as ArchiveIcon,
+  History,
+  X,
+  RotateCcw,
+  Trash2,
+  Calendar,
+  ArrowLeft,
+  PanelRightOpen,
+} from 'lucide-react';
+import { PersonAvatar, projectColor, ProjectMark, ProjectState, relativeDate } from './PanelVisual';
 import DOMPurify from 'dompurify';
 import { iso, addD } from '../../core/calendar.js';
 import { Button } from '../../components/ui/button';
@@ -15,16 +39,17 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from '../../components/ui/alert-dialog';
-import type { Task } from '../../domain/contracts';
 import { errorMessage } from '../shell/messages';
-import { TaskList, statusLabel } from '../tasks/TaskList';
+import { TaskStatusIcon, TaskPriorityIcon } from '../tasks/TaskVisual';
+import { TaskList, statusLabel, priorityLabel } from '../tasks/TaskList';
 import { ScheduleView } from '../schedules/ScheduleView';
 import { TaskDiscussionSection } from '../tasks/TaskDiscussionSection';
 import { ActivityPage } from '../activity/ActivityPage';
 import { PeoplePages } from './PeoplePages';
 import { SettingsPage } from './SettingsPage';
 import { CataloguePage } from './CataloguePage';
-import { preferredDate, notificationDay } from './panel-model';
+import { Dashboard } from './Dashboard';
+import { preferredDate } from './panel-model';
 import type { PanelProps } from './types';
 export const remainingRoutes = [
   'home',
@@ -53,182 +78,7 @@ export function RemainingRoutes(p: PanelProps) {
   if (p.route === 'archive') return <ArchivePage {...p} />;
   if (p.route === 'activity') return <HistoryPage {...p} />;
   if (p.route === 'mytasks') return <MyTasks {...p} />;
-  return <Dashboard {...p} />;
-}
-function TaskRows({ tasks, p }: { tasks: Task[]; p: PanelProps }) {
-  const [error, setError] = useState('');
-  return (
-    <>
-      {error && <p role="alert">{error}</p>}
-      {tasks.map(task => (
-        <div className="panel-row" key={task.id}>
-          <input
-            type="checkbox"
-            aria-label={p.t('Concluir: ', 'Complete: ') + task.title}
-            checked={task.status === 'done'}
-            disabled={p.readOnly || !!task.reservation?.active}
-            onChange={() =>
-              void p
-                .execute(
-                  task.status === 'done' ? 'update_task' : 'complete_task',
-                  { id: task.id, ...(task.status === 'done' ? { status: 'todo' } : {}) },
-                  task.version,
-                )
-                .catch(e => setError(errorMessage(e, p.t)))
-            }
-          />
-          <button className="inline-link" onClick={() => p.openTask(task.id)}>
-            {task.title}
-          </button>
-          <time>{preferredDate(task.dueDate, p.prefs, p.t('pt-BR', 'en'))}</time>
-        </div>
-      ))}
-      {!tasks.length && <p className="work-empty">{p.t('Nenhuma tarefa nesta lista.', 'No tasks in this list.')}</p>}
-    </>
-  );
-}
-function Dashboard(p: PanelProps) {
-  const { snapshot: s, t } = p,
-    today = iso(new Date()),
-    tasks = s.tasks.filter(task => !task.archived && s.projects.some(project => project.id === task.projectId && !project.archived)),
-    projects = s.projects.filter(project => !project.archived),
-    mine = tasks.filter(task => task.assigneeUserId === s.actorId),
-    done = tasks.filter(task => task.status === 'done'),
-    overdue = tasks.filter(task => task.status !== 'done' && task.dueDate && task.dueDate < today);
-  const [error, setError] = useState('');
-  if (p.route === 'favorites')
-    return (
-      <section className="panel-page">
-        {error && <p role="alert">{error}</p>}
-        <h2>{t('Projetos favoritos', 'Favorite projects')}</h2>
-        {projects
-          .filter(project => s.preferences.favoriteProjectIds.includes(project.id))
-          .map(project => (
-            <div className="panel-row" key={project.id}>
-              <button className="inline-link" onClick={() => p.openProject(project.id)}>
-                {project.name}
-              </button>
-              <Button variant="ghost" onClick={() => void p.toggleFavorite(project.id, 'project').catch(e => setError(errorMessage(e, t)))}>
-                {t('Remover favorito', 'Remove favorite')}
-              </Button>
-            </div>
-          ))}
-        <h2>{t('Tarefas favoritas', 'Favorite tasks')}</h2>
-        <TaskRows p={p} tasks={tasks.filter(task => s.preferences.favoriteTaskIds.includes(task.id))} />
-        <Button variant="outline" onClick={() => p.go('projects')}>
-          {t('Explorar projetos', 'Browse projects')}
-        </Button>
-      </section>
-    );
-  return (
-    <section className="panel-page">
-      <div className="button-row">
-        <Button disabled={p.readOnly} onClick={() => p.createTask(s.actorId)}>
-          {t('Nova tarefa', 'New task')}
-        </Button>
-        <Button disabled={p.readOnly} variant="outline" onClick={() => p.go('projects', { create: 'true' })}>
-          {t('Novo projeto', 'New project')}
-        </Button>
-        <Button variant="ghost" onClick={() => p.go('members')}>
-          {t('Convidar pessoas', 'Invite people')}
-        </Button>
-      </div>
-      {p.route === 'home' && (
-        <p>
-          {t('Olá, ', 'Hello, ')}
-          {s.members.find(m => m.user_id === s.actorId)?.name ?? t('você', 'you')} ·{' '}
-          {new Date().toLocaleDateString(t('pt-BR', 'en'), { weekday: 'long', day: 'numeric', month: 'long' })}
-        </p>
-      )}
-      <div className="panel-metrics">
-        {[
-          [t('Projetos', 'Projects'), projects.length, 'projects', ''],
-          [t('Em aberto', 'Open'), tasks.length - done.length, 'tasks', 'open'],
-          [t('Concluídas', 'Completed'), done.length, 'tasks', 'done'],
-          [t('Atrasadas', 'Overdue'), overdue.length, 'tasks', 'overdue'],
-        ].map(([label, count, route, filter]) => (
-          <button className="panel-card" key={String(label)} onClick={() => p.go(String(route), { filter: String(filter) })}>
-            <strong>{count}</strong>
-            <span>{label}</span>
-          </button>
-        ))}
-      </div>
-      {p.route === 'home' ? (
-        <>
-          <h2>{t('Minhas tarefas', 'My tasks')}</h2>
-          <TaskRows
-            p={p}
-            tasks={mine
-              .filter(task => task.status !== 'done')
-              .sort((a, b) => (a.dueDate ?? 'z').localeCompare(b.dueDate ?? 'z'))
-              .slice(0, 8)}
-          />
-          <h2>{t('Prazos próximos', 'Upcoming deadlines')}</h2>
-          <TaskRows
-            p={p}
-            tasks={tasks
-              .filter(task => task.status !== 'done' && task.dueDate)
-              .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!))
-              .slice(0, 6)}
-          />
-        </>
-      ) : (
-        <>
-          <h2>{t('Distribuição de tarefas', 'Task distribution')}</h2>
-          <div className="panel-metrics">
-            {['backlog', 'todo', 'progress', 'review', 'done'].map(status => (
-              <div key={status}>
-                <strong>{tasks.filter(task => task.status === status).length}</strong>
-                <span>{statusLabel(status, t)}</span>
-              </div>
-            ))}
-          </div>
-          <h2>{t('Carga por pessoa', 'Workload by person')}</h2>
-          {s.members.map(member => (
-            <div className="panel-row" key={member.user_id}>
-              <button className="inline-link" onClick={() => p.go('member', { id: member.user_id })}>
-                {member.name}
-              </button>
-              <span>{tasks.filter(task => task.assigneeUserId === member.user_id && task.status !== 'done').length}</span>
-            </div>
-          ))}
-        </>
-      )}
-      <h2>{t('Progresso dos projetos', 'Project progress')}</h2>
-      {projects.map(project => {
-        const rows = tasks.filter(task => task.projectId === project.id),
-          completed = rows.filter(task => task.status === 'done').length;
-        return (
-          <article className="panel-row" key={project.id}>
-            <button className="inline-link" onClick={() => p.openProject(project.id)}>
-              {project.name}
-            </button>
-            <progress aria-label={project.name} value={completed} max={rows.length || 1} />
-            <span>
-              {completed}/{rows.length}
-            </span>
-            <Button variant="ghost" onClick={() => p.openProject(project.id, 'timeline')}>
-              {t('Cronograma', 'Timeline')}
-            </Button>
-          </article>
-        );
-      })}
-      <h2>{t('Marcos', 'Milestones')}</h2>
-      {projects.flatMap(project =>
-        Array.isArray(project.legacyMetadata.milestones)
-          ? project.legacyMetadata.milestones.map((milestone, index) =>
-              milestone && typeof milestone === 'object' && !Array.isArray(milestone) ? (
-                <Button key={project.id + index} variant="ghost" onClick={() => p.openProject(project.id, 'timeline')}>
-                  {String(milestone.title ?? milestone.name ?? '')} {String(milestone.date ?? '')}
-                </Button>
-              ) : null,
-            )
-          : [],
-      )}
-      <h2>{t('Atividade recente', 'Recent activity')}</h2>
-      <HistoryPage {...p} compact />
-    </section>
-  );
+  return <Dashboard {...p} recentActivity={<HistoryPage {...p} compact />} />;
 }
 function MyTasks(p: PanelProps) {
   const [calendar, setCalendar] = useState(false),
@@ -243,26 +93,39 @@ function MyTasks(p: PanelProps) {
       completed: mine.filter(task => task.status === 'done'),
     };
   return (
-    <section className="panel-page">
-      <div className="button-row">
-        <Button variant={!calendar ? 'default' : 'ghost'} onClick={() => setCalendar(false)}>
-          {t('Lista', 'List')}
-        </Button>
-        <Button variant={calendar ? 'default' : 'ghost'} onClick={() => setCalendar(true)}>
-          {t('Calendário', 'Calendar')}
-        </Button>
-        <Button
-          disabled={p.readOnly}
-          onClick={() =>
-            p.createTask(
-              s.actorId,
-              group === 'today' ? today : group === 'overdue' ? iso(addD(new Date(), -1)) : undefined,
-              group === 'completed' ? 'done' : undefined,
-            )
-          }
-        >
-          {t('Adicionar tarefa neste grupo', 'Add task in this group')}
-        </Button>
+    <section className="page flush mytasks-page">
+      <div className="ph">
+        <div>
+          <h1>{t('Minhas tarefas', 'My Tasks')}</h1>
+          <p>
+            {groups.today.length} {t('para hoje', 'due today')} · {groups.overdue.length} {t('atrasadas', 'overdue')} · {groups.upcoming.length}{' '}
+            {t('próximas', 'upcoming')}
+          </p>
+        </div>
+        <div className="acts">
+          <div className="seg">
+            <Button variant="ghost" className={!calendar ? 'on' : ''} onClick={() => setCalendar(false)}>
+              {t('Lista', 'List')}
+            </Button>
+            <Button variant="ghost" className={calendar ? 'on' : ''} onClick={() => setCalendar(true)}>
+              {t('Calendário', 'Calendar')}
+            </Button>
+          </div>
+          <Button
+            aria-label={t('Adicionar tarefa neste grupo', 'Add task in this group')}
+            disabled={p.readOnly}
+            onClick={() =>
+              p.createTask(
+                s.actorId,
+                group === 'today' ? today : group === 'overdue' ? iso(addD(new Date(), -1)) : undefined,
+                group === 'completed' ? 'done' : undefined,
+              )
+            }
+          >
+            <Plus size={14} />
+            {t('Nova tarefa', 'New task')}
+          </Button>
+        </div>
       </div>
       {calendar ? (
         <ScheduleView
@@ -283,26 +146,8 @@ function MyTasks(p: PanelProps) {
         />
       ) : (
         <>
-          <div className="button-row">
-            {Object.entries(groups).map(([key, rows]) => (
-              <Button key={key} variant={group === key ? 'default' : 'ghost'} onClick={() => setGroup(key)}>
-                {
-                  (
-                    {
-                      overdue: t('Atrasadas', 'Overdue'),
-                      today: t('Hoje', 'Today'),
-                      upcoming: t('Próximas', 'Upcoming'),
-                      completed: t('Concluídas', 'Completed'),
-                    } as Record<string, string>
-                  )[key]
-                }{' '}
-                ({rows.length})
-              </Button>
-            ))}
-          </div>
           <TaskList
-            key={group}
-            tasks={groups[group as keyof typeof groups]}
+            tasks={mine}
             projects={s.projects}
             members={s.members}
             agents={s.agents}
@@ -316,7 +161,28 @@ function MyTasks(p: PanelProps) {
             view={() => {}}
             href={() => ''}
             hideLayoutSwitch
-            viewKey={'mytasks:' + group}
+            columnOrder={['title', 'project', 'status', 'priority', 'due']}
+            defaultView={{ sort: { f: 'due', dir: 1 }, hidden: ['assignee', 'start', 'created', 'deps'] }}
+            viewKey="mytasks"
+            fixedGroups={Object.entries(groups).map(([key, rows]) => ({
+              key,
+              name: (
+                {
+                  overdue: t('Atrasadas', 'Overdue'),
+                  today: t('Hoje', 'Today'),
+                  upcoming: t('Próximas', 'Upcoming'),
+                  completed: t('Concluídas', 'Completed'),
+                } as Record<string, string>
+              )[key],
+              taskIds: rows.map(task => task.id),
+              collapsed: key === 'completed',
+              onSelect: () => setGroup(key),
+              creationContext: {
+                assigneeUserId: s.actorId,
+                ...(key === 'today' ? { dueDate: today } : key === 'overdue' ? { dueDate: iso(addD(new Date(), -1)) } : {}),
+                ...(key === 'completed' ? { status: 'done' as const } : {}),
+              },
+            }))}
             creationContext={{
               assigneeUserId: s.actorId,
               ...(group === 'today' ? { dueDate: today } : group === 'overdue' ? { dueDate: iso(addD(new Date(), -1)) } : {}),
@@ -345,7 +211,9 @@ function NotificationsPage(p: PanelProps) {
     [selected, setSelected] = useState<string | null>(null),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
-  const rows = s.notifications.filter(n => (!unread || !s.preferences.notificationReadStates[n.id]) && (category === 'all' || n.notificationType === category)),
+  const rows = s.notifications
+      .filter(n => (!unread || !s.preferences.notificationReadStates[n.id]) && (category === 'all' || n.notificationType === category))
+      .sort((a, b) => notificationTimestamp(b.legacyMetadata.at) - notificationTimestamp(a.legacyMetadata.at)),
     notification = s.notifications.find(n => n.id === selected),
     task = s.tasks.find(task => task.id === notification?.taskId);
   const detail = useTaskDetails(p.repo, task?.id, s.tasks.reduce((sum, row) => sum + row.version, 0) + s.events.length, t, s);
@@ -360,114 +228,283 @@ function NotificationsPage(p: PanelProps) {
       setBusy(false);
     }
   }
-  return (
-    <section className="panel-page">
-      <div className="panel-toolbar">
-        <label className="panel-check">
-          <input type="checkbox" checked={unread} onChange={e => setUnread(e.target.checked)} />
-          {t('Somente não lidas', 'Unread only')} ({s.notifications.filter(n => !s.preferences.notificationReadStates[n.id]).length})
-        </label>
-        <Button
-          variant="outline"
-          disabled={busy}
-          onClick={() =>
-            void action(() =>
-              p.markNotifications(
-                s.notifications.map(n => n.id),
-                true,
-              ),
-            )
-          }
-        >
-          {t('Marcar todas como lidas', 'Mark all as read')}
-        </Button>
-        <Button variant="ghost" onClick={() => p.go('settings', { sec: 'notif-email' })}>
-          {t('Preferências de notificações', 'Notification preferences')}
-        </Button>
+  const inbox = p.route === 'inbox';
+  const unreadCount = s.notifications.filter(n => !s.preferences.notificationReadStates[n.id]).length;
+  const markAll = (
+    <Button
+      variant={inbox ? 'ghost' : 'outline'}
+      className={inbox ? 'ibtn ibtn-sm' : ''}
+      aria-label={t('Marcar todas como lidas', 'Mark all as read')}
+      disabled={busy}
+      onClick={() =>
+        void action(() =>
+          p.markNotifications(
+            s.notifications.map(n => n.id),
+            true,
+          ),
+        )
+      }
+    >
+      <CheckCheck size={14} />
+      {!inbox && t('Marcar todas como lidas', 'Mark all as read')}
+    </Button>
+  );
+  const renderNotification = (n: (typeof rows)[number]) => {
+    const person = s.members.find(member => member.user_id === n.authorUserId);
+    const linkedTask = s.tasks.find(task => task.id === n.taskId);
+    const project = s.projects.find(project => project.id === (n.projectId ?? linkedTask?.projectId));
+    const TypeIcon =
+      ({ mention: AtSign, assign: UserPlus, comment: MessageSquare, update: RefreshCw } as Record<string, typeof Clock>)[n.notificationType] ?? Clock;
+    return (
+      <div key={n.id}>
+        <article className={'nrow panel-row' + (!s.preferences.notificationReadStates[n.id] ? ' unread' : '') + (n.id === selected ? ' selected' : '')}>
+          {person ? (
+            <PersonAvatar member={person} size="md" />
+          ) : (
+            <span className={'av md ' + (n.projectId ? 'notification-risk' : 'notification-clock')}>
+              {n.notificationType === 'update' && n.projectId ? <TriangleAlert size={13} /> : <Clock size={13} />}
+            </span>
+          )}
+          <button
+            className="inline-link"
+            onClick={() =>
+              void (async () => {
+                if (n.id !== selected && !(await canSwitch())) return;
+                await action(async () => {
+                  await p.markNotifications([n.id], true);
+                  if (inbox) setSelected(n.id);
+                  else if (n.taskId) p.openTask(n.taskId);
+                  else if (n.projectId) p.openProject(n.projectId);
+                });
+              })()
+            }
+          >
+            <span>
+              {person ? (
+                <>
+                  <strong>{person.name}</strong> <span className="muted">{String(n.legacyMetadata.text ?? n.legacyMetadata.title ?? n.notificationType)}</span>
+                  {linkedTask && <strong> {linkedTask.title}</strong>}
+                </>
+              ) : linkedTask ? (
+                <>
+                  <strong>{linkedTask.title}</strong> <span className="muted">{String(n.legacyMetadata.text ?? n.notificationType)}</span>
+                </>
+              ) : (
+                <strong>{String(n.legacyMetadata.text ?? n.legacyMetadata.title ?? n.notificationType)}</strong>
+              )}
+            </span>
+            <p className="trunc">
+              {notificationSnippet(
+                String(n.legacyMetadata.snippet ?? ''),
+                s.members.map(member => member.name),
+              )}
+            </p>
+            <span className="row notification-meta">
+              <TypeIcon size={11} />
+              {project && (
+                <>
+                  <span className="pdot" style={{ '--c': projectColor(project) } as CSSProperties} />
+                  {project.name}
+                  <span>·</span>
+                </>
+              )}
+              <time>{relativeTime(n.legacyMetadata.at, p)}</time>
+            </span>
+          </button>
+          {!s.preferences.notificationReadStates[n.id] && <span className="notification-unread-dot" aria-label={t('Não lida', 'Unread')} />}
+          <Button
+            variant="ghost"
+            className="ibtn ibtn-xs"
+            aria-label={s.preferences.notificationReadStates[n.id] ? t('Marcar não lida', 'Mark unread') : t('Marcar lida', 'Mark read')}
+            disabled={busy}
+            onClick={() => void action(() => p.markNotifications([n.id], !s.preferences.notificationReadStates[n.id]))}
+          >
+            {s.preferences.notificationReadStates[n.id] ? <Mail size={13} /> : <MailOpen size={13} />}
+          </Button>
+        </article>
       </div>
-      {p.route === 'inbox' && (
-        <div className="button-row">
-          {['all', 'mention', 'assign', 'comment', 'update'].map(key => (
-            <Button key={key} variant={category === key ? 'default' : 'ghost'} onClick={() => setCategory(key)}>
-              {
-                (
-                  {
-                    all: t('Todas', 'All'),
-                    mention: t('Menções', 'Mentions'),
-                    assign: t('Atribuições', 'Assignments'),
-                    comment: t('Comentários', 'Comments'),
-                    update: t('Atualizações', 'Updates'),
-                  } as Record<string, string>
-                )[key]
-              }{' '}
-              ({s.notifications.filter(n => key === 'all' || n.notificationType === key).length})
-            </Button>
+    );
+  };
+  const buckets = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const label = notificationBucket(row.legacyMetadata.at, p);
+    buckets.set(label, [...(buckets.get(label) ?? []), row]);
+  }
+  const list = (
+    <div className="inbox-list">
+      {inbox
+        ? rows.map(renderNotification)
+        : [...buckets].map(([label, entries]) => (
+            <section className="notification-day" key={label}>
+              <h3 className="day-h">{label}</h3>
+              <div className="panel notification-group">{entries.map(renderNotification)}</div>
+            </section>
           ))}
+      {!rows.length && (
+        <div className="empty-state sm">
+          <div className="glyph">
+            <MailOpen size={20} />
+          </div>
+          <h2 className="es-h">{t('Nenhuma notificação.', 'No notifications.')}</h2>
+        </div>
+      )}
+    </div>
+  );
+  return (
+    <section className={'page notifications-page' + (inbox ? ' inbox-page flush' : '')}>
+      {!inbox && (
+        <div className="ph">
+          <div>
+            <h1 className="row">
+              {t('Notificações', 'Notifications')}
+              {unreadCount > 0 && (
+                <span className="badge accent">
+                  {unreadCount} {t('não lidas', 'unread')}
+                </span>
+              )}
+            </h1>
+            <p>{t('Atualizações nas tarefas e projetos que você acompanha.', 'Updates on tasks and projects you follow.')}</p>
+          </div>
+          <div className="acts">
+            <div className="seg">
+              <Button variant="ghost" className={!unread ? 'on' : ''} onClick={() => setUnread(false)}>
+                {t('Todas', 'All')}
+              </Button>
+              <Button variant="ghost" className={unread ? 'on' : ''} onClick={() => setUnread(true)}>
+                {t('Não lidas', 'Unread')}
+              </Button>
+            </div>
+            {markAll}
+            <Button
+              variant="ghost"
+              className="ibtn"
+              aria-label={t('Preferências de notificações', 'Notification preferences')}
+              onClick={() => p.go('settings', { sec: 'notif-email' })}
+            >
+              <Settings2 size={16} />
+            </Button>
+          </div>
         </div>
       )}
       {error && <p role="alert">{error}</p>}
       <div className={'inbox-layout' + (notification ? ' has-selection' : '')}>
-        <div className="inbox-list">
-          {rows.map((n, index) => (
-            <div key={n.id}>
-              {(index === 0 || notificationDay(rows[index - 1].legacyMetadata.at) !== notificationDay(n.legacyMetadata.at)) && (
-                <h3>
-                  {preferredDate(
-                    typeof n.legacyMetadata.at === 'number' ? new Date(n.legacyMetadata.at).toISOString() : String(n.legacyMetadata.at ?? ''),
-                    p.prefs,
-                    t('pt-BR', 'en'),
-                  )}
-                </h3>
-              )}
-              <article className="panel-row">
-                <button
-                  className="inline-link"
-                  onClick={() =>
-                    void (async () => {
-                      if (n.id !== selected && !(await canSwitch())) return;
-                      await action(async () => {
-                        await p.markNotifications([n.id], true);
-                        if (p.route === 'inbox') setSelected(n.id);
-                        else if (n.taskId) p.openTask(n.taskId);
-                        else if (n.projectId) p.openProject(n.projectId);
-                      });
-                    })()
-                  }
-                >
-                  <strong>{String(n.legacyMetadata.text ?? n.legacyMetadata.title ?? n.notificationType)}</strong>
-                  <p>{String(n.legacyMetadata.snippet ?? '')}</p>
-                  {!s.preferences.notificationReadStates[n.id] && <small>{t('Não lida', 'Unread')}</small>}
-                </button>
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => void action(() => p.markNotifications([n.id], !s.preferences.notificationReadStates[n.id]))}
-                >
-                  {s.preferences.notificationReadStates[n.id] ? t('Marcar não lida', 'Mark unread') : t('Marcar lida', 'Mark read')}
-                </Button>
-              </article>
+        {inbox ? (
+          <div className="inbox-sidebar">
+            <div className="row inbox-heading">
+              <h1>{t('Caixa de entrada', 'Inbox')}</h1>
+              <span className="sp" />
+              <label className="row">
+                <input className="toggle" type="checkbox" checked={unread} onChange={e => setUnread(e.target.checked)} />
+                {t('Não lidas', 'Unread')}
+              </label>
+              {markAll}
             </div>
-          ))}
-          {!rows.length && <p className="work-empty">{t('Nenhuma notificação.', 'No notifications.')}</p>}
-        </div>
+            <div className="tabs inbox-tabs" role="tablist">
+              {['all', 'mention', 'assign', 'comment', 'update'].map(key => (
+                <Button
+                  key={key}
+                  role="tab"
+                  aria-selected={category === key}
+                  variant="ghost"
+                  className={'tab' + (category === key ? ' on' : '')}
+                  onClick={() => setCategory(key)}
+                >
+                  {
+                    (
+                      {
+                        all: t('Todas', 'All'),
+                        mention: t('Menções', 'Mentions'),
+                        assign: t('Atribuições', 'Assignments'),
+                        comment: t('Comentários', 'Comments'),
+                        update: t('Atualizações', 'Updates'),
+                      } as Record<string, string>
+                    )[key]
+                  }
+                  {s.notifications.some(n => (key === 'all' || n.notificationType === key) && !s.preferences.notificationReadStates[n.id]) && (
+                    <span className="cnt">
+                      {s.notifications.filter(n => (key === 'all' || n.notificationType === key) && !s.preferences.notificationReadStates[n.id]).length}
+                    </span>
+                  )}
+                </Button>
+              ))}
+            </div>
+            {list}
+          </div>
+        ) : (
+          list
+        )}
+        {!notification && inbox && (
+          <section className="inbox-preview inbox-placeholder">
+            <div className="empty-state">
+              <div className="glyph">
+                <MailOpen size={20} />
+              </div>
+              <h2 className="es-h">{t('Selecione uma notificação', 'Select a notification')}</h2>
+              <p>{t('Leia a conversa e responda sem sair da caixa de entrada.', 'Read the conversation and reply without leaving your inbox.')}</p>
+            </div>
+          </section>
+        )}
         {notification && (
           <section className="inbox-preview" aria-label={t('Conversa selecionada', 'Selected conversation')}>
-            <Button
-              variant="outline"
-              onClick={() =>
-                void canSwitch().then(allowed => {
-                  if (allowed) setSelected(null);
-                })
-              }
-            >
-              {t('Voltar', 'Back')}
-            </Button>
-            <h2>{String(notification.legacyMetadata.text ?? notification.notificationType)}</h2>
+            <div className="inbox-conversation-head">
+              <Button
+                className="ibtn ibtn-sm"
+                variant="ghost"
+                aria-label={t('Voltar', 'Back')}
+                onClick={() =>
+                  void canSwitch().then(allowed => {
+                    if (allowed) setSelected(null);
+                  })
+                }
+              >
+                <ArrowLeft size={15} />
+              </Button>
+              {task && (
+                <>
+                  <span className="pdot" style={{ '--c': projectColor(s.projects.find(project => project.id === task.projectId)) } as CSSProperties} />
+                  <span className="muted">{s.projects.find(project => project.id === task.projectId)?.name}</span>
+                  <span className="faint mono">{task.key}</span>
+                  <span className="sp" />
+                  <Button className="btn-sm" variant="outline" onClick={() => p.openTask(task.id)}>
+                    <PanelRightOpen size={14} />
+                    {t('Abrir tarefa', 'Open task')}
+                  </Button>
+                </>
+              )}
+            </div>
             {task ? (
-              <>
-                <Button onClick={() => p.openTask(task.id)}>{task.title}</Button>
+              <div className="inbox-conversation-body">
+                <h2>{task.title}</h2>
+                <div className="row inbox-task-properties">
+                  <Button variant="ghost" className="pillbtn" onClick={() => p.openTask(task.id)}>
+                    <TaskStatusIcon status={task.status} />
+                    {statusLabel(task.status, t)}
+                  </Button>
+                  <Button variant="ghost" className="pillbtn" onClick={() => p.openTask(task.id)}>
+                    <PersonAvatar member={s.members.find(member => member.user_id === task.assigneeUserId)} />
+                    {s.members.find(member => member.user_id === task.assigneeUserId)?.name ?? t('Sem responsável', 'Unassigned')}
+                  </Button>
+                  <Button variant="ghost" className="pillbtn" onClick={() => p.openTask(task.id)}>
+                    <TaskPriorityIcon priority={task.priority} />
+                    {priorityLabel(task.priority, t)}
+                  </Button>
+                  <Button variant="ghost" className="pillbtn" onClick={() => p.openTask(task.id)}>
+                    <Calendar size={12} />
+                    {relativeDate(task.dueDate, p) || t('Sem prazo', 'No due date')}
+                  </Button>
+                </div>
+                <div className="eyebrow">{t('Conversa', 'Conversation')}</div>
+                {!detail.loading && !detail.error && !detail.comments.length && !detail.more && (
+                  <p className="muted inbox-conversation-snippet">
+                    {notificationSnippet(
+                      String(notification.legacyMetadata.snippet ?? ''),
+                      s.members.map(member => member.name),
+                    )}
+                  </p>
+                )}
                 {detail.error && <Button onClick={detail.retry}>{t('Tentar histórico novamente', 'Retry history')}</Button>}
                 <TaskDiscussionSection
+                  compact
                   registerDraft={registerReply}
                   task={task}
                   comments={detail.comments}
@@ -487,11 +524,22 @@ function NotificationsPage(p: PanelProps) {
                   disabled={p.readOnly || busy || detail.loading || !!detail.error}
                   t={t}
                 />
-              </>
-            ) : notification.projectId ? (
-              <Button onClick={() => p.openProject(notification.projectId!)}>{t('Abrir projeto', 'Open project')}</Button>
+              </div>
             ) : (
-              <p>{String(notification.legacyMetadata.snippet ?? '')}</p>
+              <div className="inbox-conversation-body">
+                <div className="alert danger">
+                  <TriangleAlert size={16} />
+                  <div>
+                    <b>{String(notification.legacyMetadata.text ?? notification.notificationType)}</b>
+                    <div className="muted">{String(notification.legacyMetadata.snippet ?? '')}</div>
+                  </div>
+                </div>
+                {notification.projectId && (
+                  <Button variant="outline" onClick={() => p.openProject(notification.projectId!)}>
+                    {t('Abrir projeto', 'Open project')}
+                  </Button>
+                )}
+              </div>
             )}
           </section>
         )}
@@ -499,22 +547,76 @@ function NotificationsPage(p: PanelProps) {
     </section>
   );
 }
+function notificationSnippet(text: string, names: string[]) {
+  const mentions = names.map(name => '@' + name).filter(name => text.includes(name));
+  if (!mentions.length) return text;
+  const pattern = new RegExp('(' + mentions.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'g');
+  return text.split(pattern).map((part, index) =>
+    mentions.includes(part) ? (
+      <span className="notification-mention" key={index}>
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+function notificationTimestamp(value: unknown) {
+  const number = new Date(typeof value === 'number' ? value : String(value)).valueOf();
+  return Number.isNaN(number) ? 0 : number;
+}
+function notificationBucket(value: unknown, p: Pick<PanelProps, 't'>) {
+  const date = new Date(notificationTimestamp(value)),
+    today = new Date();
+  date.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((today.valueOf() - date.valueOf()) / 86400000);
+  return days === 0 ? p.t('Hoje', 'Today') : days === 1 ? p.t('Ontem', 'Yesterday') : days < 7 ? p.t('Esta semana', 'This week') : p.t('Anterior', 'Earlier');
+}
+function relativeTime(value: unknown, p: Pick<PanelProps, 't' | 'prefs'>) {
+  const date = new Date(typeof value === 'number' ? value : String(value));
+  if (Number.isNaN(date.valueOf())) return '';
+  const minutes = Math.round((Date.now() - date.valueOf()) / 60000);
+  if (minutes < 1) return p.t('agora', 'just now');
+  if (minutes < 60) return `${minutes}m ${p.t('atrás', 'ago')}`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ${p.t('atrás', 'ago')}`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days}d ${p.t('atrás', 'ago')}`;
+  return preferredDate(date.toISOString(), p.prefs, p.t('pt-BR', 'en'));
+}
 function SearchPage(p: PanelProps) {
   const { snapshot: s, t } = p;
   const commentPage = usePagedCollection<Comment>(p.repo, 'list_comments', {}, s.events.length);
   const visibleTaskIds = new Set(s.tasks.map(task => task.id));
   const [q, setQ] = useState(p.params.get('q') ?? ''),
     [category, setCategory] = useState(p.params.get('category') ?? 'all'),
-    [error, setError] = useState('');
-  const recent = Array.isArray(p.prefs.recentSearches) ? p.prefs.recentSearches.filter((v): v is string => typeof v === 'string') : [];
+    [error, setError] = useState(''),
+    [localRecent, setLocalRecent] = useState<string[]>([]);
+  useEffect(() => {
+    if (p.repo.mode !== 'local') return;
+    let active = true;
+    void p.repo
+      .rpc<{ recentSearches?: unknown }>('get_local_settings')
+      .then(value => {
+        if (active) setLocalRecent(Array.isArray(value.recentSearches) ? value.recentSearches.filter((item): item is string => typeof item === 'string') : []);
+      })
+      .catch(error => {
+        if (active) setError(errorMessage(error, t));
+      });
+    return () => {
+      active = false;
+    };
+  }, [p.repo, t]);
+  const recent = Array.isArray(p.prefs.recentSearches) ? p.prefs.recentSearches.filter((v): v is string => typeof v === 'string') : localRecent;
   const results = [
-    ...s.tasks.filter(x => !x.archived).map(x => ({ id: x.id, kind: 'tasks', text: x.title, open: () => p.openTask(x.id) })),
-    ...s.projects.filter(x => !x.archived).map(x => ({ id: x.id, kind: 'projects', text: x.name, open: () => p.openProject(x.id) })),
-    ...s.members.map(x => ({ id: x.user_id, kind: 'people', text: x.name + ' ' + x.email, open: () => p.go('member', { id: x.user_id }) })),
-    ...s.files.map(x => ({ id: x.id, kind: 'files', text: x.name, open: () => p.go('files', { file: x.id }) })),
+    ...s.tasks.filter(x => !x.archived).map(x => ({ id: x.id, kind: 'tasks' as const, entity: x, text: x.title, open: () => p.openTask(x.id) })),
+    ...s.projects.filter(x => !x.archived).map(x => ({ id: x.id, kind: 'projects' as const, entity: x, text: x.name, open: () => p.openProject(x.id) })),
+    ...s.members.map(x => ({ id: x.user_id, kind: 'people' as const, entity: x, text: x.name + ' ' + x.email, open: () => p.go('member', { id: x.user_id }) })),
+    ...s.files.map(x => ({ id: x.id, kind: 'files' as const, entity: x, text: x.name, open: () => p.go('files', { file: x.id }) })),
     ...commentPage.items
       .filter(x => visibleTaskIds.has(x.taskId))
-      .map(x => ({ id: x.id, kind: 'comments', text: DOMPurify.sanitize(x.body, { ALLOWED_TAGS: [] }), open: () => p.openTask(x.taskId) })),
+      .map(x => ({ id: x.id, kind: 'comments' as const, entity: x, text: DOMPurify.sanitize(x.body, { ALLOWED_TAGS: [] }), open: () => p.openTask(x.taskId) })),
   ].filter(x => q.trim() && x.text.toLocaleLowerCase().includes(q.toLocaleLowerCase()));
   async function remember() {
     if (q.trim()) await p.savePrefs({ recentSearches: [q, ...recent.filter(x => x !== q)].slice(0, 10) });
@@ -532,22 +634,31 @@ function SearchPage(p: PanelProps) {
     );
   }
   return (
-    <section className="panel-page">
+    <section className="page search-page">
+      <h1 className="sr-only">{t('Busca', 'Search')}</h1>
       <form
-        className="panel-toolbar"
+        className="panel-toolbar search-form"
         onSubmit={e => {
           e.preventDefault();
           void remember().catch(e => setError(errorMessage(e, t)));
         }}
       >
-        <label>
-          {t('Buscar no espaço', 'Search workspace')}
-          <Input autoFocus value={q} onChange={e => setQ(e.target.value)} />
+        <label className="search-field">
+          <span className="sr-only">{t('Buscar no espaço', 'Search workspace')}</span>
+          <Search size={16} />
+          <Input
+            className="input-lg"
+            placeholder={t('Buscar tarefas, projetos, pessoas, arquivos e comentários', 'Search tasks, projects, people, files, and comments')}
+            value={q}
+            onChange={e => setQ(e.target.value)}
+          />
         </label>
-        <Button>{t('Buscar', 'Search')}</Button>
-        <Button type="button" variant="ghost" onClick={() => setQ('')}>
-          {t('Limpar busca', 'Clear search')}
-        </Button>
+
+        {q && (
+          <Button className="ibtn search-clear" type="button" variant="ghost" aria-label={t('Limpar busca', 'Clear search')} onClick={() => setQ('')}>
+            <X size={14} />
+          </Button>
+        )}
       </form>
       {error && <p role="alert">{error}</p>}
       {(commentPage.more || commentPage.error) && (
@@ -558,9 +669,9 @@ function SearchPage(p: PanelProps) {
           </Button>
         </p>
       )}
-      <div className="button-row">
+      <div className="tabs">
         {['all', 'tasks', 'projects', 'people', 'files', 'comments'].map(key => (
-          <Button key={key} variant={category === key ? 'default' : 'ghost'} onClick={() => setCategory(key)}>
+          <Button key={key} variant="ghost" className={'tab' + (category === key ? ' on' : '')} onClick={() => setCategory(key)}>
             {
               (
                 {
@@ -573,38 +684,144 @@ function SearchPage(p: PanelProps) {
                 } as Record<string, string>
               )[key]
             }{' '}
-            ({results.filter(x => key === 'all' || x.kind === key).length})
+            <span className="cnt">{results.filter(x => key === 'all' || x.kind === key).length}</span>
           </Button>
         ))}
       </div>
-      {results
-        .filter(x => category === 'all' || x.kind === category)
-        .map(x => (
-          <div className="panel-row" key={x.kind + x.id}>
-            <button
-              className="inline-link"
-              onClick={() =>
-                void remember()
-                  .then(x.open)
-                  .catch(e => setError(errorMessage(e, t)))
-              }
-            >
-              {highlight(x.text)}
-            </button>
+      {(['tasks', 'projects', 'people', 'files', 'comments'] as const).map(kind => {
+        const rows = results.filter(result => result.kind === kind);
+        if (!rows.length || (category !== 'all' && category !== kind)) return null;
+        return (
+          <section className="search-result-section" key={kind}>
+            <h2 className="eyebrow">
+              {
+                {
+                  tasks: t('Tarefas', 'Tasks'),
+                  projects: t('Projetos', 'Projects'),
+                  people: t('Pessoas', 'People'),
+                  files: t('Arquivos', 'Files'),
+                  comments: t('Comentários', 'Comments'),
+                }[kind]
+              }{' '}
+              · {rows.length}
+            </h2>
+            <div className="panel">
+              {rows.map(result => {
+                const open = () =>
+                  void remember()
+                    .then(result.open)
+                    .catch(error => setError(errorMessage(error, t)));
+                if (result.kind === 'tasks') {
+                  const task = result.entity,
+                    project = s.projects.find(project => project.id === task.projectId);
+                  return (
+                    <div className="mini panel-row" key={result.id}>
+                      <TaskStatusIcon status={task.status} />
+                      <span className="mono faint search-key">{task.key}</span>
+                      <button className="tt" onClick={open}>
+                        {highlight(task.title)}
+                      </button>
+                      <span className="pj">
+                        <span className="pdot" style={{ '--c': projectColor(project) } as CSSProperties} />
+                        {project?.name}
+                      </span>
+                      <PersonAvatar member={s.members.find(member => member.user_id === task.assigneeUserId)} />
+                    </div>
+                  );
+                }
+                if (result.kind === 'projects') {
+                  const project = result.entity;
+                  return (
+                    <div className="mini panel-row" key={result.id}>
+                      <ProjectMark project={project} />
+                      <button className="tt" onClick={open}>
+                        {highlight(project.name)} <span className="faint">{project.description.slice(0, 70)}</span>
+                      </button>
+                      <ProjectState project={project} t={t} />
+                    </div>
+                  );
+                }
+                if (result.kind === 'people') {
+                  const member = result.entity;
+                  return (
+                    <div className="mini panel-row" key={result.id}>
+                      <PersonAvatar member={member} size="md" />
+                      <button className="tt" onClick={open}>
+                        {highlight(member.name)} <span className="faint">{member.title}</span>
+                      </button>
+                      <span className="faint search-meta">{member.email}</span>
+                    </div>
+                  );
+                }
+                if (result.kind === 'files') {
+                  const file = result.entity,
+                    project = s.projects.find(project => project.id === file.projectId);
+                  return (
+                    <div className="mini panel-row" key={result.id}>
+                      <span className="ftype" style={{ '--c': fileTone(file.fileType) } as CSSProperties}>
+                        <FileTypeIcon type={file.fileType} size={14} />
+                      </span>
+                      <button className="tt" onClick={open}>
+                        {highlight(file.name)}
+                      </button>
+                      <span className="faint search-meta">
+                        {file.sizeLabel} · {project?.name}
+                      </span>
+                    </div>
+                  );
+                }
+                const comment = result.entity,
+                  task = s.tasks.find(task => task.id === comment.taskId);
+                return (
+                  <div className="mini panel-row search-comment" key={result.id}>
+                    <PersonAvatar member={s.members.find(member => member.user_id === comment.authorUserId)} />
+                    <button className="tt" onClick={open}>
+                      <span className="search-comment-context">
+                        <b>{s.members.find(member => member.user_id === comment.authorUserId)?.name}</b> {t('em', 'on')} {task?.title} ·{' '}
+                        {relativeTime(comment.createdAt, p)}
+                      </span>
+                      <span>{highlight(result.text)}</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+      {q && !results.length && commentPage.complete && (
+        <div className="panel empty-state">
+          <div className="glyph">
+            <Search size={20} />
           </div>
-        ))}
-      {q && !results.length && commentPage.complete && <p>{t('Nenhum resultado.', 'No results.')}</p>}
+          <h2 className="es-h">{t('Nenhum resultado.', 'No results.')}</h2>
+          <p>
+            {t('Nenhum resultado para', 'Nothing matches')} “{q}”. {t('Confira a escrita ou tente outro termo.', 'Check the spelling or try a broader term.')}
+          </p>
+          <Button variant="outline" className="btn-sm" onClick={() => setQ('')}>
+            {t('Limpar busca', 'Clear search')}
+          </Button>
+        </div>
+      )}
       {!q && (
         <>
-          <h2>{t('Buscas recentes', 'Recent searches')}</h2>
-          {recent.map(value => (
-            <Button key={value} variant="ghost" onClick={() => setQ(value)}>
-              {value}
+          <div className="row recent-searches">
+            <span className="faint">{t('Recentes:', 'Recent:')}</span>
+            {recent.map(value => (
+              <Button key={value} className="badge" variant="ghost" onClick={() => setQ(value)}>
+                <History size={11} />
+                {value}
+              </Button>
+            ))}
+            <Button
+              className="ibtn ibtn-xs"
+              aria-label={t('Limpar histórico', 'Clear history')}
+              variant="ghost"
+              onClick={() => void p.savePrefs({ recentSearches: [] }).catch(e => setError(errorMessage(e, t)))}
+            >
+              <X size={12} />
             </Button>
-          ))}
-          <Button variant="outline" onClick={() => void p.savePrefs({ recentSearches: [] }).catch(e => setError(errorMessage(e, t)))}>
-            {t('Limpar histórico', 'Clear history')}
-          </Button>
+          </div>
         </>
       )}
     </section>
@@ -612,7 +829,7 @@ function SearchPage(p: PanelProps) {
 }
 export function ArchivePage(p: PanelProps) {
   const { snapshot: s, t } = p;
-  const [tab, setTab] = useState('all'),
+  const [tab, setTab] = useState('task'),
     [error, setError] = useState(''),
     [remove, setRemove] = useState<{ id: string; kind: string; version: number } | null>(null),
     [busy, setBusy] = useState(false);
@@ -628,44 +845,108 @@ export function ArchivePage(p: PanelProps) {
     }
   }
   const rows = [
-    ...s.projects
-      .filter(x => x.archived)
-      .map(x => ({ id: x.id, name: x.name, kind: 'project', version: x.version, date: String(x.legacyMetadata.archivedAt ?? '') })),
+    ...s.projects.filter(x => x.archived).map(x => ({ id: x.id, name: x.name, kind: 'project', version: x.version, date: x.legacyMetadata.archivedAt ?? '' })),
     ...s.tasks.filter(x => x.archived).map(x => ({ id: x.id, name: x.title, kind: 'task', version: x.version, date: x.archivedAt ?? '' })),
   ];
   return (
-    <section className="panel-page">
-      <div className="button-row">
+    <section className="page archive-page">
+      <div className="ph">
+        <div>
+          <h1>{t('Arquivo', 'Archive')}</h1>
+          <p>
+            {t(
+              'Trabalhos arquivados ficam ocultos. Restaure quando precisar ou exclua de vez.',
+              'Archived work is hidden everywhere else. Restore it any time, or delete it for good.',
+            )}
+          </p>
+        </div>
+      </div>
+      <div className="tabs">
         {[
-          ['all', t('Tudo', 'All')],
-          ['project', t('Projetos', 'Projects')],
           ['task', t('Tarefas', 'Tasks')],
+          ['project', t('Projetos', 'Projects')],
         ].map(([key, label]) => (
-          <Button key={key} variant={tab === key ? 'default' : 'ghost'} onClick={() => setTab(key)}>
-            {label} ({rows.filter(x => key === 'all' || x.kind === key).length})
+          <Button key={key} variant="ghost" className={'tab' + (tab === key ? ' on' : '')} onClick={() => setTab(key)}>
+            {label}
+            <span className="cnt">{rows.filter(x => x.kind === key).length}</span>
           </Button>
         ))}
       </div>
       {error && <p role="alert">{error}</p>}
-      {rows
-        .filter(x => tab === 'all' || x.kind === tab)
-        .map(row => (
-          <article className="panel-row" key={row.kind + row.id}>
-            <div>
-              <strong>{row.name}</strong>
-              <p>{preferredDate(row.date, p.prefs, t('pt-BR', 'en'))}</p>
-            </div>
-            <div className="button-row">
-              <Button disabled={p.readOnly || busy} variant="outline" onClick={() => void action(row.kind, row.id, row.version)}>
-                {t('Restaurar', 'Restore')}
-              </Button>
-              <Button disabled={p.readOnly || busy} variant="destructive" onClick={() => setRemove(row)}>
-                {t('Excluir permanentemente', 'Delete permanently')}
-              </Button>
-            </div>
-          </article>
-        ))}
-      {!rows.length && <p className="work-empty">{t('O arquivo está vazio.', 'The archive is empty.')}</p>}
+      {rows.some(row => row.kind === tab) && (
+        <div className="panel archived-list">
+          {rows
+            .filter(row => row.kind === tab)
+            .map(row => {
+              const task = s.tasks.find(task => task.id === row.id),
+                project = s.projects.find(project => project.id === (row.kind === 'project' ? row.id : task?.projectId));
+              return (
+                <article className="mini archive-row" key={row.kind + row.id}>
+                  {row.kind === 'project' && project ? (
+                    <ProjectMark project={project} />
+                  ) : task ? (
+                    <TaskStatusIcon status={task.status} size={15} />
+                  ) : (
+                    <ArchiveIcon size={15} />
+                  )}
+                  <div className="grow">
+                    <div className="trunc archive-title">{row.name}</div>
+                    <div className="faint trunc archive-subtitle">
+                      {row.kind === 'task' ? (
+                        <>
+                          <span className="mono">{task?.key}</span> · {project?.name}
+                        </>
+                      ) : (
+                        <>
+                          {s.tasks.filter(task => task.projectId === row.id).length} {t('tarefas', 'tasks')} ·{' '}
+                          {project && <ProjectState project={project} t={t} />}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <span className="faint hide-m archive-time">
+                    {t('Arquivado', 'Archived')}
+                    {row.date ? ' ' + relativeTime(row.date, p) : ''}
+                  </span>
+                  <Button disabled={p.readOnly || busy} variant="outline" className="btn-sm" onClick={() => void action(row.kind, row.id, row.version)}>
+                    <RotateCcw size={13} />
+                    {t('Restaurar', 'Restore')}
+                  </Button>
+                  <Button
+                    className="ibtn ibtn-sm archive-delete"
+                    aria-label={t('Excluir permanentemente', 'Delete permanently')}
+                    disabled={p.readOnly || busy}
+                    variant="ghost"
+                    onClick={() => setRemove(row)}
+                  >
+                    <Trash2 size={15} />
+                  </Button>
+                </article>
+              );
+            })}
+        </div>
+      )}
+      {!rows.filter(row => row.kind === tab).length && (
+        <div className="panel empty-state archive-empty">
+          <div className="glyph">
+            <ArchiveIcon size={20} />
+          </div>
+          <h2 className="es-h">
+            {tab === 'task' ? t('Nenhuma tarefa arquivada', 'No archived tasks') : t('Nenhum projeto arquivado', 'No archived projects')}
+          </h2>
+          <p>
+            {tab === 'task'
+              ? t(
+                  'Arquive trabalhos concluídos para manter o foco. Eles ficam aqui até você restaurar.',
+                  'Archive finished or abandoned tasks to keep boards focused. They wait here until you restore them.',
+                )
+              : t(
+                  'Projetos arquivados saem das listas, mas mantêm tarefas, arquivos e comentários.',
+                  'Archived projects disappear from the sidebar and project lists but keep every task, file, and comment.',
+                )}
+          </p>
+        </div>
+      )}
       <AlertDialog
         open={!!remove}
         onOpenChange={open => {
@@ -714,7 +995,15 @@ function HistoryPage(p: PanelProps & { compact?: boolean }) {
   const history = activityPage.items.filter(visible).filter(e => (!actor || e.actorUserId === actor) && match(e.verb)),
     events = eventPage.items.filter(e => visible(e.payload)).filter(e => (!actor || e.actorUserId === actor) && match(e.operation));
   return (
-    <section>
+    <section className={p.compact ? 'compact-history' : 'page activity-page'}>
+      {!p.compact && (
+        <div className="ph">
+          <div>
+            <h1>{t('Atividade', 'Activity')}</h1>
+            <p>{t('Tudo que mudou no espaço de trabalho.', "Everything that's changed across the workspace.")}</p>
+          </div>
+        </div>
+      )}
       {(activityPage.more || eventPage.more || activityPage.error || eventPage.error) && (
         <p role="status">
           {t('Histórico parcial. Continue para consultar registros anteriores.', 'Partial history. Continue to view further records.')}
@@ -730,26 +1019,23 @@ function HistoryPage(p: PanelProps & { compact?: boolean }) {
         </p>
       )}
       {!p.compact && (
-        <div className="panel-toolbar">
-          <label>
-            {t('Tipo', 'Type')}
-            <select value={category} onChange={e => setCategory(e.target.value)}>
-              {[
-                ['all', t('Tudo', 'All')],
-                ['status', t('Mudanças de status', 'Status changes')],
-                ['comments', t('Comentários', 'Comments')],
-                ['projects', t('Projetos', 'Projects')],
-              ].map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            {t('Pessoa', 'Person')}
+        <div className="panel-toolbar activity-toolbar">
+          <div className="seg">
+            {[
+              ['all', t('Tudo', 'All')],
+              ['status', t('Mudanças de status', 'Status changes')],
+              ['comments', t('Comentários', 'Comments')],
+              ['projects', t('Projetos', 'Projects')],
+            ].map(([key, label]) => (
+              <Button key={key} variant="ghost" className={category === key ? 'on' : ''} onClick={() => setCategory(key)}>
+                {label}
+              </Button>
+            ))}
+          </div>
+          <label className="activity-person">
+            <span className="sr-only">{t('Pessoa', 'Person')}</span>
             <select value={actor} onChange={e => setActor(e.target.value)}>
-              <option value="">{t('Todas', 'All')}</option>
+              <option value="">{t('Todas as pessoas', 'Everyone')}</option>
               {s.members.map(m => (
                 <option key={m.user_id} value={m.user_id}>
                   {m.name}
@@ -759,29 +1045,20 @@ function HistoryPage(p: PanelProps & { compact?: boolean }) {
           </label>
         </div>
       )}
-      <ActivityPage events={p.compact ? events.slice(-5) : events} members={s.members} agents={s.agents} tasks={s.tasks} openTask={p.openTask} t={t} />
-      {(p.compact ? history.slice(0, 5) : history).map((entry, index) => (
-        <div key={entry.id}>
-          {(index === 0 || history[index - 1]?.createdAt.slice(0, 10) !== entry.createdAt.slice(0, 10)) && (
-            <h3>{preferredDate(entry.createdAt, p.prefs, t('pt-BR', 'en'))}</h3>
-          )}
-          <div className="panel-row">
-            <span>
-              {s.members.find(m => m.user_id === entry.actorUserId)?.name ?? t('Autor histórico', 'Historical author')} {entry.verb}
-            </span>
-            {entry.taskId && (
-              <Button variant="ghost" onClick={() => p.openTask(entry.taskId!)}>
-                {s.tasks.find(task => task.id === entry.taskId)?.title ?? t('Abrir tarefa', 'Open task')}
-              </Button>
-            )}
-            {entry.projectId && (
-              <Button variant="ghost" onClick={() => p.openProject(entry.projectId!)}>
-                {s.projects.find(project => project.id === entry.projectId)?.name ?? t('Abrir projeto', 'Open project')}
-              </Button>
-            )}
-          </div>
-        </div>
-      ))}
+      <ActivityPage
+        actorId={s.actorId}
+        events={events}
+        history={history}
+        projects={s.projects}
+        members={s.members}
+        agents={s.agents}
+        tasks={s.tasks}
+        openTask={p.openTask}
+        openProject={p.openProject}
+        limit={p.compact ? 7 : undefined}
+        grouped={!p.compact}
+        t={t}
+      />
     </section>
   );
 }

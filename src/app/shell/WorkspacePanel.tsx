@@ -16,15 +16,27 @@ import {
   LayoutDashboard,
   Menu,
   Palette,
+  Code,
+  Megaphone,
+  Target,
   Activity,
   CalendarDays,
   ChartGantt,
   Files,
   Bot,
-  CheckCheck,
+  CircleCheck,
+  ListChecks,
+  Paperclip,
+  SquareKanban,
   ChevronRight,
+  ChevronDown,
+  ChevronsUpDown,
+  CircleHelp,
+  PanelLeft,
+  Ellipsis,
+  Lock,
+  List,
   FolderKanban,
-  ListTodo,
   Plug,
   Plus,
   RefreshCw,
@@ -44,7 +56,8 @@ import { ScheduleView } from '../schedules/ScheduleView';
 import { FilesView } from '../files/FilesView';
 import { TaskList } from '../tasks/TaskList';
 import { TaskDrawer, type DraftGuard } from '../tasks/TaskDrawer';
-import { ProjectsPage } from '../projects/ProjectsPage';
+import { ProjectsPage, ProjectIcon } from '../projects/ProjectsPage';
+import { ShellPopover } from '../design/ShellPopover';
 import { AgentsPage } from '../agents/AgentsPage';
 import { IntegrationsPanel } from '../agents/IntegrationsPanel';
 import { useNavigation } from './navigation';
@@ -147,9 +160,43 @@ export function WorkspacePanel({
   const [prefs, setPrefs] = useState<Record<string, unknown>>({}),
     [collapsed, setCollapsed] = useState(false),
     [palette, setPalette] = useState(false),
+    [mobileNavigation, setMobileNavigation] = useState(false),
+    [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({}),
     [paletteMode, setPaletteMode] = useState<'command' | 'search'>('command');
   const paletteOpener = useRef<HTMLElement | null>(null),
     gPending = useRef(0);
+  useEffect(() => {
+    if (!mobileNavigation) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const sidebar = document.querySelector<HTMLElement>('.work-sidebar');
+    sidebar?.querySelector<HTMLElement>('select,button,a[href]')?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (document.querySelector('.ui-sheet')) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMobileNavigation(false);
+      }
+      if (event.key === 'Tab') {
+        const items = [...(sidebar?.querySelectorAll<HTMLElement>('a[href],button:not(:disabled),select') ?? [])].filter(
+          item => item.getClientRects().length && getComputedStyle(item).display !== 'none',
+        );
+        const first = items[0],
+          last = items.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('keydown', key);
+      opener?.focus();
+    };
+  }, [mobileNavigation]);
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -164,7 +211,7 @@ export function WorkspacePanel({
     return () => {
       alive = false;
     };
-  }, [repo]);
+  }, [repo, current?.id]);
   useEffect(() => {
     const update = () => setPrefs(loadAppearance(localStorage, repo.userId));
     addEventListener('gr8r:appearance', update);
@@ -206,7 +253,7 @@ export function WorkspacePanel({
     }
     return `${base}/${route}${q.size ? '?' + q.toString() : ''}`;
   };
-  const openTask = (id: string) => navigate(taskHref({ task: id, due: '', file: '' }));
+  const openTask = (id: string, options?: { quick?: boolean }) => navigate(taskHref({ task: id, due: '', file: '', edit: options?.quick ? 'quick' : '' }));
   const shown = snapshotScope === workspaceId ? snapshot : emptySnapshot;
   const projectId = url.searchParams.get('project') ?? '',
     filterProject = shown.projects.find(p => p.id === projectId),
@@ -223,11 +270,12 @@ export function WorkspacePanel({
   useEffect(() => {
     const content = document.getElementById('work-content');
     if (content) content.scrollTop = 0;
+    setMobileNavigation(false);
   }, [pageLocation]);
   const nav = [
     { id: 'home', label: t('Início', 'Home'), icon: Home },
     { id: 'inbox', label: t('Caixa de entrada', 'Inbox'), icon: Inbox },
-    { id: 'mytasks', label: t('Minhas tarefas', 'My tasks'), icon: CheckCheck },
+    { id: 'mytasks', label: t('Minhas tarefas', 'My tasks'), icon: CircleCheck },
     { id: 'favorites', label: t('Favoritos', 'Favorites'), icon: Star },
     { id: 'notifications', label: t('Notificações', 'Notifications'), icon: Bell },
     { id: 'search', label: t('Busca', 'Search'), icon: Search },
@@ -238,7 +286,7 @@ export function WorkspacePanel({
     { id: 'settings', label: t('Configurações', 'Settings'), icon: Settings },
     { id: 'system', label: t('Sistema visual', 'Design system'), icon: Palette },
     { id: 'states', label: t('Estados', 'States'), icon: LayoutDashboard },
-    { id: 'tasks', label: t('Tarefas', 'Tasks'), icon: ListTodo },
+    { id: 'tasks', label: t('Tarefas', 'Tasks'), icon: ListChecks },
     { id: 'calendar', label: t('Calendário', 'Calendar'), icon: CalendarDays },
     { id: 'timeline', label: t('Cronograma', 'Timeline'), icon: ChartGantt },
     { id: 'files', label: t('Arquivos', 'Files'), icon: Files },
@@ -277,6 +325,7 @@ export function WorkspacePanel({
           (repo.mode !== 'local' || !p.legacyMetadata.private || shown.projectMembers.some(m => m.projectId === p.id && m.userId === shown.actorId)),
       )
       .sort((a, b) => a.sortOrder - b.sortOrder);
+  const projectIsExpanded = (id: string) => expandedProjects[`${workspaceId}:${id}`] ?? id === projects.find(project => project.status !== 'complete')?.id;
   const taskMenuActions: ExtraTaskMenuAction[] = [
     {
       id: 'favorite',
@@ -359,171 +408,379 @@ export function WorkspacePanel({
     addEventListener('keydown', key);
     return () => removeEventListener('keydown', key);
   });
+  const displayName = (repo.mode === 'local' ? shown.members.find(m => m.user_id === shown.actorId)?.name : identity.name) || identity.email || '?';
+  const initials = displayName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(part => part[0])
+    .join('')
+    .toUpperCase();
+  const unread = shown.notifications.filter(item => !shown.preferences.notificationReadStates[item.id]);
+  const navLink = (id: string) => {
+    const item = nav.find(value => value.id === id)!;
+    const count =
+      id === 'notifications'
+        ? unread.length
+        : id === 'inbox'
+          ? unread.filter(n => n.notificationType !== 'update').length
+          : id === 'mytasks'
+            ? visiblePanelSnapshot(shown, repo.mode === 'local').tasks.filter(
+                task => !task.archived && task.assigneeUserId === shown.actorId && task.status !== 'done' && !!task.dueDate && task.dueDate <= iso(new Date()),
+              ).length
+            : 0;
+    return (
+      <a
+        href={`${base}/${item.id}`}
+        key={item.id}
+        aria-label={item.label}
+        title={collapsed ? item.label : undefined}
+        aria-current={route === item.id ? 'page' : undefined}
+        onClick={event => {
+          event.preventDefault();
+          navigate(event.currentTarget.href);
+        }}
+      >
+        <item.icon size={16} />
+        <span className="nav-text">{item.label}</span>
+        {count > 0 && (
+          <small className={id === 'inbox' ? 'nav-count unread' : 'nav-count'} aria-hidden="true">
+            {count}
+          </small>
+        )}
+      </a>
+    );
+  };
+  const toggleSidebar = () => {
+    const next = !collapsed;
+    void (async () => {
+      if (repo.savePersonal) await repo.savePersonal({ collapsed: next });
+      else {
+        const key = `gr8r.preferences.${repo.userId}`;
+        const value = JSON.parse(localStorage.getItem(key) ?? '{}');
+        localStorage.setItem(key, JSON.stringify({ ...value, collapsed: next }));
+      }
+      setCollapsed(next);
+    })().catch(err => setError(errorMessage(err, t)));
+  };
+  const openPalette = () => {
+    paletteOpener.current = document.activeElement as HTMLElement;
+    setPaletteMode('command');
+    setPalette(true);
+  };
+  const accountControls = (
+    <>
+      <div
+        className="shell-controls"
+        onClickCapture={event => {
+          if ((event.target as HTMLElement).closest('[data-action="logout"]') && (draft.current?.dirty || panelDraft.current?.dirty)) {
+            event.preventDefault();
+            event.stopPropagation();
+            void (async () => {
+              if (await canLeave()) {
+                try {
+                  await onSignOut?.();
+                } catch (err) {
+                  setError(errorMessage(err, t));
+                }
+              }
+            })();
+          }
+        }}
+      >
+        {controls}
+      </div>
+      <label className="density-label">
+        {t('Densidade', 'Density')}
+        <select aria-label={t('Densidade', 'Density')} value={density} onChange={event => setDensity(event.target.value)}>
+          <option value="comfortable">{t('Confortável', 'Comfortable')}</option>
+          <option value="compact">{t('Compacta', 'Compact')}</option>
+        </select>
+      </label>
+      <Button
+        variant="ghost"
+        onClick={() => {
+          setCreateWorkspace(true);
+          setWorkspaceName('');
+        }}
+      >
+        <Plus size={15} />
+        {t('Criar organização', 'Create workspace')}
+      </Button>
+    </>
+  );
   return (
-    <div className={'work-shell' + (collapsed ? ' sidebar-collapsed' : '')}>
+    <div data-route={route} className={'work-shell' + (collapsed ? ' sidebar-collapsed' : '') + (mobileNavigation ? ' mobile-navigation-open' : '')}>
       <a className="work-skip" href="#work-content">
         {t('Ir para conteúdo', 'Skip to content')}
       </a>
       <aside className="work-sidebar">
         <div className="work-brand">
           {workspaces.length ? (
-            <WorkspacePicker items={workspaces} value={workspaceId} onChange={id => navigate(`${routeRoot}/w/${id}/home`)} t={t} />
+            <WorkspacePicker
+              items={workspaces}
+              value={workspaceId}
+              onChange={id => navigate(`${routeRoot}/w/${id}/home`)}
+              onCreate={() => {
+                setCreateWorkspace(true);
+                setWorkspaceName('');
+              }}
+              onSettings={() => go('settings', { sec: 'workspace' })}
+              onInvite={() => go('members')}
+              t={t}
+            />
           ) : (
             <span className="brand">Gr8r Studio</span>
           )}
           <Button
-            className="mobile-create"
-            variant="ghost"
-            aria-label={t('Criar organização', 'Create workspace')}
-            onClick={() => {
-              setCreateWorkspace(true);
-              setWorkspaceName('');
-            }}
-          >
-            <Plus size={16} />
-          </Button>
-        </div>
-        <div className="button-row">
-          <Button
+            className="sidebar-toggle"
             variant="ghost"
             data-sidebar-toggle
             aria-label={t('Alternar barra lateral', 'Toggle sidebar')}
             aria-expanded={!collapsed}
-            onClick={() => {
-              const next = !collapsed;
-              void (async () => {
-                if (repo.savePersonal) await repo.savePersonal({ collapsed: next });
-                else {
-                  const key = `gr8r.preferences.${repo.userId}`;
-                  const value = JSON.parse(localStorage.getItem(key) ?? '{}');
-                  localStorage.setItem(key, JSON.stringify({ ...value, collapsed: next }));
-                }
-                setCollapsed(next);
-              })().catch(err => setError(errorMessage(err, t)));
-            }}
+            onClick={toggleSidebar}
           >
-            <Menu size={16} />
+            <PanelLeft size={15} />
           </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              paletteOpener.current = document.activeElement as HTMLElement;
-              setPaletteMode('command');
-              setPalette(true);
-            }}
-            aria-label={t('Abrir comandos', 'Open commands')}
-          >
-            <Search size={16} />
+          <Button className="mobile-close" variant="ghost" aria-label={t('Fechar navegação', 'Close navigation')} onClick={() => setMobileNavigation(false)}>
+            <Menu size={16} />
           </Button>
         </div>
         <nav aria-label={t('Navegação principal', 'Main navigation')}>
-          <div className="nav-caption">{t('ESPAÇO DE TRABALHO', 'WORKSPACE')}</div>
-          {nav.map(item => (
-            <a
-              href={`${base}/${item.id}`}
-              key={item.id}
-              aria-current={route === item.id ? 'page' : undefined}
-              onClick={e => {
-                e.preventDefault();
-                navigate(e.currentTarget.href);
-              }}
-            >
-              <item.icon size={17} />
-              {item.label}
-              {item.id === 'tasks' && <small aria-hidden="true">{shown.tasks.filter(task => task.status !== 'done' && !task.archived).length}</small>}
-            </a>
-          ))}
-          <div className="nav-caption">{t('PROJETOS', 'PROJECTS')}</div>
-          {projects.map(p => (
-            <a
-              key={p.id}
-              className="project-nav"
-              href={`${base}/project?project=${encodeURIComponent(p.id)}&tab=${defaultProjectTab(prefs)}`}
-              onClick={e => {
-                e.preventDefault();
-                navigate(e.currentTarget.href);
-              }}
-            >
-              <FolderKanban size={16} />
-              <span>{p.name}</span>
-            </a>
-          ))}
+          {['home', 'inbox', 'mytasks', 'favorites', 'notifications'].map(navLink)}
+          <section className="nav-group">
+            <div className="nav-caption">{t('Espaço de trabalho', 'Workspace')}</div>
+            {['overview', 'projects', 'tasks', 'calendar', 'timeline', 'members', 'activity'].map(navLink)}
+          </section>
+          <section className="nav-group">
+            <div className="nav-caption">
+              <span>{t('Projetos', 'Projects')}</span>
+              <Button variant="ghost" disabled={readOnly} aria-label={t('Novo projeto', 'New project')} onClick={() => go('projects', { create: 'true' })}>
+                <Plus size={14} />
+              </Button>
+            </div>
+            {projects
+              .filter(project => project.status !== 'complete')
+              .map(project => (
+                <div className="sidebar-project" key={project.id}>
+                  <div className="sidebar-project-row">
+                    <a
+                      className="project-nav"
+                      aria-current={route === 'project' && projectId === project.id ? 'page' : undefined}
+                      title={project.name}
+                      href={`${base}/project?project=${encodeURIComponent(project.id)}&tab=${defaultProjectTab(prefs)}`}
+                      onClick={event => {
+                        event.preventDefault();
+                        navigate(event.currentTarget.href);
+                      }}
+                    >
+                      <ProjectIcon project={project} />
+                      <span className="nav-text">{project.name}</span>
+                      {shown.preferences.favoriteProjectIds.includes(project.id) && <Star className="project-favorite" size={11} />}
+                      {project.legacyMetadata.private === true && <Lock className="project-lock" size={11} />}
+                      <span className="project-state-dot" data-status={project.status} />
+                    </a>
+                    <Button
+                      className="project-expand"
+                      variant="ghost"
+                      aria-label={`${t('Expandir projeto', 'Expand project')}: ${project.name}`}
+                      aria-expanded={projectIsExpanded(project.id)}
+                      onClick={() => setExpandedProjects(value => ({ ...value, [`${workspaceId}:${project.id}`]: !projectIsExpanded(project.id) }))}
+                    >
+                      <ChevronRight size={13} />
+                    </Button>
+                  </div>
+                  {projectIsExpanded(project.id) && (
+                    <div className="project-children">
+                      {(
+                        [
+                          ['board', t('Quadro', 'Board'), SquareKanban],
+                          ['list', t('Lista', 'List'), List],
+                          ['timeline', t('Cronograma', 'Timeline'), ChartGantt],
+                          ['files', t('Arquivos', 'Files'), Paperclip],
+                        ] as const
+                      ).map(([tab, label, Icon]) => (
+                        <a
+                          key={tab}
+                          href={`${base}/project?project=${encodeURIComponent(project.id)}&tab=${tab}`}
+                          aria-current={route === 'project' && projectId === project.id && url.searchParams.get('tab') === tab ? 'page' : undefined}
+                          onClick={event => {
+                            event.preventDefault();
+                            navigate(event.currentTarget.href);
+                          }}
+                        >
+                          <Icon size={14} />
+                          <span className="nav-text">{label}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            {navLink('archive')}
+          </section>
+          <section className="nav-group">
+            <div className="nav-caption">
+              <span>{t('Equipes', 'Teams')}</span>
+              <Button variant="ghost" aria-label={t('Ver equipes', 'View teams')} onClick={() => go('teams')}>
+                <Plus size={14} />
+              </Button>
+            </div>
+            {shown.teams.map(team => {
+              const TeamIcon =
+                ({ palette: Palette, code: Code, megaphone: Megaphone, target: Target } as Record<string, typeof Users>)[String(team.legacyMetadata.icon)] ??
+                Users;
+              return (
+                <a
+                  key={team.id}
+                  href={`${base}/team?id=${encodeURIComponent(team.id)}`}
+                  aria-label={team.name}
+                  title={collapsed ? team.name : undefined}
+                  aria-current={route === 'team' && url.searchParams.get('id') === team.id ? 'page' : undefined}
+                  onClick={event => {
+                    event.preventDefault();
+                    navigate(event.currentTarget.href);
+                  }}
+                >
+                  <TeamIcon size={16} />
+                  <span className="nav-text">{team.name}</span>
+                </a>
+              );
+            })}
+          </section>
         </nav>
         <div className="work-sidebar-bottom">
-          <span>
-            <Star size={15} />
-            <button className="inline-link" onClick={() => go('favorites')}>
-              {t('Favoritos', 'Favorites')}
-            </button>{' '}
-            <small data-testid="favorite-count">{shown.preferences.favoriteProjectIds.length + shown.preferences.favoriteTaskIds.length}</small>
-          </span>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setCreateWorkspace(true);
-              setWorkspaceName('');
+          <ShellPopover
+            label={t('Ajuda e recursos', 'Help & resources')}
+            className="sidebar-help"
+            menu
+            trigger={
+              <>
+                <CircleHelp size={16} />
+                <span className="nav-text">{t('Ajuda e recursos', 'Help & resources')}</span>
+              </>
+            }
+          >
+            {['files', 'agents', 'integrations', 'search', 'system', 'states'].map(id => (
+              <button role="menuitem" key={id} onClick={() => go(id)}>
+                {nav.find(item => item.id === id)!.label}
+              </button>
+            ))}
+            {['tasks', 'calendar', 'timeline'].includes(route) && (
+              <button role="menuitem" onClick={() => void refresh(true)}>
+                <RefreshCw size={15} />
+                {t('Atualizar dados', 'Refresh data')}
+              </button>
+            )}
+            <button role="menuitem" onClick={() => go('settings', { sec: 'shortcuts' })}>
+              {t('Atalhos de teclado', 'Keyboard shortcuts')}
+            </button>
+          </ShellPopover>
+          <a
+            href={`${base}/settings`}
+            aria-label={t('Configurações', 'Settings')}
+            title={collapsed ? t('Configurações', 'Settings') : undefined}
+            aria-current={route === 'settings' ? 'page' : undefined}
+            onClick={event => {
+              event.preventDefault();
+              navigate(event.currentTarget.href);
             }}
           >
-            <Plus size={15} />
-            {t('Criar organização', 'Create workspace')}
-          </Button>
-          <span className="account-name">
-            <span className="account-avatar">
-              {String((repo.mode === 'local' ? shown.members.find(m => m.user_id === shown.actorId)?.name : identity.name) || identity.email || '?')
-                .slice(0, 2)
-                .toUpperCase()}
-            </span>
-            <button className="inline-link" onClick={() => go('settings', { sec: 'profile' })}>
-              {(repo.mode === 'local' ? shown.members.find(m => m.user_id === shown.actorId)?.name : identity.name) || identity.email}
-            </button>
+            <Settings size={16} />
+            <span className="nav-text">{t('Configurações', 'Settings')}</span>
+          </a>
+          <ShellPopover
+            label={t('Menu da conta', 'Account menu')}
+            className="account-popover sidebar-account-popover"
+            trigger={
+              <>
+                <span className="account-avatar presence">{initials}</span>
+                <span className="nav-text">{displayName}</span>
+                <ChevronsUpDown size={13} />
+              </>
+            }
+          >
+            {accountControls}
+          </ShellPopover>
+          <span className="sr-only" data-testid="favorite-count">
+            {shown.preferences.favoriteProjectIds.length + shown.preferences.favoriteTaskIds.length}
           </span>
         </div>
       </aside>
-      <div className="work-main">
+      {mobileNavigation && (
+        <button className="navigation-scrim" aria-label={t('Fechar navegação', 'Close navigation')} onClick={() => setMobileNavigation(false)} />
+      )}
+      <div className="work-main" inert={mobileNavigation}>
         <header className="work-topbar">
-          <div className="work-breadcrumb">
-            {current?.name ?? 'Gr8r Studio'}
-            <ChevronRight size={14} />
-            <strong>{activeNav?.label ?? t('Página', 'Page')}</strong>
-          </div>
-          <div
-            className="shell-controls"
-            onClickCapture={event => {
-              if ((event.target as HTMLElement).closest('[data-action="logout"]') && (draft.current?.dirty || panelDraft.current?.dirty)) {
-                event.preventDefault();
-                event.stopPropagation();
-                void (async () => {
-                  if (await canLeave()) {
-                    try {
-                      await onSignOut?.();
-                    } catch (err) {
-                      setError(errorMessage(err, t));
-                    }
-                  }
-                })();
-              }
-            }}
+          <Button
+            className="mobile-nav-toggle"
+            variant="ghost"
+            aria-label={t('Abrir navegação', 'Open navigation')}
+            aria-expanded={mobileNavigation}
+            onClick={() => setMobileNavigation(true)}
           >
-            {controls}
+            <Menu size={17} />
+          </Button>
+          <div className="work-breadcrumb">
+            {['project', 'member', 'team'].includes(route) && (
+              <>
+                <button onClick={() => go(route === 'project' ? 'projects' : route === 'member' ? 'members' : 'teams')}>
+                  {t(
+                    route === 'project' ? 'Projetos' : route === 'member' ? 'Membros' : 'Equipes',
+                    route === 'project' ? 'Projects' : route === 'member' ? 'Members' : 'Teams',
+                  )}
+                </button>
+                <span>/</span>
+              </>
+            )}
+            <strong>{activeNav?.label ?? t('Página', 'Page')}</strong>
+            <span className="sr-only">{current?.name ?? 'Gr8r Studio'}</span>
           </div>
+          <span className="sp" />
+          <Button className="topsearch" variant="ghost" aria-label={t('Busca e comandos', 'Search and commands')} onClick={openPalette}>
+            <Search size={14} />
+            <span className="lbltxt">{t('Buscar ou ir para…', 'Search or jump to…')}</span>
+            <kbd>⌘K</kbd>
+          </Button>
+          <Button className="topbar-notifications" variant="ghost" aria-label={t('Notificações', 'Notifications')} onClick={() => go('notifications')}>
+            <Bell size={16} />
+            {unread.length > 0 && <span className="notification-dot" />}
+          </Button>
+          <ShellPopover
+            label={t('Criar novo', 'Create new')}
+            className="new-popover"
+            menu
+            trigger={
+              <>
+                <Plus size={14} />
+                <span>{t('Novo', 'New')}</span>
+                <ChevronDown size={12} />
+              </>
+            }
+          >
+            <button role="menuitem" disabled={readOnly || !projects.length} onClick={() => openTask('new')}>
+              {t('Nova tarefa', 'New task')}
+            </button>
+            <button role="menuitem" disabled={readOnly} onClick={() => go('projects', { create: 'true' })}>
+              {t('Novo projeto', 'New project')}
+            </button>
+            <button
+              role="menuitem"
+              onClick={() => {
+                setCreateWorkspace(true);
+                setWorkspaceName('');
+              }}
+            >
+              {t('Criar organização', 'Create workspace')}
+            </button>
+          </ShellPopover>
+          <ShellPopover label={t('Menu da conta', 'Account menu')} className="account-popover" trigger={<span className="account-avatar">{initials}</span>}>
+            {accountControls}
+          </ShellPopover>
         </header>
-        <div className="work-status">
+        <div className="work-status sr-only" role="status">
           <span className="sync-dot" />
           {repo.mode === 'local' ? t('Armazenado neste dispositivo', 'Stored on this device') : t('Organização na nuvem', 'Cloud workspace')}
           <span>{readOnly ? t('Somente leitura', 'Read only') : t('Alterações por versão', 'Versioned changes')}</span>
-          <label className="density-label">
-            {t('Densidade', 'Density')}
-            <select
-              aria-label={t('Densidade', 'Density')}
-              value={density}
-              onChange={e => {
-                setDensity(e.target.value);
-              }}
-            >
-              <option value="comfortable">{t('Confortável', 'Comfortable')}</option>
-              <option value="compact">{t('Compacta', 'Compact')}</option>
-            </select>
-          </label>
         </div>
         <main className="work-content" id="work-content" tabIndex={-1}>
           {discovery ? (
@@ -567,6 +824,7 @@ export function WorkspacePanel({
                     navigate(next.pathname + next.search, true);
                   }}
                   back={() => navigate(`${base}/projects`)}
+                  projectHref={id => `${base}/project?${new URLSearchParams({ project: id, tab: 'overview' })}`}
                   href={taskHref}
                   navigate={navigate}
                   openTask={openTask}
@@ -583,17 +841,17 @@ export function WorkspacePanel({
                   openProject={openProject}
                   readOnly={readOnly}
                 />
-              ) : (
-                <div className="page-heading">
+              ) : remainingRoutes.includes(route) ? null : (
+                <div className="page-heading ph workspace-page-heading">
                   <div>
                     <h1>{filterProject?.name ?? activeNav?.label ?? t('Página indisponível', 'Page unavailable')}</h1>
                     <p>
                       {route === 'tasks'
-                        ? t('Todo o trabalho da equipe, com cada próximo passo no lugar.', 'Your team’s work, with every next step in place.')
+                        ? t(`Todas as tarefas de ${projects.length} projetos.`, `Every task across ${projects.length} projects.`)
                         : route === 'calendar'
-                          ? t('Prazos e eventos de todos os projetos.', 'Deadlines and events across projects.')
+                          ? t('Prazos e eventos de todos os projetos.', 'Deadlines and events across every project.')
                           : route === 'timeline'
-                            ? t('Datas, dependências e marcos dos projetos.', 'Schedules, dependencies and project milestones.')
+                            ? t('Prazos, dependências e marcos dos projetos.', 'Schedules, dependencies, and milestones across projects.')
                             : route === 'files'
                               ? t('Documentos e metadados dos projetos.', 'Project documents and metadata.')
                               : route === 'agents'
@@ -605,29 +863,27 @@ export function WorkspacePanel({
                                     : t('Seu espaço de trabalho.', 'Your workspace.')}
                     </p>
                   </div>
-                  <div className="button-row">
-                    <Button variant="ghost" aria-label={t('Atualizar dados', 'Refresh data')} onClick={() => void refresh(true)}>
-                      <RefreshCw size={16} />
-                    </Button>
-                    {['tasks', 'calendar', 'timeline'].includes(route) && (
-                      <Button disabled={readOnly || !projects.length} onClick={() => openTask('new')}>
-                        <Plus size={16} />
-                        {t('Nova tarefa', 'New task')}
-                      </Button>
-                    )}
-                  </div>
+                  {route !== 'timeline' && (
+                    <div className="button-row acts">
+                      {!['tasks', 'calendar'].includes(route) && (
+                        <Button variant="ghost" aria-label={t('Atualizar dados', 'Refresh data')} onClick={() => void refresh(true)}>
+                          <RefreshCw size={16} />
+                        </Button>
+                      )}
+                      {['tasks', 'calendar'].includes(route) && (
+                        <Button disabled={readOnly || !projects.length} onClick={() => openTask('new')}>
+                          <Plus size={14} />
+                          {t('Nova tarefa', 'New task')}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               {loading ? (
                 <p role="status">{t('Carregando trabalho...', 'Loading work...')}</p>
               ) : route === 'tasks' ? (
                 <>
-                  <div className="task-summary">
-                    <span>
-                      <CheckCheck size={16} />
-                      {shown.tasks.filter(task => task.status === 'done').length} {t('concluídas', 'completed')}
-                    </span>
-                  </div>
                   <TaskList
                     tasks={taskList}
                     graph={shown}
@@ -743,7 +999,7 @@ export function WorkspacePanel({
                 (nav.some(item => item.id === route) || ['project', 'member', 'team'].includes(route)) &&
                 (editorTask || taskId === 'new') && (
                   <TaskDrawer
-                    key={`${workspaceId}:${taskId}`}
+                    key={`${workspaceId}:${taskId}:${url.searchParams.get('edit') ?? ''}`}
                     graph={shown}
                     task={editorTask ?? 'new'}
                     removed={!!editorTask && !selected}
@@ -754,7 +1010,8 @@ export function WorkspacePanel({
                     repo={repo}
                     execute={execute}
                     t={t}
-                    close={() => navigate(taskHref({ task: '', due: '', assignee: '', status: '' }))}
+                    close={() => navigate(taskHref({ task: '', edit: '', due: '', assignee: '', status: '' }))}
+                    quickEdit={url.searchParams.get('edit') === 'quick'}
                     created={openTask}
                     readOnly={readOnly}
                     projectId={projectId}
@@ -782,6 +1039,21 @@ export function WorkspacePanel({
           )}
         </main>
       </div>
+      <nav className="work-bottomnav" aria-label={t('Navegação móvel', 'Mobile navigation')}>
+        {['home', 'mytasks', 'projects', 'inbox'].map(id => {
+          const item = nav.find(value => value.id === id)!;
+          return (
+            <button key={id} aria-current={route === id ? 'page' : undefined} onClick={() => go(id)}>
+              <item.icon size={19} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+        <button onClick={() => setMobileNavigation(true)}>
+          <Ellipsis size={19} />
+          <span>{t('Mais', 'More')}</span>
+        </button>
+      </nav>
       <CommandPalette
         open={palette}
         onOpenChange={setPalette}

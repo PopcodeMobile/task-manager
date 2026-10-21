@@ -96,10 +96,10 @@ export function projectStatusLabel(status: string, t: Translate) {
     (
       {
         planning: t('Planejamento', 'Planning'),
-        active: t('Em andamento', 'In progress'),
-        risk: t('Em risco', 'At risk'),
-        hold: t('Em pausa', 'On hold'),
-        complete: t('Concluído', 'Complete'),
+        active: t('Em andamento', 'In Progress'),
+        risk: t('Em risco', 'At Risk'),
+        hold: t('Em pausa', 'On Hold'),
+        complete: t('Concluído', 'Completed'),
       } as Record<string, string>
     )[status] ?? status
   );

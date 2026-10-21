@@ -953,3 +953,12 @@
 .comment-reactions [aria-pressed='true'] {
   outline: 1px solid var(--accent);
 }
+
+/* Original flush workspace headers follow the mobile gutter at the 900px shell breakpoint. */
+@media (max-width: 900px) {
+  .work-shell[data-route='tasks'] .work-content > .workspace-page-heading,
+  .work-shell[data-route='calendar'] .work-content > .workspace-page-heading,
+  .work-shell[data-route='timeline'] .work-content > .workspace-page-heading {
+    padding-inline: var(--gutter-mobile);
+  }
+}

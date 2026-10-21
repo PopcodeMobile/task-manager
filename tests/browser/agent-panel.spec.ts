@@ -1,4 +1,38 @@
 import { test, expect, type Page } from '@playwright/test';
+import {
+  setLanguage,
+  toggleTheme,
+  createWorkspace,
+  switchWorkspaceNamed,
+  expectWorkspaceSelected,
+  openWorkspaceRoute,
+  chooseVisibleOption,
+  editDescriptionSource,
+  chooseTaskDate,
+  expectTaskDate,
+  openAccount,
+  renameFileMetadata,
+  teamMemberChoice,
+} from './visible-controls.js';
+async function selectVisibleTasks(page: Page) {
+  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Filters', exact: true }).getByRole('checkbox', { name: 'Select all visible tasks', exact: true }).check();
+  await page.keyboard.press('Escape');
+}
+async function openDrawerActions(page: Page, expectedState?: string) {
+  const actions = page.getByRole('dialog').locator('details.drawer-extra-actions');
+  if (expectedState) await expect(actions.getByText(expectedState, { exact: true })).toBeAttached();
+  if (!(await actions.locator(':scope[open]').count())) await actions.locator(':scope > summary').click();
+}
+async function expectAgentUpdate(page: Page, taskTitle: string, actorName?: string, timeout = 5000) {
+  const row = page
+    .locator('.activity-feed article.fitem')
+    .filter({ has: page.getByRole('link', { name: taskTitle, exact: true }) })
+    .filter({ has: page.getByText('alterou a tarefa', { exact: true }) });
+  await expect(row.locator('.activity-avatar .lucide-bot')).toBeVisible({ timeout });
+  if (actorName) await expect(row.locator('b')).toHaveText(actorName);
+  else await expect(row.locator('b')).not.toBeEmpty();
+}
 const userId = '11111111-1111-4111-8111-111111111111',
   workspace = '22222222-2222-4222-8222-222222222222',
   other = '33333333-3333-4333-8333-333333333333';
@@ -172,7 +206,8 @@ async function fixture(page: Page) {
         nextCursor: null,
       };
     if (op === 'get_task') data = { data: tasks.find(t => t.id === body.p_query.id) };
-    if (op === 'list_labels') data = { items: [{ id: 'detail-label', name: 'Recovered label', version: 1 }], nextCursor: null };
+    if (op === 'list_labels')
+      data = { items: [{ id: 'detail-label', workspaceId: body.p_workspace_id, name: 'Recovered label', version: 1, legacyMetadata: {} }], nextCursor: null };
     if (op === 'list_task_labels') data = { items: taskLabels, nextCursor: null };
     if (op === 'list_comments') data = { items: comments, nextCursor: null };
     if (op === 'list_agents') data = { items: [{ id: 'agent-1', name: 'Assistente de produto', authUserId: userId, clientId: 'client-1' }], nextCursor: null };
@@ -266,22 +301,24 @@ test('login, workspace, create, edit, board, drawer, comment and agent supervisi
   const f = await fixture(page);
   await login(page);
   await expect(page.getByText('Revisar navegação', { exact: true })).toBeVisible();
-  await expect(page.getByRole('table', { name: 'A fazer', exact: true }).getByRole('columnheader')).toHaveCount(10);
-  await expect(page.getByRole('table', { name: 'A fazer', exact: true }).getByRole('cell')).toHaveCount(10);
+  const list = page.getByRole('table', { name: 'Tarefas', exact: true });
+  await expect(list.getByRole('columnheader')).toHaveText(['Tarefa', 'Status', 'Responsável', 'Prioridade', 'Prazo', 'Projeto']);
+  await expect(list.locator('[data-task-row="task-1"] [data-task-column]')).toHaveCount(6);
   await page.getByRole('button', { name: 'Nova tarefa', exact: true }).click();
-  await page.getByLabel('Título', { exact: true }).fill('Publicar pesquisa');
+  await page.getByRole('textbox', { name: 'Título', exact: true }).fill('Publicar pesquisa');
   await page.getByRole('button', { name: 'Criar tarefa', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await page.getByLabel('Título', { exact: true }).fill('Publicar pesquisa revisada');
+  await page.getByRole('textbox', { name: 'Título', exact: true }).fill('Publicar pesquisa revisada');
   await page.getByRole('button', { name: 'Salvar alterações' }).click();
   await page.getByLabel('Comentário', { exact: true }).fill('Revisão pronta');
   await page.getByRole('button', { name: 'Comentar', exact: true }).click();
   await expect(page.getByText('Revisão pronta', { exact: true })).toBeVisible();
+  await openDrawerActions(page);
   await page.getByLabel('Agente executor').selectOption('agent-1');
   await page.getByRole('button', { name: 'Atribuir agente' }).click();
   await expect(page.getByText('Atribuído, sem reserva ativa')).toBeVisible();
   await page.getByRole('button', { name: 'Fechar painel' }).click();
-  await page.getByRole('link', { name: 'Quadro', exact: true }).click();
+  await page.locator('#work-content').getByRole('link', { name: 'Quadro', exact: true }).click();
   await expect(page.locator('.task-board')).toBeVisible();
   await expect(page.getByText('Publicar pesquisa revisada', { exact: true })).toBeVisible();
   await page.screenshot({ path: '/tmp/task5-board-light-pt.png', fullPage: true });
@@ -294,12 +331,14 @@ test('active reservation blocks completion and explicit human resume is audited'
   f.claim();
   await login(page);
   await page.getByText('Revisar navegação', { exact: true }).click();
-  await expect(page.getByText('Execução reservada')).toBeVisible();
+  await expect(page.getByText('Execução reservada', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Concluir tarefa', exact: true })).toBeDisabled();
+  await openDrawerActions(page);
   await page.getByRole('button', { name: 'Retomar controle humano' }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
   await page.screenshot({ path: '/tmp/task5-alert-resume.png', fullPage: true });
   await page.getByRole('button', { name: 'Confirmar retomada' }).click();
+  await openDrawerActions(page, 'Sem agente executor');
   await expect(page.getByText('Sem agente executor')).toBeVisible();
   expect(f.commands.find(c => c.p_operation === 'intervene_task')?.p_command).toMatchObject({ action: 'release' });
 });
@@ -310,15 +349,15 @@ test('version conflict keeps draft, network failure retries, safe rich text and 
   await page.getByText('Revisar navegação', { exact: true }).click();
   await expect(page.locator('.rich-content strong')).toHaveText('clientes');
   await expect(page.locator('.rich-content [onerror]')).toHaveCount(0);
-  await page.getByLabel('Título', { exact: true }).fill('Meu rascunho');
+  await page.getByRole('textbox', { name: 'Título', exact: true }).fill('Meu rascunho');
   f.conflict();
   await page.getByRole('button', { name: 'Salvar alterações' }).click();
   await expect(page.getByRole('alert')).toContainText('mudou');
-  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Meu rascunho');
+  await expect(page.getByRole('textbox', { name: 'Título', exact: true })).toHaveValue('Meu rascunho');
   await page.getByRole('button', { name: 'Recarregar versão e descartar rascunho' }).click();
   await page.getByRole('button', { name: 'Fechar painel' }).click();
   f.offline(true);
-  await page.getByRole('button', { name: 'Atualizar dados' }).click();
+  await openWorkspaceRoute(page, 'Atualizar dados');
   await expect(page.getByRole('alert')).toContainText('conexão');
   f.offline(false);
   await page.getByRole('button', { name: 'Tentar novamente' }).click();
@@ -328,16 +367,17 @@ test('workspace switch and logout cannot hydrate delayed identity results', asyn
   const f = await fixture(page);
   await login(page);
   f.late();
-  await page.getByLabel('Organização', { exact: true }).selectOption(other);
+  await switchWorkspaceNamed(page, 'Outro espaço');
   await f.waitLate();
-  await page.getByLabel('Organização', { exact: true }).selectOption(workspace);
+  await switchWorkspaceNamed(page, 'Gr8r Studio');
   await f.releaseLate();
   await page.getByRole('link', { name: 'Tarefas', exact: true }).click();
   await expect(page.getByText('Revisar navegação', { exact: true })).toBeVisible();
   await expect(page.getByText('Tarefa do outro espaço', { exact: true })).toHaveCount(0);
   f.late();
-  await page.getByLabel('Organização', { exact: true }).selectOption(other);
+  await switchWorkspaceNamed(page, 'Outro espaço');
   await f.waitLate();
+  await openAccount(page);
   await page.getByRole('button', { name: 'Sair', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Entre pra continuar' })).toBeVisible();
   await f.releaseLate();
@@ -350,16 +390,16 @@ test('MCP activity polling invalidates without reload; light dark PT EN mobile v
   f.external();
   await expect(page.getByText('Atualizada pelo MCP', { exact: true })).toBeVisible({ timeout: 18000 });
   await page.getByRole('link', { name: 'Atividade', exact: true }).click();
-  await expect(page.getByText('Agente alterou a tarefa', { exact: false })).toBeVisible();
-  await page.getByLabel('Idioma').selectOption('en');
-  await page.getByRole('button', { name: 'Toggle theme' }).click();
+  await expectAgentUpdate(page, 'Atualizada pelo MCP', 'Assistente de produto');
+  await setLanguage(page, 'en');
+  await toggleTheme(page);
   await page.getByRole('link', { name: 'Tasks', exact: true }).click();
   await page.screenshot({ path: '/tmp/task5-desktop-dark-en.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: '/tmp/task5-mobile-dark-en.png', fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-  await page.getByRole('button', { name: 'Toggle theme' }).click();
-  await page.getByLabel('Language').selectOption('pt-BR');
+  await toggleTheme(page);
+  await setLanguage(page, 'pt-BR');
   await page.screenshot({ path: '/tmp/task5-mobile-light-pt.png', fullPage: true });
 });
 test('signup verification and neutral password reset preserve the consent destination', async ({ page }) => {
@@ -436,14 +476,17 @@ test.describe('real normalized backend', () => {
       await page.getByLabel('Senha', { exact: true }).fill(password);
       await page.getByRole('button', { name: 'Entrar', exact: true }).click();
       await page.getByText('Execução real', { exact: true }).click();
-      await expect(page.getByText('Execução reservada')).toBeVisible();
+      await expect(page.getByText('Execução reservada', { exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Concluir tarefa', exact: true })).toBeDisabled();
+      await openDrawerActions(page);
       await page.getByRole('button', { name: 'Retomar controle humano' }).click();
       await page.getByRole('button', { name: 'Confirmar retomada' }).click();
+      await openDrawerActions(page, 'Sem agente executor');
       await expect(page.getByText('Sem agente executor')).toBeVisible();
       await page.getByLabel('Comentário', { exact: true }).fill('Decisão humana registrada');
       await page.getByRole('button', { name: 'Comentar', exact: true }).click();
       await expect(page.getByText('Decisão humana registrada', { exact: true })).toBeVisible();
+      await openDrawerActions(page);
       await page.getByRole('button', { name: 'Concluir tarefa', exact: true }).click();
       const read = await human.rpc('read_operation', { p_workspace_id: ws, p_operation: 'get_task', p_query: { id: task.id } });
       expect(read.data.data.status).toBe('done');
@@ -456,7 +499,7 @@ test.describe('real normalized backend', () => {
       });
       await page.screenshot({ path: '/tmp/task5-real-backend-drawer.png', fullPage: true });
       await page.getByRole('button', { name: 'Fechar painel' }).click();
-      await page.getByRole('button', { name: 'Criar organização', exact: true }).click();
+      await createWorkspace(page);
       await page.getByLabel('Nome da organização').fill('Segundo espaço real');
       await page.getByRole('button', { name: 'Criar organização', exact: true }).click();
       await page.getByRole('link', { name: 'Tarefas', exact: true }).click();
@@ -466,8 +509,9 @@ test.describe('real normalized backend', () => {
       expect(secondWorkspace !== ws).toBeTruthy();
       await page.reload();
       await expect(page.getByText('Nenhuma tarefa por aqui')).toBeVisible();
-      await expect(page.getByLabel('Organização', { exact: true })).toHaveValue(secondWorkspace);
-      await page.getByLabel('Organização', { exact: true }).selectOption(ws);
+      await expect(page).toHaveURL(new RegExp('/w/' + secondWorkspace + '/'));
+      await expectWorkspaceSelected(page, 'Segundo espaço real');
+      await switchWorkspaceNamed(page, 'Supervisão real');
       await page.getByRole('link', { name: 'Tarefas', exact: true }).click();
       await expect(page.getByText('Execução real', { exact: true })).toBeVisible();
       await command(human, 'update_task', { id: task.id, title: 'Atualização externa real' }, read.data.data.version);
@@ -486,12 +530,12 @@ test('failed draft flush retains drawer and prevents navigation until retry succ
   const f = await fixture(page);
   await login(page);
   await page.getByText('Revisar navegação', { exact: true }).click();
-  await page.getByLabel('Título', { exact: true }).fill('Rascunho preservado');
+  await page.getByRole('textbox', { name: 'Título', exact: true }).fill('Rascunho preservado');
   f.writeOffline(true);
   await page.getByRole('button', { name: 'Fechar painel' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('conexão');
-  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Rascunho preservado');
+  await expect(page.getByRole('textbox', { name: 'Título', exact: true })).toHaveValue('Rascunho preservado');
   f.writeOffline(false);
   await page.getByRole('button', { name: 'Fechar painel' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -546,15 +590,16 @@ test('browser back keeps an unsaved draft when its flush fails', async ({ page }
   const f = await fixture(page);
   await login(page);
   await page.getByText('Revisar navegação', { exact: true }).click();
-  await page.getByLabel('Título', { exact: true }).fill('Rascunho no histórico');
+  await page.getByRole('textbox', { name: 'Título', exact: true }).fill('Rascunho no histórico');
   f.writeOffline(true);
   await page.goBack();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Rascunho no histórico');
+  await expect(page.getByRole('textbox', { name: 'Título', exact: true })).toHaveValue('Rascunho no histórico');
   await expect(page.getByRole('alert')).toContainText('conexão');
 });
 
 test('an event committed during initial hydration cannot be skipped by the polling cursor', async ({ page }) => {
+  await page.clock.install();
   const f = await fixture(page);
   let reached = () => {},
     release = () => {};
@@ -577,6 +622,8 @@ test('an event committed during initial hydration cannot be skipped by the polli
   await arrived;
   f.external();
   release();
+  await expect(page.getByText('Revisar navegação', { exact: true })).toBeVisible();
+  await page.clock.runFor(10001);
   await expect(page.getByText('Atualizada pelo MCP', { exact: true })).toBeVisible({ timeout: 1500 });
 });
 
@@ -584,7 +631,7 @@ test('same-session token rotation preserves dirty draft, original CAS and failed
   const f = await fixture(page);
   await login(page);
   await page.getByText('Revisar navegação', { exact: true }).click();
-  await page.getByLabel('Título', { exact: true }).fill('Rascunho após rotação');
+  await page.getByRole('textbox', { name: 'Título', exact: true }).fill('Rascunho após rotação');
   const attempts: Record<string, unknown>[] = [];
   let fail = true;
   await page.route('**/rest/v1/rpc/execute_operation', async route => {
@@ -614,24 +661,24 @@ test('same-session token rotation preserves dirty draft, original CAS and failed
     });
   };
   await rotate('44444444-4444-4444-8444-444444444444');
-  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Rascunho após rotação');
+  await expect(page.getByRole('textbox', { name: 'Título', exact: true })).toHaveValue('Rascunho após rotação');
   await page.getByRole('button', { name: 'Salvar alterações' }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
   expect(attempts).toHaveLength(2);
   expect(attempts[1].p_idempotency_key === attempts[0].p_idempotency_key).toBeTruthy();
   expect(attempts[1].p_expected_version).toBe(1);
   expect(f.commands.at(-1)?.p_operation).toBe('update_task');
-  await page.getByLabel('Título', { exact: true }).fill('Não transferir para nova sessão');
+  await page.getByRole('textbox', { name: 'Título', exact: true }).fill('Não transferir para nova sessão');
   await rotate('55555555-5555-4555-8555-555555555555');
-  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Rascunho após rotação');
-  await page.getByLabel('Título', { exact: true }).fill('Não transferir para outra pessoa');
+  await expect(page.getByRole('textbox', { name: 'Título', exact: true })).toHaveValue('Rascunho após rotação');
+  await page.getByRole('textbox', { name: 'Título', exact: true }).fill('Não transferir para outra pessoa');
   await rotate('66666666-6666-4666-8666-666666666666', {
     ...user,
     id: '77777777-7777-4777-8777-777777777777',
     email: 'other@example.test',
     user_metadata: { name: 'Outra pessoa' },
   });
-  await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Rascunho após rotação');
+  await expect(page.getByRole('textbox', { name: 'Título', exact: true })).toHaveValue('Rascunho após rotação');
 });
 
 test('actual OAuth MCP agent write reaches already-open task and agent activity by polling', async ({ page }) => {
@@ -783,7 +830,7 @@ test('actual OAuth MCP agent write reaches already-open task and agent activity 
     await expect(page.locator('article.comment .rich-content').filter({ hasText: 'Comentário externo pelo MCP real' })).toBeVisible({ timeout: 18000 });
     await page.getByRole('button', { name: 'Fechar painel', exact: true }).click();
     await page.getByRole('link', { name: 'Atividade', exact: true }).click();
-    await expect(page.getByText('Agente alterou a tarefa', { exact: false })).toBeVisible({ timeout: 1500 });
+    await expectAgentUpdate(page, 'Alterada pelo MCP real', undefined, 1500);
     expect(navigations).toBe(0);
     const audit = await human.rpc('read_operation', { p_workspace_id: ws, p_operation: 'list_domain_events', p_query: { limit: 100 } });
     expect(!!audit.error).toBeFalsy();
@@ -892,7 +939,7 @@ test('actual cloud task views follow cursors, keep atomic CAS/claim guards and r
     };
     const readTask = async (id: string) => {
       const result = await human.rpc('read_operation', { p_workspace_id: ws, p_operation: 'get_task', p_query: { id } });
-      expect(!!result.error).toBe(false);
+      expect(!!result.error, result.error ? `${result.error.code}: ${result.error.message}` : undefined).toBe(false);
       return result.data.data;
     };
     const project = await command('create_project', { name: 'Task views project' }),
@@ -908,24 +955,24 @@ test('actual cloud task views follow cursors, keep atomic CAS/claim guards and r
     await page.getByLabel('E-mail').fill(email);
     await page.getByLabel('Senha', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await setLanguage(page, 'en');
     await expect(page.getByRole('button', { name: 'Cloud task 101' })).toBeVisible();
-    await page.getByRole('link', { name: 'Table', exact: true }).click();
+    await page.locator('#work-content').getByRole('link', { name: 'Table', exact: true }).click();
     await page.getByRole('textbox', { name: 'Search tasks', exact: true }).fill('Cloud task 10');
-    await page.getByRole('checkbox', { name: 'Select all visible tasks', exact: true }).check();
+    await selectVisibleTasks(page);
     await page.getByRole('combobox', { name: 'Bulk priority', exact: true }).selectOption('high');
-    await expect(page.getByRole('combobox', { name: /Priority:.*$/, exact: false }).first()).toHaveValue('high');
+    await expect(page.getByRole('button', { name: /Change priority:.*$/, exact: false }).first()).toContainText('High');
     let a = await readTask('views-task-100'),
       b = await readTask('views-task-101');
     expect(a.priority).toBe('high');
     expect(b.priority).toBe('high');
     await command('update_task', { id: a.id, priority: 'low' }, a.version);
-    await page.getByRole('checkbox', { name: 'Select all visible tasks', exact: true }).check();
+    await selectVisibleTasks(page);
     await page.getByRole('combobox', { name: 'Bulk priority', exact: true }).selectOption('urgent');
     await expect(page.getByRole('alert')).toContainText('Your draft was kept');
     expect((await readTask(b.id)).priority).toBe('high');
-    await page.getByRole('button', { name: 'Refresh data', exact: true }).click();
-    await expect(page.getByRole('combobox', { name: 'Priority: ' + a.key, exact: true })).toHaveValue('low');
+    await openWorkspaceRoute(page, 'Refresh data');
+    await expect(page.getByRole('button', { name: 'Change priority: ' + a.key, exact: true })).toContainText('Low');
     await expect(page.getByRole('combobox', { name: 'Bulk priority', exact: true })).toBeEnabled();
     await page.getByRole('combobox', { name: 'Bulk priority', exact: true }).selectOption('urgent');
     await expect(page.getByRole('combobox', { name: 'Bulk priority', exact: true })).toHaveCount(0);
@@ -934,51 +981,64 @@ test('actual cloud task views follow cursors, keep atomic CAS/claim guards and r
     expect(a.priority).toBe('urgent');
     expect(b.priority).toBe('urgent');
     const lease = await command('claim_task', { id: b.id }, b.version, executor);
-    await page.getByRole('button', { name: 'Refresh data', exact: true }).click();
-    await expect(page.getByRole('combobox', { name: 'Priority: ' + b.key, exact: true })).toBeDisabled();
-    await expect(page.getByText('Views executor', { exact: true })).toBeVisible();
-    await page.getByRole('checkbox', { name: 'Select all visible tasks', exact: true }).check();
+    await openWorkspaceRoute(page, 'Refresh data');
+    await expect(page.getByRole('button', { name: 'Change priority: ' + b.key, exact: true })).toBeDisabled();
+    await expect(
+      page.getByRole('table', { name: 'Tasks table', exact: true }).locator(`[data-task-row="${b.id}"]`).getByText('Views executor', { exact: true }),
+    ).toBeVisible();
+    await selectVisibleTasks(page);
     await page.getByRole('button', { name: 'Archive selected', exact: true }).click();
     await expect(page.getByRole('alert')).toContainText('explicitly resume human control');
     expect((await readTask(a.id)).archived).toBe(false);
     expect(await page.locator('body').textContent()).not.toContain(lease.claimToken);
     await page.getByRole('button', { name: 'Cloud task 101' }).click();
-    await page.getByRole('textbox', { name: 'Description', exact: true }).fill('<p>Saved cloud draft</p><img src=x onerror=alert(1)>');
+    await (await editDescriptionSource(page)).fill('<p>Saved cloud draft</p><img src=x onerror=alert(1)>');
+    await openDrawerActions(page);
     await page.getByRole('button', { name: 'Resume human control', exact: true }).click();
     await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Save changes before this action');
     await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeFocused();
     await page.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
+    await openDrawerActions(page);
     await page.getByRole('button', { name: 'Resume human control', exact: true }).click();
     await page.getByRole('button', { name: 'Confirm resume', exact: true }).click();
+    await openDrawerActions(page, 'No executor agent');
     await expect(page.getByText('No executor agent', { exact: true })).toBeVisible();
-    await page.getByLabel('Due date', { exact: true }).fill('2026-11-20');
-    await page.getByRole('combobox', { name: 'Recurrence', exact: true }).selectOption('Weekly');
+    await chooseTaskDate(page, 'Due date', '2026-11-20');
+    await chooseVisibleOption(page, 'Recurrence', 'Weekly');
+    await openDrawerActions(page);
     await page.getByRole('button', { name: 'Complete task', exact: true }).click();
     await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Save changes before this action');
     await page.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
+    await openDrawerActions(page);
     await page.getByRole('button', { name: 'Complete task', exact: true }).click();
-    await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
+    await expect(page.getByRole('button', { name: 'Status', exact: true })).toContainText('Done');
     await page.reload();
-    await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
-    await expect(page.getByLabel('Due date', { exact: true })).toHaveValue('2026-11-20');
-    await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue('<p>Saved cloud draft</p><img src=x onerror=alert(1)>');
+    await expect(page.getByRole('button', { name: 'Status', exact: true })).toContainText('Done');
+    await expectTaskDate(page, 'Due date', '2026-11-20');
+    await expect(await editDescriptionSource(page)).toHaveValue('<p>Saved cloud draft</p><img src=x onerror=alert(1)>');
+    await page.getByRole('button', { name: 'Preview description', exact: true }).click();
+    await expect(page.locator('.task-description-preview')).toBeVisible();
     await expect(page.locator('.rich-content [onerror]')).toHaveCount(0);
+    await openDrawerActions(page);
     await page.getByRole('combobox', { name: 'Destination project', exact: true }).selectOption(second.id);
     await page.getByRole('button', { name: 'Move task', exact: true }).click();
     await expect(page.getByRole('combobox', { name: 'Destination project', exact: true })).toHaveValue(second.id);
     const sourceTaskId = new URL(page.url()).searchParams.get('task');
+    await openDrawerActions(page);
     await page.getByRole('button', { name: 'Duplicate task', exact: true }).click();
     await expect.poll(() => new URL(page.url()).searchParams.get('task')).not.toBe(sourceTaskId);
-    await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('done');
-    await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue('<p>Saved cloud draft</p><img src=x onerror=alert(1)>');
+    await expect(page.getByRole('button', { name: 'Status', exact: true })).toContainText('Done');
+    await expect(await editDescriptionSource(page)).toHaveValue('<p>Saved cloud draft</p><img src=x onerror=alert(1)>');
     const cloneURL = page.url(),
       cloneId = new URL(cloneURL).searchParams.get('task')!;
+    await openDrawerActions(page);
     await page.getByRole('button', { name: 'Archive task', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toHaveCount(0);
     expect((await readTask(cloneId)).archived).toBe(true);
     await page.goto(cloneURL);
+    await openDrawerActions(page);
     await page.getByRole('button', { name: 'Restore task', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toHaveCount(0);
     expect((await readTask(cloneId)).archived).toBe(false);
@@ -1050,25 +1110,25 @@ test('actual cloud task context menu completes, reopens and respects active rese
     await page.getByLabel('E-mail').fill(email);
     await page.getByLabel('Senha', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
-    await page.getByRole('button', { name: task.key + ' Cloud menu task', exact: true }).click({ button: 'right' });
+    await setLanguage(page, 'en');
+    await page.getByRole('button', { name: 'Cloud menu task', exact: true }).filter({ hasText: task.key }).click({ button: 'right' });
     await expect(page.getByRole('menuitem', { name: 'Open task', exact: true })).toBeFocused();
     await page.getByRole('menuitem', { name: 'Complete task', exact: true }).click();
-    await expect(page.getByRole('combobox', { name: 'Status: ' + task.key, exact: true })).toHaveValue('done');
+    await expect(page.getByRole('button', { name: 'Change status: ' + task.key, exact: true })).toContainText('Done');
     await expect(page.getByRole('menu', { name: 'Task actions', exact: true })).toHaveCount(0);
     task = await readTask(task.id);
     expect(task.status).toBe('done');
-    await page.getByRole('button', { name: task.key + ' Cloud menu task', exact: true }).focus();
+    await page.getByRole('button', { name: 'Cloud menu task', exact: true }).filter({ hasText: task.key }).focus();
     await page.keyboard.press('Shift+F10');
     await page.getByRole('menuitem', { name: 'Reopen task', exact: true }).click();
-    await expect(page.getByRole('combobox', { name: 'Status: ' + task.key, exact: true })).toHaveValue('todo');
+    await expect(page.getByRole('button', { name: 'Change status: ' + task.key, exact: true })).toContainText('To do');
     await expect(page.getByRole('menu', { name: 'Task actions', exact: true })).toHaveCount(0);
     task = await readTask(task.id);
     expect(task.status).toBe('todo');
     await command('claim_task', { id: task.id }, task.version, executor);
-    await page.getByRole('button', { name: 'Refresh data', exact: true }).click();
-    await expect(page.getByRole('combobox', { name: 'Status: ' + task.key, exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: task.key + ' Cloud menu task', exact: true }).click({ button: 'right' });
+    await openWorkspaceRoute(page, 'Refresh data');
+    await expect(page.getByRole('button', { name: 'Change status: ' + task.key, exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Cloud menu task', exact: true }).filter({ hasText: task.key }).click({ button: 'right' });
     await expect(page.getByRole('menuitem', { name: 'Complete task', exact: true })).toHaveAttribute('aria-disabled', 'true');
     await expect(page.getByRole('menuitem', { name: 'Archive task', exact: true })).toHaveAttribute('aria-disabled', 'true');
     const claimed = await readTask(task.id);
@@ -1154,11 +1214,19 @@ test('actual cloud details persist canonical relations, personal stars, author r
     await page.getByLabel('E-mail').fill(email);
     await page.getByLabel('Senha', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
-    await page.getByRole('button', { name: task.key + ' Cloud detail task', exact: true }).click();
+    await setLanguage(page, 'en');
+    await page.getByRole('button', { name: 'Cloud detail task', exact: true }).filter({ hasText: task.key }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Change labels: ' + task.key, exact: true })
+      .click();
     await page.getByLabel('New label', { exact: true }).fill('Cloud label');
     await page.getByRole('button', { name: 'Create and apply label', exact: true }).click();
-    await expect(page.getByRole('dialog').getByLabel('Label: Cloud label', { exact: true })).toBeChecked();
+    await expect(page.getByRole('menu', { name: 'Labels', exact: true }).getByRole('menuitemcheckbox', { name: 'Cloud label', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await page.keyboard.press('Escape');
     expect((await read('list_task_labels', { taskId: task.id })).items).toHaveLength(1);
     await page.getByLabel('New subtask', { exact: true }).fill('Cloud child');
     await page.getByRole('button', { name: 'Add subtask', exact: true }).click();
@@ -1167,6 +1235,7 @@ test('actual cloud details persist canonical relations, personal stars, author r
     await page.getByRole('button', { name: 'Save subtask', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Convert to task', exact: true })).toBeEnabled();
     expect((await read('list_subtasks', { taskId: task.id })).items[0].legacyMetadata.note).toBe('Canonical notes');
+    await page.getByRole('dialog').locator('.attachment-metadata-actions > summary').click();
     await page.getByLabel('Metadata name', { exact: true }).fill('Cloud metadata.pdf');
     await page.getByRole('button', { name: 'Add metadata', exact: true }).click();
     await expect(page.getByText('Cloud metadata.pdf', { exact: true })).toBeVisible();
@@ -1183,20 +1252,29 @@ test('actual cloud details persist canonical relations, personal stars, author r
     await expect(page.getByRole('button', { name: 'Remove from favorites', exact: true })).toBeVisible();
     expect((await read('get_preferences')).data.preferences.favoriteTaskIds).toContain(task.id);
     await page.reload();
-    await expect(page.getByRole('dialog').getByLabel('Label: Cloud label', { exact: true })).toBeChecked();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Change labels: ' + task.key, exact: true })
+      .click();
+    await expect(page.getByRole('menu', { name: 'Labels', exact: true }).getByRole('menuitemcheckbox', { name: 'Cloud label', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await page.keyboard.press('Escape');
     await page.locator('article.comment').filter({ hasText: 'Cloud discussion' }).getByRole('button', { name: 'Delete comment', exact: true }).click();
     await expect(page.locator('article.comment')).toHaveCount(0);
     expect((await read('list_reactions')).items).toHaveLength(0);
     await page.getByRole('button', { name: 'Subtask details: Cloud child', exact: true }).click();
     await page.getByRole('button', { name: 'Convert to task', exact: true }).click();
-    await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Cloud child');
-    await expect(page.getByLabel('Description', { exact: true })).toHaveValue('Canonical notes');
+    await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue('Cloud child');
+    await expect(await editDescriptionSource(page)).toHaveValue('Canonical notes');
     expect((await read('list_subtasks', { taskId: task.id })).items).toHaveLength(0);
     const promoted = (await read('list_tasks')).items.find((row: { title: string }) => row.title === 'Cloud child');
     const latest = (await read('get_task', { id: promoted.id })).data;
     await command('claim_task', { id: latest.id }, latest.version, executor);
     await page.reload();
     await expect(page.getByRole('button', { name: 'Add subtask', exact: true })).toBeDisabled();
+    await page.getByRole('dialog').locator('.attachment-metadata-actions > summary').click();
     await expect(page.getByRole('button', { name: 'Add metadata', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Resume human control', exact: true })).toBeEnabled();
     await page.screenshot({ path: '/tmp/task6b2-cloud-details-claim.png', fullPage: true });
@@ -1225,10 +1303,15 @@ test('successful relation command refreshes canonical links even when event read
   await page.getByLabel('E-mail').fill(user.email);
   await page.getByLabel('Senha', { exact: true }).fill('fixture-password');
   await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+  await setLanguage(page, 'en');
   await page.getByRole('button', { name: /Revisar navegação/ }).click();
-  const label = page.getByRole('dialog').getByLabel('Label: Recovered label', { exact: true });
-  await expect(label).not.toBeChecked();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Change labels: ' + baseTask.key, exact: true })
+    .click();
+  const label = page.getByRole('menu', { name: 'Labels', exact: true }).getByRole('menuitemcheckbox', { name: 'Recovered label', exact: true });
+  await expect(label).toHaveAttribute('aria-checked', 'false');
+  await page.keyboard.press('Escape');
   reads.length = 0;
   const poll = page.waitForResponse(
     response => response.url().endsWith('/read_operation') && response.request().postDataJSON().p_operation === 'list_domain_events',
@@ -1237,8 +1320,12 @@ test('successful relation command refreshes canonical links even when event read
   await poll;
   expect(reads).toEqual(['list_domain_events']);
   control.eventOffline(true);
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Change labels: ' + baseTask.key, exact: true })
+    .click();
   await label.click();
-  await expect(label).toBeChecked();
+  await expect(label).toHaveAttribute('aria-checked', 'true');
 });
 
 test('actual cloud schedules and files preserve duration, CAS, claims, metadata and cursor reload', async ({ page }) => {
@@ -1346,16 +1433,22 @@ test('actual cloud schedules and files preserve duration, CAS, claims, metadata 
     await page.getByLabel('Senha', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Calendário', exact: true })).toBeVisible();
-    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await setLanguage(page, 'en');
     await page.getByRole('button', { name: /14:00(?::00)? Cloud <event>/ }).click();
-    await expect(page.getByRole('dialog')).toContainText('Schedules project');
+    await expect(page.getByRole('dialog', { name: 'Event details', exact: true })).toContainText('Schedules project');
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'Cloud schedule', exact: true }).dragTo(page.locator(`[data-calendar-day="${day(3)}"]`));
-    await expect(page.locator(`[data-calendar-day="${day(3)}"]`).getByRole('button', { name: 'Cloud schedule', exact: true })).toBeVisible();
+    await page
+      .locator(`[data-calendar-day="${day(1)}"]`)
+      .getByRole('button', { name: 'Cloud schedule' })
+      .dragTo(page.locator(`[data-calendar-day="${day(3)}"]`));
+    await expect(page.locator(`[data-calendar-day="${day(3)}"]`).getByRole('button', { name: 'Cloud schedule' })).toBeVisible();
     let current = (await read('get_task', { id: task.id })).data;
     expect(current.startDate).toBe(day(0));
     expect(current.dueDate).toBe(day(3));
-    await page.getByRole('link', { name: 'Timeline', exact: true }).click();
+    await page
+      .getByRole('link', { name: 'Timeline', exact: true })
+      .and(page.locator(`a[href="/app/w/${ws}/timeline"]`))
+      .click();
     await page.getByRole('button', { name: 'Today', exact: true }).click();
     const bar = page.locator(`[data-schedule-bar="${task.id}"]`);
     await bar.scrollIntoViewIfNeeded();
@@ -1372,13 +1465,12 @@ test('actual cloud schedules and files preserve duration, CAS, claims, metadata 
     await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('alert')).toContainText(/reservation|reserved|control/i);
     expect((await read('get_task', { id: task.id })).data.dueDate).toBe(day(4));
-    await page.getByRole('link', { name: 'Files', exact: true }).click();
+    await openWorkspaceRoute(page, 'Files');
     await expect(page.locator('[data-file-id]')).toHaveCount(103);
     await expect(page.getByLabel('Select files for metadata simulation', { exact: true })).toHaveCount(0);
     await page.getByLabel('Search files', { exact: true }).fill('Cloud file 102');
     await page.getByRole('button', { name: 'Cloud file 102.pdf', exact: true }).click();
-    await page.getByLabel('File name', { exact: true }).fill('Literal <renamed>.pdf');
-    await page.getByRole('button', { name: 'Rename file', exact: true }).click();
+    await renameFileMetadata(page, 'Cloud file 102.pdf', 'Literal <renamed>.pdf');
     await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Literal <renamed>.pdf');
     const duplicateAttempts: Record<string, unknown>[] = [];
     await page.route('**/rest/v1/rpc/execute_operation', async route => {
@@ -1391,9 +1483,12 @@ test('actual cloud schedules and files preserve duration, CAS, claims, metadata 
         await route.abort('failed');
       } else await route.fallback();
     });
-    await page.getByRole('button', { name: 'Duplicate', exact: true }).click();
-    await expect(page.getByRole('dialog').getByRole('alert')).toContainText(/connection/i);
-    await page.getByRole('button', { name: 'Duplicate', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByRole('button', { name: 'File options: Literal <renamed>.pdf', exact: true }).click();
+    await page.getByRole('menu', { name: 'File options', exact: true }).getByRole('menuitem', { name: 'Duplicate', exact: true }).click();
+    await expect(page.locator('.files-view > .error-row').getByRole('alert')).toContainText(/connection/i);
+    await page.getByRole('button', { name: 'File options: Literal <renamed>.pdf', exact: true }).click();
+    await page.getByRole('menu', { name: 'File options', exact: true }).getByRole('menuitem', { name: 'Duplicate', exact: true }).click();
     await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Literal <renamed> copy.pdf');
     expect(duplicateAttempts).toHaveLength(2);
     expect(duplicateAttempts[1].p_idempotency_key).toBe(duplicateAttempts[0].p_idempotency_key);
@@ -1411,14 +1506,20 @@ test('actual cloud schedules and files preserve duration, CAS, claims, metadata 
     await page.getByRole('button', { name: 'Close panel', exact: true }).click();
     await page.getByLabel('Search files', { exact: true }).fill('Literal');
     await page.getByRole('button', { name: 'Literal <renamed>.pdf', exact: true }).click();
-    await page.getByRole('button', { name: 'Delete file', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByRole('button', { name: 'File options: Literal <renamed>.pdf', exact: true }).click();
+    await page.getByRole('menu', { name: 'File options', exact: true }).getByRole('menuitem', { name: 'Delete', exact: true }).click();
     await page.getByRole('button', { name: 'Confirm deletion', exact: true }).click();
     await expect(page.getByRole('alertdialog').getByRole('alert')).toContainText(/reservation|reserved|control/i);
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
     // Explicit human intervention is the only path that clears the executor reservation.
-    await page.getByRole('link', { name: 'Timeline', exact: true }).click();
+    await page
+      .getByRole('link', { name: 'Timeline', exact: true })
+      .and(page.locator(`a[href="/app/w/${ws}/timeline"]`))
+      .click();
     await page.locator('.timeline-row-name').getByRole('button', { name: 'Cloud schedule', exact: true }).click();
+    await openDrawerActions(page);
     await page.getByRole('button', { name: 'Resume human control', exact: true }).click();
     await page.getByRole('button', { name: 'Confirm resume', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Resume human control', exact: true })).toBeDisabled();
@@ -1426,9 +1527,11 @@ test('actual cloud schedules and files preserve duration, CAS, claims, metadata 
     await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Close panel', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await page.getByRole('link', { name: 'Files', exact: true }).click();
+    await openWorkspaceRoute(page, 'Files');
     await page.getByRole('button', { name: 'Literal <renamed>.pdf', exact: true }).click();
-    await page.getByRole('button', { name: 'Delete file', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByRole('button', { name: 'File options: Literal <renamed>.pdf', exact: true }).click();
+    await page.getByRole('menu', { name: 'File options', exact: true }).getByRole('menuitem', { name: 'Delete', exact: true }).click();
     await page.getByRole('button', { name: 'Confirm deletion', exact: true }).click();
     await expect(page.locator('[data-file-id="schedule-file-102"]')).toHaveCount(0);
     expect((await read('list_attachments')).items.filter((x: { fileId: string }) => x.fileId === 'schedule-file-102')).toHaveLength(0);
@@ -1575,7 +1678,7 @@ test('actual cloud projects compose templates members saved views full graph cop
     await page.getByLabel('Senha', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Projetos', exact: true })).toBeVisible();
-    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await setLanguage(page, 'en');
     await page.evaluate(
       ({ userId, ws, sourceId }) => {
         const key = `gr8r.preferences.${userId}`,
@@ -1620,9 +1723,12 @@ test('actual cloud projects compose templates members saved views full graph cop
       }
       return route.continue();
     });
-    await page.getByRole('button', { name: 'New project', exact: true }).click();
+    await page.locator('#work-content').getByRole('button', { name: 'New project', exact: true }).click();
     await page.getByLabel('Name', { exact: true }).fill('Cloud created');
-    await page.getByRole('combobox', { name: 'Template', exact: true }).selectOption('personal');
+    await page
+      .getByRole('radiogroup', { name: 'Template', exact: true })
+      .getByRole('radio', { name: /^Personal (?:Goals|Project)/ })
+      .click();
     await page.getByRole('combobox', { name: 'Lead', exact: true }).selectOption(users[1]);
     await page.getByRole('button', { name: 'Save project', exact: true }).click();
     await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
@@ -1633,11 +1739,11 @@ test('actual cloud projects compose templates members saved views full graph cop
     const created = new URL(page.url()).searchParams.get('project')!;
     expect((await read('list_project_members', { projectId: created })).items.map((m: { userId: string }) => m.userId).sort()).toEqual([...users].sort());
     expect((await read('list_tasks', { projectId: created })).items).toHaveLength(4);
-    await page.getByRole('button', { name: /^Members \(/ }).click();
-    await expect(page.getByRole('dialog')).toContainText('does not change access permissions');
+    await page.locator('.project-members-trigger').click();
+    await expect(page.getByRole('dialog')).toContainText('This list does not change permissions; invitations and project privacy are unavailable.');
     await expect(page.getByLabel('Demo email')).toHaveCount(0);
     await page.keyboard.press('Escape');
-    await page.getByRole('link', { name: 'List', exact: true }).click();
+    await page.locator('#work-content').getByRole('link', { name: 'List', exact: true }).click();
     await page.getByRole('button', { name: 'Save view', exact: true }).click();
     await page.getByLabel('View name', { exact: true }).fill('Cloud view');
     await page.getByRole('combobox', { name: 'View type', exact: true }).selectOption('table');
@@ -1648,8 +1754,9 @@ test('actual cloud projects compose templates members saved views full graph cop
     await page.goto(`/app/w/${ws}/project?project=${source.id}&tab=list&task=${task.id}`);
     await expect(page.getByRole('dialog').locator('.rich-content b').filter({ hasText: 'Cloud rich' })).toBeVisible();
     await page.getByRole('button', { name: 'Add to favorites', exact: true }).click();
+    await openDrawerActions(page);
     await page.getByRole('button', { name: 'Duplicate task', exact: true }).click();
-    await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Source task (copy)');
+    await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue('Source task (copy)');
     const individual = new URL(page.url()).searchParams.get('task')!;
     await page.getByRole('button', { name: 'Close panel', exact: true }).click();
     await page.locator('.project-heading .project-options summary').click();
@@ -1685,7 +1792,7 @@ test('actual cloud projects compose templates members saved views full graph cop
     ]);
     expect((await read('list_views', { projectId: copied })).items).toEqual([]);
     expect((await read('list_comments', { taskId: full.id })).items).toEqual([]);
-    await page.getByRole('link', { name: 'List', exact: true }).click();
+    await page.locator('#work-content').getByRole('link', { name: 'List', exact: true }).click();
     await page.getByRole('button', { name: /Source task$/ }).click();
     await expect(page.getByRole('button', { name: 'Remove from favorites', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Close panel', exact: true }).click();
@@ -1780,15 +1887,15 @@ test('actual cloud remaining teams workspace notifications and unavailable setti
     await page.getByLabel('E-mail').fill(addresses[0]);
     await page.getByLabel('Senha', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await setLanguage(page, 'en');
     await expect(page.getByRole('button', { name: 'Create team', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Create team', exact: true }).click();
     await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Cloud <team>');
-    await page.getByRole('dialog').getByLabel('Remaining teammate', { exact: true }).check();
+    await teamMemberChoice(page, 'Remaining teammate').check();
     await page.getByRole('button', { name: 'Save team', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await page.reload();
-    await expect(page.getByRole('button', { name: 'Remaining teammate', exact: true })).toBeVisible();
+    await expect(page.locator('.team-person button').filter({ has: page.getByText('Remaining teammate', { exact: true }) })).toBeVisible();
     const teams = (await read('list_teams')).items,
       newTeam = teams.find((team: { name: string }) => team.name === 'Cloud <team>');
     expect(newTeam).toBeTruthy();
@@ -1798,10 +1905,10 @@ test('actual cloud remaining teams workspace notifications and unavailable setti
     await page.goto(`/app/w/${ws}/notifications`);
     await expect(page.getByRole('button', { name: /Remaining notification/ })).toBeVisible();
     await page.getByRole('button', { name: 'Mark all as read', exact: true }).click();
-    await page.getByLabel(/Unread only/).check();
+    await page.getByRole('button', { name: 'Unread', exact: true }).click();
     await expect(page.getByText('No notifications.', { exact: true })).toBeVisible();
     await page.reload();
-    await page.getByLabel(/Unread only/).check();
+    await page.getByRole('button', { name: 'Unread', exact: true }).click();
     await expect(page.getByText('No notifications.', { exact: true })).toBeVisible();
     await page.goto(`/app/w/${ws}/settings?sec=workspace`);
     await page.getByLabel('Workspace name', { exact: true }).fill('Remaining renamed');
@@ -1817,7 +1924,7 @@ test('actual cloud remaining teams workspace notifications and unavailable setti
             {
               profile: 'Profile',
               permissions: 'Permissions',
-              'notif-email': 'Email notifications',
+              'notif-email': 'Email',
               sessions: 'Sessions',
               '2fa': 'Two-factor authentication',
               plan: 'Plan',
@@ -1828,11 +1935,14 @@ test('actual cloud remaining teams workspace notifications and unavailable setti
           exact: true,
         })
         .click();
-      await expect(page.locator('.settings-content')).toContainText(sec === 'profile' ? 'read-only' : 'unavailable');
+      if (sec === 'profile') await expect(page.locator('.settings-content')).toContainText('read-only');
+      else await expect(page.locator('.settings-content .lead')).toHaveText('Unavailable for cloud workspaces in this panel. No changes will be made.');
     }
     await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: 'Password', exact: true }).click();
     await page.getByLabel('Current password', { exact: true }).fill('wrong-password');
-    await page.getByLabel('New password', { exact: true }).fill('Valid-password-123!');
+    const newPassword = page.locator('form.settings-password').getByLabel(/^New password/);
+    await expect(newPassword).toBeVisible();
+    await newPassword.fill('Valid-password-123!');
     await page.getByLabel('Confirm new password', { exact: true }).fill('Valid-password-123!');
     await page.getByRole('button', { name: 'Update password', exact: true }).click();
     await expect(page.getByRole('alert')).toBeVisible();
@@ -1941,15 +2051,15 @@ test('actual cloud fix team absent membership conflicts replan and ambiguous ret
     await page.getByLabel('E-mail').fill(addresses[0]);
     await page.getByLabel('Senha', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
-    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await setLanguage(page, 'en');
     await expect(page.getByRole('button', { name: 'Create team', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Create team', exact: true }).click();
     await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Cloud <team>');
-    await page.getByRole('dialog').getByLabel('Remaining teammate', { exact: true }).check();
+    await teamMemberChoice(page, 'Remaining teammate').check();
     await page.getByRole('button', { name: 'Save team', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await page.reload();
-    await expect(page.getByRole('button', { name: 'Remaining teammate', exact: true })).toBeVisible();
+    await expect(page.locator('.team-person button').filter({ has: page.getByText('Remaining teammate', { exact: true }) })).toBeVisible();
     const teams = (await read('list_teams')).items,
       newTeam = teams.find((team: { name: string }) => team.name === 'Cloud <team>');
     expect(newTeam).toBeTruthy();
@@ -1959,7 +2069,7 @@ test('actual cloud fix team absent membership conflicts replan and ambiguous ret
     await page.getByRole('button', { name: 'Edit team', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Name', { exact: true }).fill('Reviewed team draft');
-    await dialog.getByLabel('Remaining owner', { exact: true }).check();
+    await teamMemberChoice(page, 'Remaining owner').check();
     const old = (await read('list_teams')).items.find((item: { id: string }) => item.id === first.id);
     await command('set_team_member', { id: first.id, userId: users[0] }, old.version);
     await dialog.getByRole('button', { name: 'Save team', exact: true }).click();
@@ -2027,10 +2137,10 @@ for (const operation of ['delete_task', 'delete_project'])
     const f = await fixture(page);
     await login(page);
     await page.getByText('Revisar navegação', { exact: true }).click();
-    await page.getByLabel('Título', { exact: true }).fill('Texto preservado após exclusão');
+    await page.getByRole('textbox', { name: 'Título', exact: true }).fill('Texto preservado após exclusão');
     f.removeTask(operation);
     await expect(page.getByText('Esta tarefa foi excluída. Seu rascunho foi mantido para cópia.')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByLabel('Título', { exact: true })).toHaveValue('Texto preservado após exclusão');
+    await expect(page.getByRole('textbox', { name: 'Título', exact: true })).toHaveValue('Texto preservado após exclusão');
     await expect(page.getByRole('button', { name: 'Salvar alterações', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Descartar rascunhos e fechar' }).click();
     await expect(page.getByRole('heading', { name: 'Detalhes da tarefa', exact: true })).toHaveCount(0);
@@ -2042,7 +2152,10 @@ test('final fix discussion guard composes with core draft and uncertain send ret
   await page.getByRole('textbox', { name: 'Comentário', exact: true }).fill('Resposta preservada');
   await page.getByRole('button', { name: 'Fechar painel' }).click();
   await expect(page.getByRole('textbox', { name: 'Comentário', exact: true })).toHaveValue('Resposta preservada');
-  await page.getByLabel('Organização', { exact: true }).selectOption(other);
+  await page.keyboard.press('Control+k');
+  const palette = page.getByRole('dialog', { name: 'Comandos e busca', exact: true });
+  await palette.getByRole('textbox', { name: 'Buscar comandos', exact: true }).fill('Mudar para Outro espaço');
+  await palette.getByRole('button', { name: 'Mudar para Outro espaço', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(workspace));
   await page.goBack();
   await expect(page.getByRole('textbox', { name: 'Comentário', exact: true })).toHaveValue('Resposta preservada');
@@ -2063,6 +2176,8 @@ test('final fix discussion guard composes with core draft and uncertain send ret
 test('final fix completed inline creation retries identical committed operation after lost response', async ({ page }) => {
   const f = await fixture(page);
   await login(page);
+  const footer = page.getByRole('button', { name: 'Adicionar tarefa no grupo: done', exact: true });
+  await footer.click();
   const composer = page.getByRole('textbox', { name: 'Nova tarefa no grupo: done', exact: true });
   await composer.fill('Criada concluída uma vez');
   f.dropResponse();
@@ -2070,8 +2185,8 @@ test('final fix completed inline creation retries identical committed operation 
   await expect(composer).toBeDisabled();
   await expect(page.getByText('Confirme o envio anterior tentando novamente.')).toBeVisible();
   await page.getByRole('button', { name: 'Adicionar ao grupo: done', exact: true }).click();
-  await expect(composer).toBeEnabled();
-  await expect(composer).toHaveValue('');
+  await expect(footer).toBeEnabled();
+  await expect(composer).toHaveCount(0);
   const writes = f.commands.filter(c => c.p_operation === 'batch');
   expect(writes).toHaveLength(2);
   expect(writes[1]).toEqual(writes[0]);
@@ -2087,13 +2202,15 @@ test('final fix blocked execution reason is visible independently from workflow 
   await page.getByText('Revisar navegação', { exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Execução bloqueada: Preciso de uma decisão humana');
   await page.screenshot({ path: '/tmp/final-execution-blocked.png', fullPage: true });
-  await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('todo');
+  await expect(page.getByRole('button', { name: 'Status', exact: true })).toContainText('A fazer');
 });
 
 test('residual contextual history survives reload, continues later pages, and palette preserves comment query', async ({ page }) => {
   await fixture(page);
   const history = Array.from({ length: 105 }, (_, i) => ({
     id: `history-${String(i).padStart(3, '0')}`,
+    workspaceId: workspace,
+    legacyMetadata: {},
     projectId: i === 0 || i === 104 ? 'project-1' : 'other-project',
     taskId: i === 0 || i === 104 ? 'task-1' : 'other-task',
     actorUserId: i === 0 || i === 104 ? userId : 'other-user',
@@ -2102,6 +2219,7 @@ test('residual contextual history survives reload, continues later pages, and pa
   }));
   const comments = Array.from({ length: 105 }, (_, i) => ({
     id: `comment-${String(i).padStart(3, '0')}`,
+    workspaceId: workspace,
     taskId: 'task-1',
     authorUserId: userId,
     body: i === 104 ? 'Instrução singular posterior' : `Comentário histórico ${i}`,
@@ -2144,7 +2262,7 @@ test('residual contextual history survives reload, continues later pages, and pa
   await page.goto(`/app/w/${workspace}/project?project=project-1&tab=overview`);
   const feed = page.locator('.context-history');
   await expect(feed.getByText('Atividade histórica inicial', { exact: false })).toBeVisible();
-  await expect(feed.getByText('comentou na tarefa', { exact: false }).first()).toBeVisible();
+  await expect(feed.getByText('comentou em', { exact: false }).first()).toBeVisible();
   await expect(feed.getByRole('status')).toContainText('Histórico parcial');
   await page.getByRole('link', { name: 'Atividade', exact: true }).last().click();
   await expect(feed.getByText('criou a tarefa', { exact: false })).toBeVisible();

@@ -11,7 +11,7 @@ export default defineConfig({
   webServer: {
     command: process.env.GR8R_PREVIEW_DIR
       ? `npm run preview -- --host 127.0.0.1 --port 5180 --strictPort --outDir ${process.env.GR8R_PREVIEW_DIR}`
-      : 'VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= VITE_SUPABASE_PUBLISHABLE_KEY= npm run dev -- --host 127.0.0.1 --port 5180 --strictPort',
+      : 'VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= VITE_SUPABASE_PUBLISHABLE_KEY= npm run dev -- --config vite.playwright.config.js --host 127.0.0.1 --port 5180 --strictPort',
     url: 'http://127.0.0.1:5180',
     reuseExistingServer: false,
   },

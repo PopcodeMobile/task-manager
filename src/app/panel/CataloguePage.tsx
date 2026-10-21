@@ -10,6 +10,9 @@ import {
   AlertDialogAction,
 } from '../../components/ui/alert-dialog';
 import type { PanelProps } from './types';
+import { StateExamples } from './StateExamples';
+import { DesignCatalogue } from './DesignCatalogue';
+import { Sun, Moon, Monitor, FolderKanban, ListChecks, Plus, WifiOff, BellOff, SearchX } from 'lucide-react';
 import { errorMessage } from '../shell/messages';
 export function CataloguePage(p: PanelProps) {
   const { t } = p;
@@ -28,64 +31,68 @@ export function CataloguePage(p: PanelProps) {
     [message, setMessage] = useState(''),
     [error, setError] = useState('');
   return (
-    <section className="panel-page">
+    <section className="page catalogue-page">
+      <div className="ph">
+        <div>
+          <h1>{p.route === 'system' ? t('Design system', 'Design system') : t('Estados do sistema', 'System states')}</h1>
+          <p>
+            {p.route === 'system'
+              ? t(
+                  'Tokens e componentes do Gr8r. Alterne o tema para ver as duas paletas.',
+                  'Tokens and components that make up Gr8r. Switch themes to see both palettes.',
+                )
+              : t('Estados vazios, carregamento, erro e confirmação usados no Gr8r.', 'Empty, loading, error, and confirmation states used throughout Gr8r.')}
+          </p>
+        </div>
+        <div className="acts">
+          {p.route === 'system' ? (
+            <div className="seg">
+              {[
+                ['light', t('Claro', 'Light')],
+                ['dark', t('Escuro', 'Dark')],
+                ['system', t('Sistema', 'System')],
+              ].map(([key, label]) => {
+                const Icon = key === 'light' ? Sun : key === 'dark' ? Moon : Monitor;
+                return (
+                  <Button
+                    variant="ghost"
+                    className={String(p.prefs.theme ?? 'light') === key ? 'on' : ''}
+                    key={key}
+                    onClick={() => void p.savePrefs({ theme: key }).catch(error => setError(errorMessage(error, t)))}
+                  >
+                    <Icon size={13} />
+                    {label}
+                  </Button>
+                );
+              })}
+            </div>
+          ) : (
+            <Button variant="outline" onClick={() => setOffline(!offline)}>
+              <WifiOff size={14} />
+              {t('Simular offline', 'Simulate offline')}
+            </Button>
+          )}
+        </div>
+      </div>
       {error && <p role="alert">{error}</p>}
-      <p className="configuration-note">{t('Catálogo e demonstrações de interface.', 'Interface catalogue and demonstrations.')}</p>
+
       {p.route === 'system' ? (
-        <>
-          <h2>{t('Aparência', 'Appearance')}</h2>
-          <div className="panel-toolbar">
-            <label>
-              {t('Destaque', 'Accent')}
-              <select
-                value={String(p.prefs.accent ?? 'indigo')}
-                onChange={e => void p.savePrefs({ accent: e.target.value }).catch(e => setError(errorMessage(e, t)))}
-              >
-                {['indigo', 'violet', 'blue', 'teal', 'green', 'amber', 'rose'].map(v => (
-                  <option key={v}>{v}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {t('Densidade', 'Density')}
-              <select
-                value={String(p.prefs.density ?? 'comfortable')}
-                onChange={e => void p.savePrefs({ density: e.target.value }).catch(e => setError(errorMessage(e, t)))}
-              >
-                <option value="comfortable">{t('Confortável', 'Comfortable')}</option>
-                <option value="compact">{t('Compacta', 'Compact')}</option>
-              </select>
-            </label>
-            <label>
-              {t('Tema', 'Theme')}
-              <select
-                value={String(p.prefs.theme ?? 'light')}
-                onChange={e => void p.savePrefs({ theme: e.target.value }).catch(e => setError(errorMessage(e, t)))}
-              >
-                <option value="light">{t('Claro', 'Light')}</option>
-                <option value="dark">{t('Escuro', 'Dark')}</option>
-                <option value="system">{t('Sistema', 'System')}</option>
-              </select>
-            </label>
-          </div>
-          <h2>{t('Cores e tipografia', 'Colors and typography')}</h2>
-          <div className="token-swatches">
-            {['accent', 'surface', 'sunken', 'text', 'text-3', 'border'].map(token => (
-              <div key={token}>
-                <span style={{ background: `var(--${token})` }} />
-                {token}
-              </div>
-            ))}
-          </div>
-          <h3>{t('Título de seção', 'Section title')}</h3>
-          <p>{t('Texto de conteúdo para leitura e trabalho diário.', 'Content text for reading and everyday work.')}</p>
-          <div className="button-row">
-            <Button>{t('Primário', 'Primary')}</Button>
-            <Button variant="outline">{t('Secundário', 'Secondary')}</Button>
-            <Button variant="ghost">{t('Discreto', 'Ghost')}</Button>
-            <Button disabled>{t('Desabilitado', 'Disabled')}</Button>
-          </div>
-        </>
+        <DesignCatalogue
+          {...p}
+          onModal={() => {
+            remember();
+            setModal(true);
+          }}
+          onConfirm={() => {
+            remember();
+            setConfirm(true);
+          }}
+          onToast={failed =>
+            failed
+              ? setError(t('Erro de exemplo. Nenhum dado foi alterado.', 'Sample error. No data changed.'))
+              : setMessage(t('Mensagem de exemplo. Nenhuma rede foi acessada.', 'Sample message. No network request was made.'))
+          }
+        />
       ) : (
         <>
           {offline && (
@@ -94,61 +101,90 @@ export function CataloguePage(p: PanelProps) {
               <Button onClick={() => setOffline(false)}>{t('Encerrar simulação', 'Exit simulation')}</Button>
             </p>
           )}
-          <div className="button-row">
-            <Button onClick={() => setOffline(!offline)}>{t('Simular offline', 'Simulate offline')}</Button>
-            <Button onClick={() => setLoading(!loading)}>
-              {loading ? t('Encerrar carregamento', 'Stop loading') : t('Simular carregamento', 'Simulate loading')}
-            </Button>
-            <Button onClick={() => p.go('unknown')}>{t('Abrir exemplo 404', 'Open 404 example')}</Button>
-          </div>
           {loading && (
             <p role="status" aria-busy="true">
               {t('Carregando demonstração...', 'Loading demonstration...')}
             </p>
           )}
-          <div className="panel-grid">
+          <h2 className="sec">{t('Estados vazios', 'Empty states')}</h2>
+          <div className="states-grid">
             {[
-              [t('Estado vazio', 'Empty state'), t('Nenhum item. Crie seu primeiro item.', 'No items. Create your first item.')],
-              [t('Sem acesso', 'Access denied'), t('Você não tem permissão para este conteúdo.', 'You do not have permission for this content.')],
-              [
-                t('Falha ao salvar', 'Save failed'),
-                t('As alterações continuam no formulário. Tente novamente.', 'Your changes remain in the form. Try again.'),
-              ],
-            ].map(([title, text]) => (
-              <article className="panel-card" key={title}>
-                <h3>{title}</h3>
-                <p>{text}</p>
+              {
+                cap: t('Sem projetos', 'No projects'),
+                title: t('Nenhum projeto ainda', 'No projects yet'),
+                text: t('Crie seu primeiro projeto para organizar seu trabalho.', 'Create your first project to start organizing your work.'),
+                Icon: FolderKanban,
+                action: () => p.go('projects', { create: 'true' }),
+                cta: t('Criar projeto', 'Create project'),
+              },
+              {
+                cap: t('Sem tarefas', 'No tasks'),
+                title: t('Nenhuma tarefa aqui', 'No tasks here'),
+                text: t('Adicione uma tarefa para começar.', 'Add a task to get things moving.'),
+                Icon: ListChecks,
+                action: () => p.createTask(),
+                cta: t('Adicionar tarefa', 'Add task'),
+              },
+              {
+                cap: t('Sem notificações', 'No notifications'),
+                title: t('Tudo em dia.', "You're all caught up."),
+                text: t('Novas menções e atribuições aparecerão aqui.', 'New mentions and assignments will show up here.'),
+                Icon: BellOff,
+              },
+              {
+                cap: t('Sem resultados', 'No search results'),
+                title: t('Nenhum resultado encontrado', 'No results found'),
+                text: t(
+                  'Nenhum resultado para “brand guidelines”. Confira a escrita ou tente outro termo.',
+                  'Nothing matches “brand guidelines”. Check the spelling or try a broader term.',
+                ),
+                Icon: SearchX,
+                action: () => p.go('search'),
+                cta: t('Limpar busca', 'Clear search'),
+              },
+            ].map(({ cap, title, text, Icon, action, cta }) => (
+              <article className="panel" key={cap}>
+                <div className="cap">
+                  <Icon size={13} />
+                  {cap}
+                </div>
+                <div className="empty-state">
+                  <div className="glyph">
+                    <Icon size={20} />
+                  </div>
+                  <h3 className="es-h">{title}</h3>
+                  <p>{text}</p>
+                  {action && (
+                    <Button
+                      variant={cap === t('Sem resultados', 'No search results') ? 'outline' : 'default'}
+                      className="btn-sm"
+                      disabled={p.readOnly && cap !== t('Sem resultados', 'No search results')}
+                      onClick={action}
+                    >
+                      {cap !== t('Sem resultados', 'No search results') && <Plus size={14} />}
+                      {cta}
+                    </Button>
+                  )}
+                </div>
               </article>
             ))}
           </div>
+          <StateExamples
+            p={p}
+            loading={loading}
+            setLoading={setLoading}
+            confirm={() => {
+              remember();
+              setConfirm(true);
+            }}
+            toast={failed =>
+              failed
+                ? setError(t('Erro de exemplo. Nenhum dado foi alterado.', 'Sample error. No data changed.'))
+                : setMessage(t('Tentativa de exemplo. Nenhuma rede foi acessada.', 'Sample retry. No network request was made.'))
+            }
+          />
         </>
       )}
-      <h2>{t('Controles de demonstração', 'Demonstration controls')}</h2>
-      <div className="button-row">
-        <Button
-          onClick={() => {
-            remember();
-            setModal(true);
-          }}
-        >
-          {t('Abrir modal de exemplo', 'Open sample modal')}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            remember();
-            setConfirm(true);
-          }}
-        >
-          {t('Abrir confirmação', 'Open confirmation')}
-        </Button>
-        <Button variant="outline" onClick={() => setMessage(t('Mensagem de demonstração.', 'Demonstration message.'))}>
-          {t('Mostrar mensagem', 'Show message')}
-        </Button>
-        <Button variant="outline" onClick={() => document.dispatchEvent(new CustomEvent('gr8r:palette'))}>
-          {t('Abrir comandos', 'Open commands')}
-        </Button>
-      </div>
       {message && (
         <p role="status">
           {message}
@@ -158,7 +194,7 @@ export function CataloguePage(p: PanelProps) {
         </p>
       )}
       <Sheet open={modal} onOpenChange={setModal}>
-        <SheetContent onCloseAutoFocus={restore} closeLabel={t('Fechar', 'Close')}>
+        <SheetContent className="panel-modal catalogue-modal" onCloseAutoFocus={restore} closeLabel={t('Fechar', 'Close')}>
           <SheetTitle>{t('Modal de exemplo', 'Sample modal')}</SheetTitle>
           <SheetDescription>{t('Use Tab para navegar e Escape para fechar.', 'Use Tab to navigate and Escape to close.')}</SheetDescription>
           <Button onClick={() => setModal(false)}>{t('Concluir exemplo', 'Finish example')}</Button>

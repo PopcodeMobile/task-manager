@@ -5,6 +5,20 @@ export const taskStatuses = ['backlog', 'todo', 'progress', 'review', 'done'] as
 export const priorities = ['none', 'low', 'medium', 'high', 'urgent'] as const;
 export const columns = ['title', 'status', 'project', 'priority', 'assignee', 'due', 'start', 'labels', 'deps', 'estimate', 'created'] as const;
 export type Column = (typeof columns)[number];
+/** Pinned original table defaults, shared by rendering and width controls. */
+export const defaultTaskColumnWidths: Record<Column, number> = {
+  title: 314,
+  status: 132,
+  priority: 112,
+  assignee: 156,
+  due: 112,
+  start: 112,
+  labels: 180,
+  deps: 150,
+  estimate: 92,
+  created: 112,
+  project: 156,
+};
 export type Filter = { f: string; op: 'is' | 'not'; v: string[] };
 export type TaskView = {
   q: string;
@@ -191,12 +205,12 @@ export function reorderTask(tasks: Task[], id: string, before: string | null, gr
   return commandsFor(sortOrder);
 }
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
-export function loadTaskView(storage: StorageLike, identity: string, workspaceId: string, key: string) {
+export function loadTaskView(storage: StorageLike, identity: string, workspaceId: string, key: string, fallback?: unknown) {
   const raw = storage.getItem(`gr8r.preferences.${identity}`);
   const personal = object(raw ? JSON.parse(raw) : {});
   const views = object(object(personal.views)[workspaceId]);
   const legacyKey = key.startsWith('project:') ? key.split(':')[1] : 'tasks';
-  return readTaskView(views[key] ?? views[legacyKey]);
+  return readTaskView(views[key] ?? views[legacyKey] ?? fallback);
 }
 export function saveTaskView(storage: StorageLike, identity: string, workspaceId: string, key: string, view: TaskView) {
   const storageKey = `gr8r.preferences.${identity}`,

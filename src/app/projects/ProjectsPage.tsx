@@ -1,5 +1,36 @@
-import { useEffect, useRef, useState } from 'react';
-import { FolderKanban, Plus, Star, Target, Globe, Megaphone, Palette, Code, Heart, Rocket, Briefcase, Layers } from 'lucide-react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import {
+  FolderKanban,
+  Folder,
+  Zap,
+  Sparkles,
+  Plus,
+  Star,
+  Target,
+  Globe,
+  Megaphone,
+  Palette,
+  Code,
+  Heart,
+  Rocket,
+  Briefcase,
+  Layers,
+  Smartphone,
+  Component,
+  Building2,
+  Search,
+  LayoutGrid,
+  List,
+  Table2,
+  CircleCheck,
+  Calendar,
+  Clock,
+  Lock,
+  MoreHorizontal,
+  Share2,
+  Settings,
+  ListFilter,
+} from 'lucide-react';
 import type { Project, SavedView } from '../../domain/contracts';
 import type { Translate } from '../auth/ConsentPage';
 import type { WorkspaceRepository } from '../../workspace/repository';
@@ -16,6 +47,8 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from '../../components/ui/alert-dialog';
+import { preferredDate } from '../panel/panel-model';
+import { MemberAvatar, MemberStack, ProjectStatus, ProjectProgress, projectTone } from './ProjectVisual';
 import { useSurfaceView } from '../schedules/useSurfaceView';
 import { ProjectEditor, projectError, type ProjectEdit } from './ProjectEditor';
 import { ProjectSharing } from './ProjectSharing';
@@ -23,11 +56,14 @@ import { ProjectDetail } from './ProjectDetail';
 import { SavedViewEditor, type ViewEdit } from './SavedViewEditor';
 import { projectStatuses, projectStatusLabel, reorderProjects } from './project-model';
 export type Execute = <T = unknown>(operation: string, input: Record<string, unknown>, version?: number) => Promise<T>;
-export function ProjectIcon({ project }: { project: Project }) {
+export function ProjectIcon({ project, size = 15 }: { project: Project; size?: number }) {
   const Icon =
     (
       {
         target: Target,
+        folder: Folder,
+        zap: Zap,
+        sparkles: Sparkles,
         globe: Globe,
         megaphone: Megaphone,
         palette: Palette,
@@ -36,18 +72,22 @@ export function ProjectIcon({ project }: { project: Project }) {
         rocket: Rocket,
         briefcase: Briefcase,
         layers: Layers,
+        smartphone: Smartphone,
+        'layout-grid': LayoutGrid,
+        component: Component,
+        'building-2': Building2,
       } as Record<string, typeof FolderKanban>
     )[String(project.legacyMetadata.icon)] ?? FolderKanban;
   return (
-    <span className="project-icon" data-tone={String(project.legacyMetadata.color)}>
-      <Icon size={18} />
+    <span className="project-icon picon" data-tone={String(project.legacyMetadata.color)} style={{ '--c': projectTone(project) } as CSSProperties}>
+      <Icon size={size} />
     </span>
   );
 }
 const readCollection = (value: Record<string, unknown>) => ({
   q: String(value.q ?? ''),
   status: String(value.status ?? ''),
-  sort: String(value.sort ?? 'manual'),
+  sort: String(value.sort ?? 'recent'),
   layout: ['grid', 'list', 'table'].includes(String(value.layout)) ? String(value.layout) : 'grid',
   archived: value.archived === true,
 });
@@ -59,6 +99,7 @@ export function ProjectsPage({
   projectId,
   tab = 'overview',
   openProject,
+  projectHref,
   back,
   href,
   navigate,
@@ -82,10 +123,11 @@ export function ProjectsPage({
   projectId?: string;
   tab?: string;
   openProject: (id: string, tab?: string) => void;
+  projectHref: (id: string) => string;
   back: () => void;
   href: (params: Record<string, string>) => string;
   navigate: (href: string) => void;
-  openTask: (id: string) => void;
+  openTask: (id: string, options?: { quick?: boolean }) => void;
   createTask: (day?: string) => void;
   fileId?: string;
   selectFile: (id: string) => void;
@@ -121,7 +163,20 @@ export function ProjectsPage({
     const tasks = snapshot.tasks.filter(task => task.projectId === p.id && !task.archived);
     return Math.round((tasks.filter(task => task.status === 'done').length / Math.max(tasks.length, 1)) * 100);
   };
-  const recent = (p: Project) => Math.max(0, ...snapshot.tasks.filter(task => task.projectId === p.id).map(task => Date.parse(task.updatedAt) || 0));
+  const recent = (p: Project) =>
+    typeof p.legacyMetadata.last === 'number'
+      ? Date.now() - p.legacyMetadata.last * 60000
+      : Math.max(0, ...snapshot.tasks.filter(task => task.projectId === p.id).map(task => Date.parse(task.updatedAt) || 0));
+  const lastActivity = (p: Project) => {
+    const minutes = typeof p.legacyMetadata.last === 'number' ? p.legacyMetadata.last : Math.round((Date.now() - recent(p)) / 60000);
+    if (minutes < 1) return t('agora', 'just now');
+    if (minutes < 60) return t(`há ${minutes} min`, `${minutes}m ago`);
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return t(`há ${hours} h`, `${hours}h ago`);
+    const days = Math.round(hours / 24);
+    if (days < 7) return t(`há ${days} d`, `${days}d ago`);
+    return preferredDate(new Date(Date.now() - minutes * 60000).toISOString(), collection.prefs, t('pt-BR', 'en'));
+  };
   const shown = available
     .filter(
       p =>
@@ -137,7 +192,7 @@ export function ProjectsPage({
           : collection.value.sort === 'progress'
             ? progress(b) - progress(a)
             : collection.value.sort === 'recent'
-              ? recent(b) - recent(a)
+              ? recent(b) - recent(a) || a.sortOrder - b.sortOrder
               : a.sortOrder - b.sortOrder,
     );
   const begin = (kind: ProjectEdit['kind'], project?: Project) => setEdit({ kind, project, opener: document.activeElement as HTMLElement });
@@ -162,17 +217,36 @@ export function ProjectsPage({
   const favorite = (p: Project) => (
     <Button
       variant="ghost"
+      className="ibtn ibtn-sm project-favorite"
       aria-label={t('Favoritar projeto ', 'Favorite project ') + p.name}
       aria-pressed={snapshot.preferences.favoriteProjectIds.includes(p.id)}
+      style={{ color: snapshot.preferences.favoriteProjectIds.includes(p.id) ? 'var(--amber)' : undefined }}
       onClick={() => void action(() => toggleFavorite(p.id, 'project'))}
     >
-      <Star size={16} fill={snapshot.preferences.favoriteProjectIds.includes(p.id) ? 'currentColor' : 'none'} />
+      <Star size={15} fill="none" />
     </Button>
   );
   const options = (p: Project) => (
     <details className="project-options">
-      <summary aria-label={t('Opções do projeto ', 'Project options ') + p.name}>···</summary>
+      <summary className="ibtn ibtn-sm" aria-label={t('Opções do projeto ', 'Project options ') + p.name}>
+        <MoreHorizontal size={14} />
+      </summary>
       <div>
+        <Button
+          variant="ghost"
+          disabled={busy}
+          aria-pressed={snapshot.preferences.favoriteProjectIds.includes(p.id)}
+          aria-label={
+            (snapshot.preferences.favoriteProjectIds.includes(p.id)
+              ? t('Desfavoritar projeto ', 'Unfavorite project ')
+              : t('Favoritar projeto ', 'Favorite project ')) + p.name
+          }
+          onClick={() => void action(() => toggleFavorite(p.id, 'project'))}
+        >
+          {snapshot.preferences.favoriteProjectIds.includes(p.id)
+            ? t('Desfavoritar projeto', 'Unfavorite project')
+            : t('Favoritar projeto', 'Favorite project')}
+        </Button>
         <Button variant="ghost" disabled={readOnly || busy} onClick={() => begin('edit', p)}>
           {t('Editar projeto', 'Edit project')}
         </Button>
@@ -270,39 +344,58 @@ export function ProjectsPage({
           </div>
         ) : (
           <>
-            <div className="page-heading project-heading" onContextMenu={context} onKeyDown={context}>
-              <div>
-                <div className="project-title">
-                  <ProjectIcon project={active} />
-                  <h1>{active.name}</h1>
-                  {favorite(active)}
-                </div>
-                <p>{active.key}</p>
-              </div>
-              <div className="button-row">
-                <label>
-                  <span className="sr-only">{t('Status do projeto', 'Project status')}</span>
-                  <select
-                    aria-label={t('Status do projeto', 'Project status')}
-                    disabled={readOnly || busy}
-                    value={active.status}
-                    onChange={e => void action(() => execute('update_project', { id: active.id, status: e.target.value }, active.version))}
+            <div className="proj-h project-heading" onContextMenu={context} onKeyDown={context}>
+              <div className="t">
+                <ProjectIcon project={active} size={18} />
+                <h1>{active.name}</h1>
+                {favorite(active)}
+                <select
+                  className="project-status-control pillbtn bordered"
+                  aria-label={t('Status do projeto', 'Project status')}
+                  disabled={readOnly || busy}
+                  value={active.status}
+                  onChange={e => void action(() => execute('update_project', { id: active.id, status: e.target.value }, active.version))}
+                >
+                  {projectStatuses.map(status => (
+                    <option key={status} value={status}>
+                      {projectStatusLabel(status, t)}
+                    </option>
+                  ))}
+                </select>
+                <span className="sp" />
+                <div className="row project-heading-actions">
+                  <Button
+                    variant="ghost"
+                    className="project-members-trigger"
+                    aria-label={t('Membros', 'Members')}
+                    onClick={() => setShare({ project: active, opener: document.activeElement as HTMLElement })}
                   >
-                    {projectStatuses.map(status => (
-                      <option key={status} value={status}>
-                        {projectStatusLabel(status, t)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <Button variant="outline" onClick={() => setShare({ project: active, opener: document.activeElement as HTMLElement })}>
-                  {t('Membros', 'Members')} ({snapshot.projectMembers.filter(m => m.projectId === active.id).length})
-                </Button>
-                <Button disabled={readOnly} onClick={() => openTask('new')}>
-                  <Plus size={16} />
-                  {t('Nova tarefa', 'New task')}
-                </Button>
-                {options(active)}
+                    <MemberStack
+                      ids={snapshot.projectMembers.filter(m => m.projectId === active.id).map(m => m.userId)}
+                      members={snapshot.members}
+                      max={5}
+                      size="md"
+                    />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="btn-sm hide-m"
+                    onClick={() => setShare({ project: active, opener: document.activeElement as HTMLElement })}
+                  >
+                    <Share2 size={13} />
+                    {t('Compartilhar', 'Share')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="ibtn ibtn-sm"
+                    disabled={readOnly || busy}
+                    aria-label={t('Configurações do projeto', 'Project settings')}
+                    onClick={() => begin('edit', active)}
+                  >
+                    <Settings size={15} />
+                  </Button>
+                  {options(active)}
+                </div>
               </div>
             </div>
             <ProjectDetail
@@ -333,26 +426,36 @@ export function ProjectsPage({
           </>
         )
       ) : (
-        <>
-          <div className="page-heading">
+        <div className="page wide project-collection-page">
+          <div className="ph">
             <div>
               <h1>{t('Projetos', 'Projects')}</h1>
-              <p>{t('Organize o trabalho em um só lugar.', 'Organize your work in one place.')}</p>
+              <p>
+                {available.filter(p => !p.archived && p.status !== 'complete').length} {t('ativos', 'active')} ·{' '}
+                {available.filter(p => !p.archived && p.status === 'complete').length} {t('concluídos', 'completed')}
+              </p>
             </div>
-            <Button disabled={readOnly || !snapshot.actorId} onClick={() => begin('new')}>
-              <Plus size={16} />
-              {t('Novo projeto', 'New project')}
-            </Button>
+            <div className="acts">
+              <Button disabled={readOnly || !snapshot.actorId} onClick={() => begin('new')}>
+                <Plus size={14} />
+                {t('Novo projeto', 'New project')}
+              </Button>
+            </div>
           </div>
           {collection.error && <p role="alert">{collection.error}</p>}
-          <fieldset className="project-collection-tools project-form-fields" disabled={!collection.ready}>
-            <Input
-              aria-label={t('Buscar projetos', 'Search projects')}
-              placeholder={t('Buscar projetos', 'Search projects')}
-              value={collection.value.q}
-              onChange={e => collection.save({ ...collection.value, q: e.target.value })}
-            />
+          <fieldset className="project-collection-tools project-form-fields row" disabled={!collection.ready}>
+            <div className="inwrap">
+              <Search className="i" size={13} />
+              <Input
+                className="input search-sm"
+                aria-label={t('Buscar projetos', 'Search projects')}
+                placeholder={t('Buscar projetos', 'Search projects')}
+                value={collection.value.q}
+                onChange={e => collection.save({ ...collection.value, q: e.target.value })}
+              />
+            </div>
             <select
+              className="select"
               aria-label={t('Filtrar status do projeto', 'Filter project status')}
               value={collection.value.status}
               onChange={e => collection.save({ ...collection.value, status: e.target.value })}
@@ -365,6 +468,7 @@ export function ProjectsPage({
               ))}
             </select>
             <select
+              className="select"
               aria-label={t('Ordenar projetos', 'Sort projects')}
               value={collection.value.sort}
               onChange={e => collection.save({ ...collection.value, sort: e.target.value })}
@@ -374,85 +478,214 @@ export function ProjectsPage({
                 ['name', t('Nome', 'Name')],
                 ['due', t('Prazo', 'Due date')],
                 ['progress', t('Progresso', 'Progress')],
-                ['recent', t('Recentes', 'Recent')],
+                ['recent', t('Atividade recente', 'Recently active')],
               ].map(([value, label]) => (
                 <option key={value} value={value}>
+                  {t('Ordenar: ', 'Sort: ')}
                   {label}
                 </option>
               ))}
             </select>
-            <select
-              aria-label={t('Layout dos projetos', 'Project layout')}
-              value={collection.value.layout}
-              onChange={e => collection.save({ ...collection.value, layout: e.target.value })}
-            >
-              {[
-                ['grid', t('Grade', 'Grid')],
-                ['list', t('Lista', 'List')],
-                ['table', t('Tabela', 'Table')],
-              ].map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
+            <details className="view-options project-collection-filter">
+              <summary aria-label={t('Mais filtros de projetos', 'More project filters')}>
+                <ListFilter size={13} />
+              </summary>
+              <div className="view-options-body">
+                <label className="project-archive-filter">
+                  <input
+                    type="checkbox"
+                    checked={collection.value.archived}
+                    onChange={e => collection.save({ ...collection.value, archived: e.target.checked })}
+                  />
+                  {t('Arquivados', 'Archived')}
+                </label>
+              </div>
+            </details>
+            <span className="sp" />
+            <div className="seg" role="tablist" aria-label={t('Layout', 'Layout')}>
+              {(
+                [
+                  ['grid', t('Grade', 'Grid'), LayoutGrid],
+                  ['list', t('Lista', 'List'), List],
+                  ['table', t('Tabela', 'Table'), Table2],
+                ] as const
+              ).map(([value, label, Icon]) => (
+                <Button
+                  key={value}
+                  role="tab"
+                  aria-label={label}
+                  variant="ghost"
+                  className={collection.value.layout === value ? 'on' : ''}
+                  aria-selected={collection.value.layout === value}
+                  onClick={() => collection.save({ ...collection.value, layout: value })}
+                >
+                  <Icon size={13} />
+                  <span className="hide-m">{label}</span>
+                </Button>
               ))}
-            </select>
-            <label>
-              <input type="checkbox" checked={collection.value.archived} onChange={e => collection.save({ ...collection.value, archived: e.target.checked })} />
-              {t('Arquivados', 'Archived')}
-            </label>
+            </div>
           </fieldset>
           <div
-            className={`project-collection project-layout-${collection.value.layout}`}
-            role={collection.value.layout === 'table' ? 'table' : undefined}
+            className={`project-collection project-layout-${collection.value.layout} ${collection.value.layout === 'grid' ? 'pgrid' : 'panel'}`}
             aria-label={t('Lista de projetos', 'Project collection')}
           >
-            {collection.value.layout === 'table' && (
-              <div className="project-table-head" role="row">
-                {[
-                  t('Projeto', 'Project'),
-                  t('Status', 'Status'),
-                  t('Progresso', 'Progress'),
-                  t('Prazo', 'Due date'),
-                  t('Favorito', 'Favorite'),
-                  t('Opções', 'Options'),
-                ].map(label => (
-                  <span role="columnheader" key={label}>
-                    {label}
-                  </span>
-                ))}
-              </div>
+            {collection.value.layout === 'table' ? (
+              <table className="perm-t project-table" aria-label={t('Lista de projetos', 'Project collection')}>
+                <thead>
+                  <tr>
+                    {[
+                      t('Projeto', 'Project'),
+                      t('Status', 'Status'),
+                      t('Líder', 'Lead'),
+                      t('Equipe', 'Team'),
+                      t('Progresso', 'Progress'),
+                      t('Tarefas', 'Tasks'),
+                      t('Início', 'Start'),
+                      t('Prazo', 'Due date'),
+                      t('Atividade recente', 'Last activity'),
+                      t('Opções', 'Options'),
+                    ].map(label => (
+                      <th key={label}>{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map(p => {
+                    const ts = snapshot.tasks.filter(task => task.projectId === p.id && !task.archived);
+
+                    return (
+                      <tr key={p.id} data-project-id={p.id} onContextMenu={context} onKeyDown={context}>
+                        <td>
+                          <span className="row">
+                            <ProjectIcon project={p} />
+                            <button className="project-card-title" onClick={() => openProject(p.id)}>
+                              {p.name}
+                            </button>
+                          </span>
+                        </td>
+                        <td>
+                          <ProjectStatus status={p.status} t={t} />
+                        </td>
+                        <td>
+                          <span className="row">
+                            <MemberAvatar member={snapshot.members.find(m => m.user_id === p.leadUserId)} />
+                            {snapshot.members.find(m => m.user_id === p.leadUserId)?.name ?? '—'}
+                          </span>
+                        </td>
+                        <td className="muted">{snapshot.teams.find(team => team.id === p.teamId)?.name ?? '—'}</td>
+                        <td>
+                          <span className="row">
+                            <ProjectProgress value={progress(p)} name={t('Progresso de ', 'Progress of ') + p.name} />
+                            <span className="num faint">{progress(p)}%</span>
+                          </span>
+                        </td>
+                        <td className="num">{ts.length}</td>
+                        <td className="num muted">{preferredDate(p.startDate, collection.prefs, t('pt-BR', 'en')) || '—'}</td>
+                        <td className="num muted">
+                          <time dateTime={p.dueDate ?? undefined}>
+                            {preferredDate(
+                              p.dueDate,
+                              collection.prefs,
+                              t('pt-BR', 'en'),
+                              !!p.dueDate && new Date(p.dueDate).getFullYear() !== new Date().getFullYear(),
+                            ) || '—'}
+                          </time>
+                        </td>
+                        <td className="muted">{lastActivity(p)}</td>
+                        <td>{options(p)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              shown.map(p => {
+                const ts = snapshot.tasks.filter(task => task.projectId === p.id && !task.archived);
+                const ids = snapshot.projectMembers.filter(m => m.projectId === p.id).map(m => m.userId);
+
+                if (collection.value.layout === 'list')
+                  return (
+                    <article key={p.id} data-project-id={p.id} className="project-list-row mini" onContextMenu={context} onKeyDown={context}>
+                      <ProjectIcon project={p} />
+                      <div className="grow project-list-name">
+                        <button className="project-card-title" onClick={() => openProject(p.id)}>
+                          {p.name}
+                          {p.legacyMetadata.private && <Lock size={12} />}
+                        </button>
+                        <div className="trunc faint">{p.description}</div>
+                      </div>
+                      <div className="project-list-meta">
+                        <ProjectStatus status={p.status} t={t} />
+                        <span className="row project-list-progress hide-m">
+                          <ProjectProgress value={progress(p)} name={t('Progresso de ', 'Progress of ') + p.name} />
+                          <span className="num faint">{progress(p)}%</span>
+                        </span>
+                        <time className="num muted hide-m">{preferredDate(p.dueDate, collection.prefs, t('pt-BR', 'en')) || '—'}</time>
+                        <MemberStack ids={ids} members={snapshot.members} />
+                        {options(p)}
+                      </div>
+                    </article>
+                  );
+                return (
+                  <article
+                    key={p.id}
+                    data-project-id={p.id}
+                    className={collection.value.layout === 'grid' ? 'project-card pcard' : 'project-card project-list-row mini'}
+                    onContextMenu={context}
+                    onKeyDown={context}
+                  >
+                    <div className="row project-card-head">
+                      <ProjectIcon project={p} />
+                      <button className="project-card-title grow" onClick={() => openProject(p.id)}>
+                        <strong>{p.name}</strong>
+                        {snapshot.preferences.favoriteProjectIds.includes(p.id) && <Star size={12} className="project-favorite-mark" />}
+                        {p.legacyMetadata.private && <Lock size={12} className="faint" />}
+                      </button>
+                      <ProjectStatus status={p.status} t={t} />
+                    </div>
+                    <div className="desc">{p.description}</div>
+                    <div className="row project-card-progress">
+                      <ProjectProgress
+                        value={progress(p)}
+                        name={t('Progresso de ', 'Progress of ') + p.name}
+                        tone={p.status === 'complete' ? 'green' : p.status === 'risk' ? 'red' : ''}
+                      />
+                      <span className="num">{progress(p)}%</span>
+                    </div>
+                    <div className="foot">
+                      <span className="row">
+                        <CircleCheck size={12} />
+                        {ts.filter(task => task.status === 'done').length}/{ts.length}
+                      </span>
+                      <span className="row">
+                        <Calendar size={12} />
+                        <time dateTime={p.dueDate ?? undefined}>
+                          {preferredDate(
+                            p.dueDate,
+                            collection.prefs,
+                            t('pt-BR', 'en'),
+                            !!p.dueDate && new Date(p.dueDate).getFullYear() !== new Date().getFullYear(),
+                          ) || '—'}
+                        </time>
+                      </span>
+                      <span className="row hide-m">
+                        <Clock size={12} />
+                        {lastActivity(p)}
+                      </span>
+                      <span className="sp" />
+                      <MemberStack ids={ids} members={snapshot.members} />
+                    </div>
+                    <div className="project-card-options">
+                      {favorite(p)}
+                      {options(p)}
+                    </div>
+                  </article>
+                );
+              })
             )}
-            {shown.map(p => (
-              <article
-                key={p.id}
-                data-project-id={p.id}
-                className="project-card"
-                onContextMenu={context}
-                onKeyDown={context}
-                role={collection.value.layout === 'table' ? 'row' : undefined}
-              >
-                <div className="project-card-name" role={collection.value.layout === 'table' ? 'cell' : undefined}>
-                  <ProjectIcon project={p} />
-                  <button className="project-card-title" onClick={() => openProject(p.id)}>
-                    <strong>{p.name}</strong>
-                    <small>{p.key}</small>
-                  </button>
-                </div>
-                <span role={collection.value.layout === 'table' ? 'cell' : undefined}>{projectStatusLabel(p.status, t)}</span>
-                <span className="project-card-progress" role={collection.value.layout === 'table' ? 'cell' : undefined}>
-                  <progress value={progress(p)} max={100} aria-label={t('Progresso de ', 'Progress of ') + p.name} />
-                  {progress(p)}%
-                </span>
-                <span role={collection.value.layout === 'table' ? 'cell' : undefined}>
-                  <time>{p.dueDate ?? '—'}</time>
-                </span>
-                <span role={collection.value.layout === 'table' ? 'cell' : undefined}>{favorite(p)}</span>
-                <div role={collection.value.layout === 'table' ? 'cell' : undefined}>{options(p)}</div>
-              </article>
-            ))}
           </div>
           {!shown.length && <p className="work-empty">{t('Nenhum projeto corresponde aos filtros.', 'No projects match these filters.')}</p>}
-        </>
+        </div>
       )}
       {edit && (
         <ProjectEditor
@@ -472,6 +705,7 @@ export function ProjectsPage({
       {share && (
         <ProjectSharing
           project={snapshot.projects.find(p => p.id === share.project.id) ?? share.project}
+          projectUrl={new URL(projectHref(share.project.id), location.origin).href}
           snapshot={snapshot}
           repo={repo}
           execute={execute}

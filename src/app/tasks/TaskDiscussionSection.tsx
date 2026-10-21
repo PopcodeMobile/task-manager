@@ -1,3 +1,5 @@
+import { MemberAvatar } from '../projects/ProjectVisual';
+import { preferredDate } from '../panel/panel-model';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { safeRichText } from '../../core/rich-text.js';
 import type { Task, Comment, CommentReaction, ActivityEntry } from '../../domain/contracts';
@@ -24,8 +26,10 @@ export function TaskDiscussionSection({
   disabled,
   t,
   registerDraft,
+  compact = false,
 }: {
   task: Task;
+  compact?: boolean;
   more?: boolean;
   loadMore?: () => Promise<void>;
   comments: Comment[];
@@ -75,33 +79,36 @@ export function TaskDiscussionSection({
   const mention = body.match(/(?:^|\s)@([^@\s]*)$/u);
   const candidates = mention ? members.filter(m => m.name.toLocaleLowerCase().includes(mention[1].toLocaleLowerCase())) : [];
   return (
-    <section className="drawer-section">
+    <section className={`drawer-section ${compact ? 'task-discussion-compact' : ''}`}>
       {more && (
         <Button variant="outline" disabled={disabled || pending} onClick={() => void loadMore?.()}>
           {t('Carregar mais histórico', 'Load more history')}
         </Button>
       )}
-      <div role="tablist" aria-label={t('Discussão da tarefa', 'Task discussion')} className="button-row">
-        {['comments', 'activity'].map(key => (
-          <Button
-            key={key}
-            role="tab"
-            aria-selected={tab === key}
-            tabIndex={tab === key ? 0 : -1}
-            onKeyDown={e => {
-              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-                setTab(key === 'comments' ? 'activity' : 'comments');
-                e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role=tab]')[key === 'comments' ? 1 : 0]?.focus();
-              }
-            }}
-            variant={tab === key ? 'default' : 'ghost'}
-            onClick={() => setTab(key)}
-          >
-            {key === 'comments' ? t('Comentários', 'Comments') : t('Atividade', 'Activity')}
-          </Button>
-        ))}
-      </div>
-      {tab === 'activity' ? (
+      {!compact && (
+        <div role="tablist" aria-label={t('Discussão da tarefa', 'Task discussion')} className="task-discussion-tabs tabs">
+          {['comments', 'activity'].map(key => (
+            <Button
+              key={key}
+              role="tab"
+              className={`tab ${tab === key ? 'on' : ''}`}
+              aria-selected={tab === key}
+              tabIndex={tab === key ? 0 : -1}
+              onKeyDown={e => {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                  setTab(key === 'comments' ? 'activity' : 'comments');
+                  e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role=tab]')[key === 'comments' ? 1 : 0]?.focus();
+                }
+              }}
+              variant={tab === key ? 'default' : 'ghost'}
+              onClick={() => setTab(key)}
+            >
+              {key === 'comments' ? t('Comentários', 'Comments') : t('Atividade', 'Activity')}
+            </Button>
+          ))}
+        </div>
+      )}
+      {!compact && tab === 'activity' ? (
         <div role="tabpanel">
           {history.map(entry => (
             <article className="comment" key={entry.id}>
@@ -114,34 +121,40 @@ export function TaskDiscussionSection({
       ) : (
         <div role="tabpanel">
           {comments.map(item => (
-            <article className="comment" key={item.id}>
-              <strong>{members.find(m => m.user_id === item.authorUserId)?.name ?? t('Autor histórico', 'Historical author')}</strong>
-              <div className="rich-content" dangerouslySetInnerHTML={{ __html: safeRichText(item.body) }} />
-              <div className="comment-reactions">
-                {[...new Set(['👍', '❤️', '🎉', ...reactions.filter(r => r.commentId === item.id).map(r => r.reaction)])].map(reaction => {
-                  const people = reactions.filter(r => r.commentId === item.id && r.reaction === reaction),
-                    mine = people.some(r => r.userId === actorId);
-                  return (
-                    <Button
-                      variant="ghost"
-                      key={reaction}
-                      aria-label={t('Reagir: ', 'React: ') + reaction}
-                      aria-pressed={mine}
-                      disabled={disabled || pending || !actorId}
-                      title={people.map(r => members.find(m => m.user_id === (r.userId ?? r.legacyUserId))?.name ?? r.legacyUserId).join(', ')}
-                      onClick={() => void action(() => execute(mine ? 'remove_reaction' : 'add_reaction', { commentId: item.id, reaction }))}
-                    >
-                      {reaction}
-                      {people.length ? ` ${people.length}` : ''}
-                    </Button>
-                  );
-                })}
+            <article className="comment cmt" key={item.id}>
+              <MemberAvatar member={members.find(m => m.user_id === item.authorUserId)} size="md" />
+              <div className="comment-body">
+                <div className="comment-heading">
+                  <strong>{members.find(m => m.user_id === item.authorUserId)?.name ?? t('Autor histórico', 'Historical author')}</strong>
+                  <time dateTime={item.createdAt}>{preferredDate(item.createdAt, {}, t('pt-BR', 'en'))}</time>
+                </div>
+                <div className="rich-content" dangerouslySetInnerHTML={{ __html: safeRichText(item.body) }} />
+                <div className="comment-reactions">
+                  {[...new Set(['👍', '❤️', '🎉', ...reactions.filter(r => r.commentId === item.id).map(r => r.reaction)])].map(reaction => {
+                    const people = reactions.filter(r => r.commentId === item.id && r.reaction === reaction),
+                      mine = people.some(r => r.userId === actorId);
+                    return (
+                      <Button
+                        variant="ghost"
+                        key={reaction}
+                        aria-label={t('Reagir: ', 'React: ') + reaction}
+                        aria-pressed={mine}
+                        disabled={disabled || pending || !actorId}
+                        title={people.map(r => members.find(m => m.user_id === (r.userId ?? r.legacyUserId))?.name ?? r.legacyUserId).join(', ')}
+                        onClick={() => void action(() => execute(mine ? 'remove_reaction' : 'add_reaction', { commentId: item.id, reaction }))}
+                      >
+                        {reaction}
+                        {people.length ? ` ${people.length}` : ''}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {(admin || (actorId && item.authorUserId === actorId)) && (
+                  <Button variant="ghost" disabled={disabled} onClick={() => void action(() => execute('delete_comment', { id: item.id }, item.version))}>
+                    {t('Excluir comentário', 'Delete comment')}
+                  </Button>
+                )}
               </div>
-              {(admin || (actorId && item.authorUserId === actorId)) && (
-                <Button variant="ghost" disabled={disabled} onClick={() => void action(() => execute('delete_comment', { id: item.id }, item.version))}>
-                  {t('Excluir comentário', 'Delete comment')}
-                </Button>
-              )}
             </article>
           ))}
           {blocked && (
@@ -152,7 +165,11 @@ export function TaskDiscussionSection({
               )}
             </p>
           )}
+          {!compact && !comments.length && (
+            <p className="discussion-empty">{t('Nenhum comentário ainda. Inicie a conversa.', 'No comments yet. Start the conversation.')}</p>
+          )}
           <form
+            className="task-comment-composer"
             onSubmit={e => {
               e.preventDefault();
               if (pending) return;
@@ -173,10 +190,26 @@ export function TaskDiscussionSection({
               }).finally(() => setPending(false));
             }}
           >
+            {!compact && (
+              <span className="comment-composer-avatar">
+                <MemberAvatar member={members.find(member => member.user_id === actorId)} />
+              </span>
+            )}
             <label className="form-field">
-              {t('Comentário', 'Comment')}
+              {compact ? <span className="sr-only">{t('Resposta', 'Reply')}</span> : t('Comentário', 'Comment')}
               <textarea
                 ref={textarea}
+                placeholder={
+                  compact
+                    ? t('Responda… use @ para mencionar', 'Reply… use @ to mention')
+                    : t('Deixe um comentário… digite @ para mencionar', 'Leave a comment… type @ to mention')
+                }
+                onKeyDown={event => {
+                  if (compact && (event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
                 required
                 maxLength={20000}
                 value={body}
@@ -202,8 +235,14 @@ export function TaskDiscussionSection({
                 ))}
               </div>
             )}
+            {compact && (
+              <span className="reply-key-hint">
+                {navigator.platform.toLowerCase().includes('mac') ? '⌘' : 'Ctrl'}
+                {t('+Enter para enviar', '+Enter to send')}
+              </span>
+            )}
             <Button type="submit" disabled={disabled || pending || !actorId}>
-              {t('Comentar', 'Post comment')}
+              {compact ? t('Responder', 'Reply') : t('Comentar', 'Post comment')}
             </Button>
             {registerDraft && body && (
               <Button
