@@ -58,6 +58,7 @@ export type TaskAttachment = { workspaceId: string; taskId: string; fileId: stri
 export type Label = VersionedEntity & { name: string; legacyMetadata: LegacyMetadata };
 export type Comment = VersionedEntity & { taskId: string; authorUserId: string | null; body: string; createdAt: string; legacyMetadata: LegacyMetadata };
 export type CommentReaction = { workspaceId: string; commentId: string; reaction: string; legacyUserId: string; userId: string | null };
+export type TeamMembershipBaseline = { userId: string; teamIds: string[] };
 export type Team = VersionedEntity & { name: string; description: string };
 export type Notification = EntityRef & {
   projectId: string | null;

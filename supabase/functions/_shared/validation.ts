@@ -1,3 +1,4 @@
+import { validTeamMembershipBaselines } from './team-memberships.ts';
 import type { Command } from '../../../src/domain/contracts.ts';
 import { PublicError } from './errors.ts';
 type Rule = { fields: string[]; required: string[]; version?: boolean };
@@ -40,8 +41,8 @@ export const commandRules: Record<string, Rule> = {
   remove_task_attachment: rule('id fileId claimToken', 'id fileId', true),
   add_reaction: rule('commentId reaction', 'commentId reaction'),
   remove_reaction: rule('commentId reaction', 'commentId reaction'),
-  create_team: rule('id name description attributes', 'name'),
-  update_team: rule('id name description attributes', 'id', true),
+  create_team: rule('id name description attributes expectedMemberships', 'name'),
+  update_team: rule('id name description attributes expectedMemberships', 'id', true),
   delete_team: rule('id', 'id', true),
   set_team_member: rule('id userId', 'id userId', true),
   remove_team_member: rule('id userId', 'id userId', true),
@@ -163,6 +164,10 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
     return value as Command<Record<string, unknown>>;
   }
   for (const [key, item] of Object.entries(input)) {
+    if (key === 'expectedMemberships') {
+      if (!validTeamMembershipBaselines(item, true)) invalid();
+      continue;
+    }
     if (
       (operation === 'duplicate_file' && (key === 'id' || key === 'newId')) ||
       (operation === 'duplicate_task_graph' && (key === 'id' || key === 'projectId'))

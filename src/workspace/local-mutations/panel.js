@@ -79,6 +79,16 @@ export function mutatePanel({ data, find, cas, bump, dto, initialize }, operatio
       for (const row of rows) bump(kind, row);
     return { id: ws.id, demo: true };
   }
+  // Run on the transaction's current graph, before this command changes any team.
+  if (Object.hasOwn(input, 'expectedMemberships')) {
+    const teams = new Set(localTeams(data).map(team => team.id));
+    for (const baseline of input.expectedMemberships) {
+      const member = data.members.find(member => member.id === baseline.userId);
+      const current = member?.team && teams.has(member.team) ? [member.team] : [];
+      if (!member || current.length !== baseline.teamIds.length || current.some(id => !baseline.teamIds.includes(id)))
+        throw new RepositoryError('version_conflict');
+    }
+  }
   let row;
   if (operation === 'create_team') {
     row = { id: input.id ?? crypto.randomUUID(), name: input.name, desc: '' };
@@ -109,7 +119,9 @@ export function mutatePanel({ data, find, cas, bump, dto, initialize }, operatio
     } else if (member.team === row.id) member.team = '';
   } else {
     if (data.teams.some(t => t.id !== row.id && t.name.toLowerCase() === input.name?.toLowerCase())) fail();
-    patchLocal(row, input);
+    const patch = { ...input };
+    delete patch.expectedMemberships;
+    patchLocal(row, patch);
   }
   if (operation !== 'create_team') bump('team', row);
   return dto('team', row);

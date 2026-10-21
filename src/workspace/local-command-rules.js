@@ -4,8 +4,8 @@ const taskFields = 'title description status priority assigneeUserId recurrence 
 const projectFields = 'key name description status teamId leadUserId dueDate startDate sortOrder attributes';
 const rule = (fields, required = '') => ({ fields: fields.split(' '), required: required.split(' ').filter(Boolean) });
 export const localCommandRules = {
-  create_team: rule('id name description attributes', 'name'),
-  update_team: rule('id name description attributes', 'id'),
+  create_team: rule('id name description attributes expectedMemberships', 'name'),
+  update_team: rule('id name description attributes expectedMemberships', 'id'),
   delete_team: rule('id', 'id'),
   set_team_member: rule('id userId', 'id userId'),
   remove_team_member: rule('id userId', 'id userId'),

@@ -6684,6 +6684,9 @@
               },
               "attributes": {
                 "type": "object"
+              },
+              "expectedMemberships": {
+                "$ref": "#/components/schemas/TeamMembershipBaselines"
               }
             }
           }
@@ -6721,6 +6724,9 @@
               },
               "attributes": {
                 "type": "object"
+              },
+              "expectedMemberships": {
+                "$ref": "#/components/schemas/TeamMembershipBaselines"
               }
             }
           }
@@ -8516,6 +8522,31 @@
           }
         },
         "description": "Source-authoritative atomic task graph copy. Requires source expectedVersion and agent claimToken when applicable. Task mode preserves status and done completion time; project mode resets todo. Fresh task/subtask IDs, key and creation/update times, no archive/executor/lease/run, full metadata and relation copies. Original file ownership and dependency targets retained; no comments or recurrence successor."
+      },
+      "TeamMembershipBaselines": {
+        "type": "array",
+        "description": "Optional exact relationship snapshots for selected users, compared in the current workspace under its transaction mutex before this create/update. User IDs must be unique (UUID case ignored); team IDs are unordered sets with no duplicates. An empty teamIds array asserts no current team. An empty guard list is valid. Missing current membership or any changed, removed, or foreign team relation returns version_conflict (409) and rolls back the whole batch. Invalid shape/duplicates return validation_error (422). Omission preserves existing multi-team behavior. Guard is not entity metadata. Authorized idempotent replay returns the receipt without rerunning these preconditions. Existing batch limit 100 and input limit 262144 apply to the entire request; no chunking.",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["userId", "teamIds"],
+          "properties": {
+            "userId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "teamIds": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Exact unnormalized team ID. At most 128 UTF-16 code units, nonblank under ECMAScript trim, no NUL or unpaired surrogate. A numeric string is valid; a JSON number is not."
+              }
+            }
+          }
+        }
       }
     }
   }

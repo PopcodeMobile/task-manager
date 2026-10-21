@@ -1,4 +1,5 @@
 // @ts-check
+import { validTeamMembershipBaselines } from '../../supabase/functions/_shared/team-memberships.ts';
 import { mutatePanel } from './local-mutations/panel.js';
 import { assertTaskGraphActor } from './local-mutations/task-graph.js';
 import { RepositoryError } from './normalized.ts';
@@ -506,6 +507,7 @@ function validateLocalInput(data, operation, input) {
     rule.required.some(key => input[key] === undefined || input[key] === null)
   )
     fail('validation_error');
+  if (Object.hasOwn(input, 'expectedMemberships') && !validTeamMembershipBaselines(input.expectedMemberships)) fail('validation_error');
   if (operation === 'local_update_profile' && Object.values(input).some(value => typeof value !== 'string' || value.length > 500)) fail('validation_error');
   if (
     operation === 'update_workspace' &&
