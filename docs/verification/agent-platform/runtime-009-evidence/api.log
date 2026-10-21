@@ -1,0 +1,10 @@
+WARN: config section [inbucket] is deprecated and will be removed in v3, use [local_smtp] instead.
+Uploading asset (api): supabase/functions/deno.json
+Uploading asset (api): supabase/functions/api/index.ts
+Uploading asset (api): supabase/functions/_shared/validation.ts
+Uploading asset (api): supabase/functions/_shared/errors.ts
+Uploading asset (api): src/domain/contracts.ts
+Uploading asset (api): supabase/functions/_shared/team-memberships.ts
+Uploading asset (api): supabase/functions/_shared/operations.ts
+Uploading asset (api): supabase/functions/_shared/auth.ts
+{"project_ref":"ddodhyhtpgvsqzpipgcq","functions":["api"],"dashboard_url":"https://supabase.com/dashboard/project/ddodhyhtpgvsqzpipgcq/functions","message":"Deployed Functions."}

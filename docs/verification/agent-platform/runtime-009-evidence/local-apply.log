@@ -1,0 +1,6 @@
+Connecting to local database...
+Do you want to push these migrations to the local database?
+ • 202610200009_task_context_execution.sql
+ [Y/n] y
+Applying migration 202610200009_task_context_execution.sql...
+{"upToDate":false,"dryRun":false,"migrations":["202610200009_task_context_execution.sql"],"seeds":[],"roles":[],"message":"Finished supabase db push."}

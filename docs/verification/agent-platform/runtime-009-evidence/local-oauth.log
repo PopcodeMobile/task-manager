@@ -1,0 +1,8 @@
+running 1 test from ../../../tmp/task9-local-oauth-live.test.ts
+real local OAuth PKCE isolates two users, grants, MCP transport, refresh and immediate revocation ...
+------- output -------
+009 actual MCP/context/execution/API boundary checks passed; durable queue remains isolated-PG proof until receiver activation
+----- output end -----
+real local OAuth PKCE isolates two users, grants, MCP transport, refresh and immediate revocation ... ok (1s)
+
+ok | 1 passed | 0 failed (1s)

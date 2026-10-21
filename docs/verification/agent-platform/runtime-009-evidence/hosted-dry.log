@@ -1,0 +1,5 @@
+DRY RUN: migrations will *not* be pushed to the database.
+Connecting to remote database...
+Would push these migrations:
+ • 202610200009_task_context_execution.sql
+{"upToDate":false,"dryRun":true,"migrations":["202610200009_task_context_execution.sql"],"seeds":[],"roles":[],"message":"Finished supabase db push."}

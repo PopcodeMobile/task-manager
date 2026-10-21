@@ -1,0 +1,27 @@
+running 1 test from ../../../tmp/task9-local-oauth-live.test.ts
+real local OAuth PKCE isolates two users, grants, MCP transport, refresh and immediate revocation ... FAILED (1s)
+
+ ERRORS 
+
+real local OAuth PKCE isolates two users, grants, MCP transport, refresh and immediate revocation => ../../../tmp/task9-local-oauth-live.test.ts:10:6
+error: AssertionError: Values are not equal.
+
+
+    [Diff] Actual / Expected
+
+
+-   200
++   201
+
+  throw new AssertionError(message);
+        ^
+    at assertEquals (https://jsr.io/@std/assert/1.0.19/equals.ts:67:9)
+    at fn (file:///tmp/task9-local-oauth-live.test.ts:342:1)
+
+ FAILURES 
+
+real local OAuth PKCE isolates two users, grants, MCP transport, refresh and immediate revocation => ../../../tmp/task9-local-oauth-live.test.ts:10:6
+
+FAILED | 0 passed | 1 failed (1s)
+
+error: Test failed

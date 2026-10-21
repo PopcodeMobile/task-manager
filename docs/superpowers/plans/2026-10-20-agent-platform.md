@@ -10,7 +10,7 @@
 
 **Spec:** [Desenho e critérios de aceite](../specs/2026-10-20-agent-platform-design.md).
 
-Estado: escopo completo aprovado pelo usuário; execução por etapas autorizada. Revisão ampla em0630425 pediu I1–I9/M1/M2; onda única de correções implementada, aguardando uma revisão scoped do root.009 possui prova isolada; runtime local/hosted permanece008 e ativação real segue separada.
+Estado: escopo completo aprovado. Implementação e revisões de código concluídas;009aplicada local/hosted, API/MCP e Auth/transportes reais com usuários sintéticos validados. Ativação pública/Hermes/duas contas Claude reais e integração final da branch seguem pendentes. Ver prova runtime009.
 
 ## Global Constraints
 
@@ -554,7 +554,7 @@ Preservar callbacks/consentimento e demonstração local no entrypoint final.
       e sem configuração cloud, bundle sem segredos/logs e auditoria visual.
       Resultados ignorados/fixtures e uniões de execuções ficam identificados.
 - [x] Aprovar revisão independente de Task6d (revisão scoped final em `fb881aa`).
-- [ ] Aprovar revisão ampla final da branch pelo root.
+- [x] Aprovar revisão ampla final e correções/residuais, com revisões scoped e decisões explícitas preservadas.
 - [x] Publicar matriz e provas permanentes; substituir ponteiros temporários do plano.
       Atualizar documentação da stack e limites, sem afirmar ativação real pendente.
 - [x] Commit: `refactor(ui): finish react migration and retire legacy rendering`.
@@ -570,7 +570,7 @@ autorizam suas próprias conexões Claude; nenhuma conta ou assinatura é compar
 
 - [ ] Conferir estado do projeto alvo, export de recuperação, versão de CLI,
       assinatura JWT assimétrica, OAuth/redirects, pgmq, Vault, Cron e permissões.
-- [ ] Aplicar migrations/functions no ambiente de teste identificado, configurar
+- [x] Aplicar migrations/functions no ambiente de teste identificado, configurar
       segredos fora do git e executar os mesmos testes contra o serviço hospedado.
 - [ ] Conectar Hermes real: tarefa atribuída → webhook aceito → MCP consulta/reserva
       → comentário/conclusão → histórico visível, incluindo uma falha e uma retomada.
@@ -595,17 +595,17 @@ ferramentas não comprova Docker ativo, projeto remoto acessível ou clientes co
 
 Gates6a–6c aprovados, incluindo6b0–6b4 e correções6c: [arquivo de relatórios e revisões](../../verification/agent-platform/README.md). O aggregate6b foi concluído pelos cinco commits/gates menores, não por um commit agregado adicional.
 
-Task6d: [relatório de implementação e comandos](../../verification/agent-platform/task-6d-report.md); gate scoped aprovado emfb881aa. A revisão ampla subsequente pediu as correções registradas no [relatório final](../../verification/agent-platform/final-fix-report.md); rerevisão scoped e ativação pertencem ao root. Marcação de implementação não equivale a aprovação ou publicação.
+Task6d: [relatório de implementação e comandos](../../verification/agent-platform/task-6d-report.md); gate scoped aprovado emfb881aa. A revisão ampla subsequente pediu as correções registradas no [relatório final](../../verification/agent-platform/final-fix-report.md); rerevisões scoped/residuais e auditor estão aprovados na [prova009](../../verification/agent-platform/runtime-009-proof.md). Ativação pública/real ainda pertence ao root; aprovação de código não equivale a publicação.
 
-Task7: backend hospedado até008/API/MCP e wake-up vazio possuem [prova própria](../../verification/agent-platform/hosted-preactivation-proof.md); Cron desabilitado, frontend/Auth/CORS de produção, Hermes real e dois usuários Claude reais continuam pendentes. [Hermes isolado5/5](../../verification/agent-platform/task-7-hermes-isolated-runtime.md) não substitui esses gates.
+Task7: backend hospedado009/API/MCP possui [prova atual](../../verification/agent-platform/runtime-009-proof.md);008/wake-up vazio mantêm [prova histórica](../../verification/agent-platform/hosted-preactivation-proof.md); Cron desabilitado, frontend/Auth/CORS de produção, Hermes real e dois usuários Claude reais continuam pendentes. [Hermes isolado5/5](../../verification/agent-platform/task-7-hermes-isolated-runtime.md) não substitui esses gates.
 
 ## Onda única após revisão ampla
 
 - [x] Implementar I1–I9 e M1, com M2 limitado a observação de contenção; preservar12tools,240quota e migrations001–008.
 - [x] Documentar contratos/custo/hash009, testes focados, falhas anteriores e limites no [relatório final](../../verification/agent-platform/final-fix-report.md).
 - [x] Preservar [revisão imutável](../../verification/agent-platform/final-review.md), três decisões novas e [preflight de retenção Hermes](../../verification/agent-platform/task-7-hermes-retention-preflight.md).
-- [ ] Root: uma rerevisão scoped do pacote de correções.
-- [ ] Root: aplicar009 revisada nos alvos corretos e provar API/MCP com Auth/transportes reais, sem confundir SDK/PGlite com esse gate.
+- [x] Root: rerevisão scoped do pacote, seguida das correções residuais e verificações limitadas documentadas.
+- [x] Root: aplicar009revisada local/hosted e provar API/MCP/Auth reais; [prova009](../../verification/agent-platform/runtime-009-proof.md).
 - [ ] Root: confirmar política efetiva de retenção e horizonte completo de entrega/replay antes da ativação.604800segundos cobrem apenas sete esperas Retry-After máximas; fila/outage/replay podem exceder esse prazo.
 
 ## Remediação residual N1/N2 autorizada pelo root
@@ -613,6 +613,17 @@ Task7: backend hospedado até008/API/MCP e wake-up vazio possuem [prova própria
 A rerevisão preservada aprovou os demais achados e encontrou N1(histórico contextual desconectado) e N2(projeção da reserva). As duas últimas decisões no arquivo de rulings registram a exceção explícita ao limite processual de uma onda, sob o escopo já autorizado. Não houve nova revisão ampla ou redução de aceite.
 
 - [x] Corrigir N1/N2 com escopo limitado, provas e novo hash009 no [relatório residual](../../verification/agent-platform/final-residual-report.md).
-- [ ] Root: revisão independente apenas de N1/N2 e depois gate runtime/API/MCP/Auth na009aceita.
+- [x] Root: revisão independente N1/N2, correção/revisão exata N3 e gate runtime/API/MCP/Auth009.
 
 Ativação real permanece separada; resultados anteriores não substituem o novo gate.
+
+## Gate atual009
+
+- [x] Fechar todos os achados originais/residuais e o auditor de ativação com revisão independente.
+- [x] Provar Auth/API/MCP reais local/hosted, catalog51objetos,001–009, cleanup e builds finais; preservar limites de usuários sintéticos.
+- [ ] Publicar frontend e configurar Auth/redirects/CORS para sua URLHTTPS real (acesso Vercel pendente).
+- [ ] Concluir Hermes/DNS/TLS/receiver/retention e duas contas Claude reais; só depois habilitar entregas e integrar branch conformeTask7.
+
+A [prova009](../../verification/agent-platform/runtime-009-proof.md) é o estado atual. Relatórios anteriores mantêm sua cronologia. Nenhuma conta/segredo real é compartilhado.
+
+Checagem final atual:285/285testes,0skips, com SDK/Auth local real; lint/types/format/tokens234/103/build aprovados. Documentação/evidência posterior não altera produto.

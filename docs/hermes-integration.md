@@ -3,6 +3,8 @@
 Target: `https://hermes.deltaacademy.com.br/webhooks/task-manager`.
 The user will create DNS later. No remote configuration, DNS change, TLS issuance or real Hermes acceptance is implied by the local tests below. Activation belongs to the deployment task.
 
+Current backend009 has [real Auth/API/MCP proof](verification/agent-platform/runtime-009-proof.md). Existing get_task can page comments/current task context; renew_task_claim can report structured blocked execution. This does not prove a real Hermes receiver or personal-Claude connection. Cron remains disabled.
+
 ## Contract
 
 A task command commits its immutable domain event, matching subscriptions, delivery ledger and **logged** pgmq message in one transaction. The worker claims at most five deliveries concurrently. Every reservation is persisted before HTTP with a new UUID lease and a 60-second expiry. SQL rechecks lease expiry using a fresh clock after acquiring the row lock, before retrieving a Vault secret or recording a result. Restart/crash recovery uses SQL state; no in-memory acknowledgement or pg_net response is authoritative.

@@ -1,18 +1,17 @@
 # Agent platform evidence archive
 
-Latest candidate: [N3 local visibility correction](final-visibility-report.md), following [N1/N2 approval with minor N3](final-residual-review.md). Exact-diff N3 verification is pending;009hash and runtime008 boundary are unchanged.
+Current source/backend readiness: [reviewed009 and real transports](runtime-009-proof.md). Runtime/UI432e43e plus auditor25f3c2e pass a fresh285/285whole-tree Node check without skips; the auditor also has45focused cases and [independent approval](audit-009-review.md). [N3exact review](final-visibility-review.md) closes the residual local filter; N1/N2 and all original findings are addressed. Actual local/hosted catalog51objects and OAuth/API/MCP gates pass.
 
-These source-owned reports and independent review rulings were preserved from the staged implementation workspace before cleanup. They record their own BASE/HEAD and chronology. Earlier failures/pending statements are historical; later appends and final cutover evidence take precedence. Paths under `/tmp` or private config directories identify original local logs and are not published credentials or a promise those logs remain available forever.
+Public frontend/Hermes/two actual personal-Claude users and production Auth/CORS/receiver/effective retention remain pending; Cron is disabled. No push/merge or scratch cleanup has occurred. Earlier reports retain their own historical pending statements; runtime009proof supersedes those current-state claims without changing their recorded executions.
 
-The [final residual report](final-residual-report.md) records the bounded N1/N2 correction after the [scoped rereview](final-fix-rereview.md); its new009hash supersedes the first final-fix hash. Independent narrow N1/N2 review and matched runtime gate remain pending.
-
-The [whole-branch review](final-review.md) found I1–I9/M1/M2. The [consolidated fix report](final-fix-report.md) records implemented fixes, final009 hash and focused evidence; independent scoped rereview and matched local/hosted009 runtime gate remain pending. The [main Hermes retention preflight](task-7-hermes-retention-preflight.md) records file/default policy only, with effective runtime retention still unverified.
-
-The historical [Task6d report](task-6d-report.md) and [verification matrix](../../verification.md) identify current evidence. Stage reports are retained rather than rewriting their historical claims. No scratch directory has been deleted. The [Task6d independent gate](task-6d-rereview-2.md) is approved at `fb881aa`. Scoped rereview and actual activation remain root responsibilities.
-
-The exact [rulings](final-rulings-source.md) preserve withdrawn alternatives as well as superseding decisions, including the disproved private-http proposal. The [hosted proof](hosted-preactivation-proof.md) includes008 API/MCP and current synthetic/real-client boundaries. [Isolated Hermes proof](task-7-hermes-isolated-runtime.md) is pinned synthetic-runtime evidence, not deployed service acceptance.
+[Exact rulings](final-rulings-source.md) preserve all21decisions, costs and withdrawn alternatives. Private credentials, raw Auth fixture JSON and recovery database exports are excluded.
 
 ## Preserved records
+
+- [runtime-009-proof.md](runtime-009-proof.md)
+- [final-visibility-review.md](final-visibility-review.md)
+- [audit-009-report.md](audit-009-report.md)
+- [audit-009-review.md](audit-009-review.md)
 
 - [final-fix-rereview.md](final-fix-rereview.md)
 - [final-residual-report.md](final-residual-report.md)

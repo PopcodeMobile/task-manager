@@ -18,9 +18,9 @@ Apply the original `202610160001_workspaces.sql` and then the additive migration
 | `202610200006` | File metadata duplication                                                                    |
 | `202610200007` | Atomic task-graph copies                                                                     |
 | `202610200008` | Optional exact team-membership baselines                                                     |
-| `202610200009` | Task-context pages, structured execution and event high-water (source; runtime gate pending) |
+| `202610200009` | Task-context pages, structured execution and event high-water (reviewed/applied009)          |
 
-The dedicated hosted project has reviewed migrations through 008 and actual hosted API/MCP evidence recorded in [hosted preactivation proof](verification/agent-platform/hosted-preactivation-proof.md). This is not permission to target another project or proof that the final frontend is published. Production frontend origin, Auth Site URL/redirect allowlist, consent origin and CORS still require the actual deployment URL. Configure only that intended project; do not push local Auth defaults wholesale.
+The dedicated hosted project has reviewed migrations through009 and matched API/MCP deployed; [actual009proof](verification/agent-platform/runtime-009-proof.md) records real Auth/transport/catalog checks. [Earlier008proof](verification/agent-platform/hosted-preactivation-proof.md) retains its historical scope. This is not permission to target another project or proof that the final frontend is published. Production frontend origin, Auth Site URL/redirect allowlist, consent origin and CORS still require the actual deployment URL. Configure only that intended project; do not push local Auth defaults wholesale.
 
 Callbacks use `/auth/callback` and preserve a validated local `returnTo`. OAuth consent uses `/oauth/consent?authorization_id=...`; the final SPA must serve those URLs on direct navigation/reload. Hosted email confirmation remains enabled. Configure delivery with the intended provider and test actual signup/recovery separately from local fixtures.
 

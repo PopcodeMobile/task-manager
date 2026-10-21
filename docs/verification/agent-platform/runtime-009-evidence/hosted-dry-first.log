@@ -1,0 +1,1 @@
+{"_tag":"Error","error":{"code":"DbConfigLoadError","message":"failed to read signing keys: NotFound: FileSystem.readFile (/private/tmp/task-manager-reviewed-runtime-009/supabase/.temp/task3-signing-keys.json)"}}

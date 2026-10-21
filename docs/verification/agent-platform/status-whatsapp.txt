@@ -1,0 +1,1 @@
+Deixei o painel em React e o backend no Supabase, com API e MCP. Validei OAuth, comentários, reservas de tarefas e revogação com usuários de teste. Ainda falta publicar o painel e conectar o Hermes e duas contas do Claude. O agendador continua desligado até concluirmos essa validação.

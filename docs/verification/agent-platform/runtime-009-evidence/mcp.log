@@ -1,0 +1,11 @@
+WARN: config section [inbucket] is deprecated and will be removed in v3, use [local_smtp] instead.
+Uploading asset (mcp): supabase/functions/deno.json
+Uploading asset (mcp): supabase/functions/mcp/index.ts
+Uploading asset (mcp): supabase/functions/mcp/tools.ts
+Uploading asset (mcp): supabase/functions/_shared/errors.ts
+Uploading asset (mcp): supabase/functions/_shared/operations.ts
+Uploading asset (mcp): supabase/functions/_shared/validation.ts
+Uploading asset (mcp): src/domain/contracts.ts
+Uploading asset (mcp): supabase/functions/_shared/team-memberships.ts
+Uploading asset (mcp): supabase/functions/_shared/auth.ts
+{"project_ref":"ddodhyhtpgvsqzpipgcq","functions":["mcp"],"dashboard_url":"https://supabase.com/dashboard/project/ddodhyhtpgvsqzpipgcq/functions","message":"Deployed Functions."}

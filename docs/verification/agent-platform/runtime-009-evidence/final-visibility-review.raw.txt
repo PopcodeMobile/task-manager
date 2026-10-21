@@ -1,0 +1,39 @@
+# Independent exact N3 correction review
+
+2026-10-21. **N3: ADDRESSED. Spec: PASS. Quality: PASS for this bounded correction. No new directly introduced actionable breakage found in the reviewed diff.** N1/N2 remain addressed and were not reopened. This closes the minor local visibility finding from the preceding residual review; it is not production activation approval.
+
+## Exact candidate and scope
+
+BASE `2c555e4852ebe4cbaf98e7a7991edbe0a383720d` → HEAD `432e43efc69cb9cc4eb026ad8f93467562ae2414`, two commits: product `6976360e94ece2407dffc926eb1c7654449e8fef`, then documentation. Independently verified current HEAD and supplied package size **49,717 bytes** for `review-2c555e4..432e43e.diff`. Worktree/index status was clean.
+
+Read permanent `docs/verification/agent-platform/final-visibility-report.md`, the exact source/test diff, targeted local operation definitions and archived focused evidence. Production scope is16added lines in `src/app/activity/ContextHistory.tsx`; tests add the three requested visibility controls. Remaining changes archive reports/evidence and update documentation. No broader audit, delegated review or reopening of earlier findings occurred.
+
+## N3 disposition and evidence
+
+The local-only guard at `src/app/activity/ContextHistory.tsx:62–77` recognizes the eight supported project operations and resolves the associated project from `payload.projectId ?? entityId`. If that project is absent from the visibility-filtered snapshot, the event is suppressed before ActivityPage receives it. The operation list agrees with the existing local project mutation dispatcher and command definitions.
+
+For the exact reported shape, `update_project`, entityId=`private-project`, payload={}, the guard now rejects the event when only `public-project` is visible. Thus the hidden project's actor/action/timestamp no longer enters the member feed. A visible project with the same payload shape passes. Unscoped workspace/member operations do not match the project-operation guard and retain their existing treatment. The cloud path is excluded explicitly by `repo.mode === 'local'`.
+
+Inspected all three added test controls in `tests/residual-history.test.mjs:145–177`: hidden-project update suppressed, visible-project update retained, and unscoped `local_workspace_member` retained. They evaluate the actual ContextHistory and actual usePagedCollection through the existing state/effect/JSX fixture. Archived evidence supports the behavior:
+
+- `final-visibility-evidence/red.log`: hidden-project control fails before the product correction; visible-project and unscoped-member controls pass (2pass/1fail).
+- `final-visibility-evidence/green-final.log`: all three controls plus the unchanged contextual paging/failure/retry/polled-event case pass (4pass/0fail/0skip).
+- `types.log` and `format-check.log`: recorded typecheck and targeted formatting checks pass. The report records targeted ESLint exit0; its archived log contains no diagnostic output.
+
+These are inspected implementer results, not fresh reviewer executions. Source and evidence resolve the exact doubt, so no additional probe, suite, build or browser was run.
+
+## Spec and quality assessment
+
+**Spec PASS:** The exact hidden-project event is excluded while the visible-project and legitimate unscoped member controls remain. Local-demo visibility parity is repaired without changing cloud scope, permissions or data fetching. This was a local presentation/visibility finding, not a demonstrated cloud tenant/Auth vulnerability.
+
+**Quality PASS within scope:** The guard is explicit, bounded and colocated with existing contextual visibility filtering. It adds no dependency or new state and leaves pagination, retry, merging and rendering unchanged. No new actionable regression was identified in this correction. This verdict does not certify global coverage, cyclomatic complexity, security or production performance.
+
+Migration009 remains byte-identical at SHA-256 `f2212f8031061ad9d12cd76e491cf9f53ba2fb064131131c9f7fc3a644f47fb3`, independently verified. The exact diff contains no Supabase changes and no changes to the paging hook, execution UI or earlier project/member/palette wiring. Prior N1/N2 dispositions remain closed.
+
+## Runtime boundary and stop condition
+
+Root reports a separately approved backend gate and successful009 application to local61922; hosted remains008 at this handoff. Root's actual local Auth/MCP probe and full Node/SDK run are separate ongoing work. This review does not resolve or relabel the reported private probe's200-versus201 assertion mismatch, and does not claim those runtime gates have passed.
+
+No production/frontend publication, real Hermes/personal Claude activation, Cron, receiver DNS/TLS, Auth/CORS or effective retention/pruning/replay-horizon acceptance follows from this code verdict. Earlier preview/build evidence remains associated with its own source revision; final-source runtime/build evidence is root-owned.
+
+Stop condition met: exact N3 source and three controls assessed; N3 closed with spec/quality pass; no new directly introduced actionable finding. Only this review artifact was written. Product/index/HEAD, local/hosted services, user preview5182 and unrelated services were untouched by the reviewer. No subagents or automatic follow-on review cycle were started.
