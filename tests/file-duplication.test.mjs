@@ -67,6 +67,7 @@ async function sql() {
   await db.query("select public.execute_operation($1,'update_file','{\"id\":\"source\"}','warm-005',1)", [ws]);
   await db.exec('rollback');
   await db.exec(await readFile('supabase/migrations/202610200006_file_duplication.sql', 'utf8'));
+  await db.exec(await readFile('supabase/migrations/202610200007_task_graph_copy.sql', 'utf8'));
   await db.query("insert into public.workspace_memberships values($1,$2,'member')", [ws, member]);
   await db.exec('set role authenticated');
   const command = async (operation, input, version = null, key = crypto.randomUUID(), workspace = ws) =>

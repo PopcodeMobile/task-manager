@@ -56,6 +56,9 @@ export function auditWebhookApiSurface({ sql, exposedSchemas, extraSearchPath })
         'operation_validate_before_file_duplication',
         'operation_graph',
         'operation_graph_before_file_duplication',
+        'operation_graph_before_task_graph_copy',
+        'operation_validate_before_task_graph_copy',
+        'operation_batch_allowed_before_task_graph_copy',
       ].includes(object.name)
     ) {
       assert.equal(object.definer || object.anon || object.authenticated, false, 'batch capability helpers must remain private invokers');
@@ -136,7 +139,9 @@ export async function verifyWebhookApiBoundary({ base, signToken, productionSurf
     for (const [name, body] of [
       ['operation_validate', { p_operation: 'duplicate_file', p_input: { id: 'source' } }],
       ['operation_validate_before_file_duplication', { p_operation: 'create_file', p_input: { name: 'forged' } }],
-      ...['operation_graph', 'operation_graph_before_file_duplication'].map(name => [
+      ['operation_validate_before_task_graph_copy', { p_operation: 'duplicate_task_graph', p_input: { id: 'source', projectId: 'p1', mode: 'task' } }],
+      ['operation_batch_allowed_before_task_graph_copy', { p_operation: 'duplicate_task_graph' }],
+      ...['operation_graph', 'operation_graph_before_file_duplication', 'operation_graph_before_task_graph_copy'].map(name => [
         name,
         {
           p_workspace: '00000000-0000-0000-0000-000000000000',

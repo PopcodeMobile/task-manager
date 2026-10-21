@@ -4,7 +4,7 @@ const fail = code => {
   throw new RepositoryError(code);
 };
 import { removeTasks } from '../../core/task-operations.js';
-import { copyTask, protectRemoval } from './task-graph.js';
+import { copyTask, copyTaskGraph, protectRemoval } from './task-graph.js';
 export function mutateTask({ data, find, cas, bump, dto, initialize, keyFor }, operation, input) {
   if (operation === 'create_task') {
     find('project', input.projectId);
@@ -29,7 +29,9 @@ export function mutateTask({ data, find, cas, bump, dto, initialize, keyFor }, o
     data.tasks.push(row);
     return dto('task', row);
   }
-  if (['update_task', 'complete_task', 'move_task', 'duplicate_task', 'delete_task', 'archive_task', 'restore_task'].includes(operation)) {
+  if (
+    ['update_task', 'complete_task', 'move_task', 'duplicate_task', 'duplicate_task_graph', 'delete_task', 'archive_task', 'restore_task'].includes(operation)
+  ) {
     const task = find('task', input.id);
     cas('task', task);
     if (input.title !== undefined && !input.title.trim()) fail('validation_error');
@@ -45,6 +47,13 @@ export function mutateTask({ data, find, cas, bump, dto, initialize, keyFor }, o
     if (operation === 'archive_task' || operation === 'restore_task') {
       task.archived = operation === 'archive_task';
       task.archivedAt = task.archived ? Date.now() : null;
+    }
+    if (operation === 'duplicate_task_graph') {
+      find('project', input.projectId);
+      const next = copyTaskGraph(data, task, input, keyFor);
+      initialize('task', next);
+      data.tasks.push(next);
+      return { ...dto('task', next), taskId: next.id };
     }
     if (operation === 'duplicate_task') {
       const next = copyTask(task, input.projectId ?? task.project, keyFor);

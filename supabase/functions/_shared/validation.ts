@@ -14,6 +14,7 @@ export const commandRules: Record<string, Rule> = {
   update_task: rule('id title description status priority assigneeUserId recurrence dueDate startDate sortOrder claimToken attributes', 'id', true),
   move_task: rule('id projectId sortOrder claimToken', 'id projectId', true),
   duplicate_task: rule('id projectId title claimToken', 'id', true),
+  duplicate_task_graph: rule('id projectId mode title claimToken', 'id projectId mode', true),
   delete_task: rule('id claimToken', 'id', true),
   archive_task: rule('id claimToken', 'id', true),
   restore_task: rule('id claimToken', 'id', true),
@@ -162,7 +163,10 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
     return value as Command<Record<string, unknown>>;
   }
   for (const [key, item] of Object.entries(input)) {
-    if (operation === 'duplicate_file' && (key === 'id' || key === 'newId')) {
+    if (
+      (operation === 'duplicate_file' && (key === 'id' || key === 'newId')) ||
+      (operation === 'duplicate_task_graph' && (key === 'id' || key === 'projectId'))
+    ) {
       // PostgreSQL text cannot represent NUL or lone UTF-16 surrogates.
       if (typeof item !== 'string' || !item.trim() || item.length > 128 || item.includes('\0') || /[\uD800-\uDFFF]/u.test(item)) invalid();
       continue;
@@ -185,6 +189,7 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
       invalid();
     if (['userId', 'assigneeUserId', 'leadUserId', 'claimToken'].includes(key) && !uuid(item)) invalid();
   }
+  if (operation === 'duplicate_task_graph' && !['task', 'project'].includes(input.mode as string)) invalid();
   if (input.attributes !== undefined) {
     const attrs = input.attributes as Record<string, unknown>;
     const fields = ['create_subtask', 'update_subtask'].includes(operation)

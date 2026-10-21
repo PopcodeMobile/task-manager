@@ -85,7 +85,7 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
             initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
               ? repo.list<TaskLabel>('list_task_labels', {}, true)
               : Promise.resolve(null),
-            initial || operations.some(op => /dependency$|delete_project|delete_task/.test(op))
+            initial || operations.some(op => /dependency$|duplicate_task_graph|delete_project|delete_task/.test(op))
               ? repo.list<TaskDependency>('list_dependencies', {}, true)
               : Promise.resolve(null),
             initial || operations.some(op => /subtask$|duplicate_task|complete_task|delete_project|delete_task/.test(op))

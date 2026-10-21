@@ -5359,6 +5359,65 @@
         },
         "description": "Duplicate canonical file metadata. expectedVersion is the source file version. The source and its attachment joins are unchanged; joins are not copied. Unknown metadata and project/task ownership are preserved. The server renews ID, creation time and author, including legacy aliases. Agents retain existing restrictions on task-owned or attached files. Returns the FileMetadata DTO with createdAt (ISO timestamp), authorUserId and legacyMetadata."
       }
+    },
+    "/v1/workspaces/{workspaceId}/commands/duplicate_task_graph": {
+      "post": {
+        "operationId": "duplicate_task_graph",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/duplicate_task_graph"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed canonical Task data with taskId alias equal to its NEW id, and one durable event identity. Replay returns the same IDs and key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "404": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "409": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8248,6 +8307,24 @@
                           "maximum": 9007199254740991
                         }
                       }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["operation", "input", "expectedVersion"],
+                      "properties": {
+                        "operation": {
+                          "const": "duplicate_task_graph"
+                        },
+                        "input": {
+                          "$ref": "#/components/schemas/duplicate_task_graph/properties/input"
+                        },
+                        "expectedVersion": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      }
                     }
                   ]
                 }
@@ -8390,6 +8467,55 @@
           }
         },
         "description": "Duplicate canonical file metadata. expectedVersion is the source file version. The source and its attachment joins are unchanged; joins are not copied. Unknown metadata and project/task ownership are preserved. The server renews ID, creation time and author, including legacy aliases. Agents retain existing restrictions on task-owned or attached files."
+      },
+      "duplicate_task_graph": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["idempotencyKey", "input", "expectedVersion"],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "projectId", "mode"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Exact nonblank identifier; UTF-16 length bound; no NUL or lone surrogates."
+              },
+              "projectId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "description": "Explicit destination project. Exact ID; same string restrictions as id."
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["task", "project"]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "claimToken": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        },
+        "description": "Source-authoritative atomic task graph copy. Requires source expectedVersion and agent claimToken when applicable. Task mode preserves status and done completion time; project mode resets todo. Fresh task/subtask IDs, key and creation/update times, no archive/executor/lease/run, full metadata and relation copies. Original file ownership and dependency targets retained; no comments or recurrence successor."
       }
     }
   }

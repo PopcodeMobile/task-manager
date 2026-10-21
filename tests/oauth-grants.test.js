@@ -21,6 +21,7 @@ async function setup() {
   await db.exec(migration);
   await db.exec(await readFile('supabase/migrations/202610200005_ui_contracts.sql', 'utf8'));
   await db.exec(await readFile('supabase/migrations/202610200006_file_duplication.sql', 'utf8'));
+  await db.exec(await readFile('supabase/migrations/202610200007_task_graph_copy.sql', 'utf8'));
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [uid]);
   const w = (
     await db.query(
@@ -290,6 +291,39 @@ test('006 OAuth file duplication retains write-grant/agent ownership gates and r
     await db.query("update public.integration_connections set status='revoked' where id=$1", [c.connectionId]);
     await db.exec('set role authenticated');
     await denied(db.query("select public.execute_operation($1,'duplicate_file','{\"id\":\"free\"}','free-copy',1)", [w]));
+  } finally {
+    await db.close();
+  }
+});
+
+test('graph copy requires current write grant, source lease, and rechecks cached batch access after downgrade/revocation', async () => {
+  const { db, w } = await setup();
+  const command = async (operation, input, version, key) =>
+    (await db.query('select public.execute_operation($1,$2,$3,$4,$5) result', [w, operation, JSON.stringify(input), key, version])).rows[0].result;
+  try {
+    const connection = await prepare(db, w, 'write');
+    await activate(db);
+    await delegated(db);
+    const claim = (await command('claim_task', { id: 't1' }, 1, 'graph-claim')).data;
+    const input = { id: 't1', projectId: 'p1', mode: 'task', claimToken: claim.claimToken };
+    const batch = { commands: [{ operation: 'duplicate_task_graph', input, expectedVersion: 2 }] };
+    const result = await command('batch', batch, null, 'graph-batch');
+    assert.equal(result.data.results[0].data.executorAgentId, null);
+    assert.equal(result.data.results[0].data.reservation, null);
+    assert.deepEqual(await command('batch', batch, null, 'graph-batch'), result);
+    await db.exec("select set_config('request.jwt.claims','{}',false)");
+    await newAuthorization(db, 'graph-read');
+    await prepare(db, w, 'read', 'graph-read');
+    await db.exec("update auth.oauth_authorizations set status='approved'");
+    await activateAttempt(db);
+    await delegated(db);
+    await denied(command('batch', batch, null, 'graph-batch'));
+    await denied(command('duplicate_task_graph', input, 2, 'graph-read-denied'));
+    await db.exec("select set_config('request.jwt.claims','{}',false)");
+    await db.query('select public.revoke_integration_connection($1)', [connection.connectionId]);
+    await delegated(db);
+    await denied(command('batch', batch, null, 'graph-batch'));
+    assert.equal((await db.query("select count(*)::int n from public.domain_events where operation='duplicate_task_graph'")).rows[0].n, 1);
   } finally {
     await db.close();
   }

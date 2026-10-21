@@ -77,6 +77,7 @@ create table auth.oauth_consents(user_id uuid,client_id uuid,revoked_at timestam
     sql(await readFile('supabase/migrations/202610200003_integration_grants.sql', 'utf8'));
     sql(await readFile('supabase/migrations/202610200005_ui_contracts.sql', 'utf8'));
     sql(await readFile('supabase/migrations/202610200006_file_duplication.sql', 'utf8'));
+    sql(await readFile('supabase/migrations/202610200007_task_graph_copy.sql', 'utf8'));
     sql(`select set_config('request.jwt.claim.sub','${owner}',false);
 create table public.oauth_race_fixture as select (public.create_workspace_v2('OAuth race','oauth-race','race-workspace')->'data'->>'id')::uuid workspace_id;
 grant select on public.oauth_race_fixture to authenticated;

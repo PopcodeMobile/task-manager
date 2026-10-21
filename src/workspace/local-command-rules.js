@@ -8,6 +8,7 @@ export const localCommandRules = {
   update_task: rule(`id ${taskFields}`, 'id'),
   move_task: rule('id projectId sortOrder', 'id projectId'),
   duplicate_task: rule('id projectId title', 'id'),
+  duplicate_task_graph: rule('id projectId mode title', 'id projectId mode'),
   delete_task: rule('id', 'id'),
   archive_task: rule('id', 'id'),
   restore_task: rule('id', 'id'),

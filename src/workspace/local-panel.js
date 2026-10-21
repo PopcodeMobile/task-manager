@@ -1,4 +1,5 @@
 // @ts-check
+import { assertTaskGraphActor } from './local-mutations/task-graph.js';
 import { RepositoryError } from './normalized.ts';
 import { localDTO, localWorkspaceDTO, entityVersion, localFiles } from './local-dto.js';
 import { localCommandRules as commandRules } from './local-command-rules.js';
@@ -151,7 +152,11 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     if (operation === 'list_task_labels')
       return data.tasks.flatMap(t => (t.labels ?? []).map(/** @param {string} id */ id => ({ workspaceId, taskId: t.id, labelId: id })));
     if (operation === 'list_attachments')
-      return data.tasks.flatMap(t => (t.attachments ?? []).map(/** @param {any} f */ f => ({ workspaceId, taskId: t.id, fileId: f.id })));
+      return data.tasks.flatMap(t =>
+        (t.attachments ?? []).map(
+          /** @param {any} f */ f => ({ workspaceId, taskId: t.id, fileId: f.id, sortOrder: f.order ?? 0, legacyMetadata: structuredClone(f) }),
+        ),
+      );
     if (operation === 'list_reactions')
       return (data.comments ?? []).flatMap(c =>
         Object.entries(c.re ?? {}).flatMap(([reaction, users]) =>
@@ -265,14 +270,16 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
             if (previous) {
               if (previous.signature !== signature) fail('idempotency_conflict');
               if (operation === 'batch' && Array.isArray(command.input.commands)) {
-                const cached = /** @type {{results?: {data: unknown}[]}} */ (previous.result.data);
+                const cached = /** @type {{results?: {data: unknown, eventId: string}[]}} */ (previous.result.data);
                 command.input.commands.forEach((child, index) => {
                   assertCommentReplay(data, child.operation, cached.results?.[index]?.data);
                   assertFileDuplicationActor(data, child.operation, cached.results?.[index]?.data);
+                  assertTaskGraphActor(data, child.operation, cached.results?.[index]?.eventId);
                 });
               } else {
                 assertCommentReplay(data, operation, previous.result.data);
                 assertFileDuplicationActor(data, operation, previous.result.data);
+                assertTaskGraphActor(data, operation, previous.result.eventId);
               }
               return { changed: false, value: previous.result };
             }
@@ -312,7 +319,7 @@ function appendEvent(data, operation, input, result) {
   events.push({
     id,
     operation,
-    entityId: operation === 'duplicate_file' ? result.id : (input.id ?? input.taskId ?? null),
+    entityId: ['duplicate_file', 'duplicate_task_graph'].includes(operation) ? result.id : (input.id ?? input.taskId ?? null),
     actorUserId: data.me,
     actorAgentId: null,
     createdAt,
@@ -331,6 +338,7 @@ function appendEvent(data, operation, input, result) {
 function mutate(data, workspaceId, operation, input, expectedVersion) {
   if (/claim|intervene|executor|webhook|connection/.test(operation)) fail('cloud_required');
   validateLocalInput(data, operation, input);
+  assertTaskGraphActor(data, operation);
   /** @param {string} kind @param {string} id */
   const find = (kind, id) =>
     (data[collections[kind]] ?? []).find(/** @param {any} row */ row => row.id === id) ??
@@ -374,7 +382,19 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
     return `${p.key ?? 'TASK'}-${p.seq}`;
   };
   const context = { data, find, cas, bump, dto, initialize, keyFor };
-  if (['create_task', 'update_task', 'complete_task', 'move_task', 'duplicate_task', 'delete_task', 'archive_task', 'restore_task'].includes(operation))
+  if (
+    [
+      'create_task',
+      'update_task',
+      'complete_task',
+      'move_task',
+      'duplicate_task',
+      'duplicate_task_graph',
+      'delete_task',
+      'archive_task',
+      'restore_task',
+    ].includes(operation)
+  )
     return mutateTask(context, operation, input);
   if (['create_project', 'update_project', 'delete_project', 'archive_project', 'restore_project'].includes(operation))
     return mutateProject(context, operation, input);
@@ -404,6 +424,7 @@ function validateLocalInput(data, operation, input) {
     rule.required.some(key => input[key] === undefined || input[key] === null)
   )
     fail('validation_error');
+  if (operation === 'duplicate_task_graph' && !['task', 'project'].includes(input.mode)) fail('validation_error');
   if (input.attributes !== undefined) {
     const allowed = operation.endsWith('subtask')
       ? ['assignee', 'due', 'note']
@@ -434,7 +455,10 @@ function validateLocalInput(data, operation, input) {
       }
   }
   for (const [key, value] of Object.entries(input)) {
-    if (operation === 'duplicate_file' && (key === 'id' || key === 'newId')) {
+    if (
+      (operation === 'duplicate_file' && (key === 'id' || key === 'newId')) ||
+      (operation === 'duplicate_task_graph' && (key === 'id' || key === 'projectId'))
+    ) {
       // Preserve the shared API's UTF-16 bound and exact string, including punctuation.
       if (typeof value !== 'string' || !value.trim() || value.length > 128 || value.includes('\0') || /[\uD800-\uDFFF]/u.test(value)) fail('validation_error');
       continue;
