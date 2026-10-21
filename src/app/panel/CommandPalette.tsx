@@ -11,6 +11,7 @@ export function CommandPalette({
   items,
   t,
   initialMode,
+  searchHistory,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -18,6 +19,7 @@ export function CommandPalette({
   items: PaletteItem[];
   t: Translate;
   initialMode: 'command' | 'search';
+  searchHistory: (query: string, category: string) => void;
 }) {
   const [query, setQuery] = useState(''),
     [mode, setMode] = useState(initialMode),
@@ -121,7 +123,23 @@ export function CommandPalette({
               {item.label}
             </Button>
           ))}
-          {!results.length && <p>{t('Nenhum resultado.', 'No results.')}</p>}
+          {!results.length && (
+            <p>
+              {mode === 'search' ? t('Nenhum resultado entre os itens carregados.', 'No results among loaded items.') : t('Nenhum resultado.', 'No results.')}
+            </p>
+          )}
+          {mode === 'search' && (
+            <Button
+              data-command
+              variant="outline"
+              onClick={() => {
+                onOpenChange(false);
+                searchHistory(query, scope);
+              }}
+            >
+              {t('Continuar busca no histórico', 'Continue search in history')}
+            </Button>
+          )}
         </div>
       </SheetContent>
     </Sheet>

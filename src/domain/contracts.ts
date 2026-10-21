@@ -19,8 +19,9 @@ export type BatchCommand = { operation: string; input: Record<string, Json>; exp
 export type BatchInput = { commands: BatchCommand[] };
 export type BatchResult = { results: { data: Json; eventId: string }[] };
 export type Task = VersionedEntity & {
-  /** Present on reads. Assignment executorAgentId is independent from this live reservation. */
+  /** Unexpired reservation locks ordinary writes even if the agent loses execution authority. */
   reservation?: TaskReservation | null;
+  /** Effective current authority; false after revocation even while the reservation remains locked. */
   execution?: { state: 'running' | 'blocked'; reason: string | null; active: boolean } | null;
   projectId: string;
   key: string | null;

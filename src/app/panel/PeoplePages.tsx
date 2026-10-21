@@ -15,6 +15,7 @@ import {
 import { errorMessage } from '../shell/messages';
 import { teamCommands, type TeamDraft } from './panel-model';
 import type { PanelProps } from './types';
+import { ContextHistory } from '../activity/ContextHistory';
 function TeamMark({ team }: { team: Team }) {
   const Icon =
     ({ users: Users, code: Code, palette: Palette, megaphone: Megaphone, briefcase: Briefcase, heart: Heart } as Record<string, typeof Users>)[
@@ -303,12 +304,7 @@ export function PeoplePages(p: PanelProps) {
               </Button>
             ))}
           <h3>{t('Atividade recente', 'Recent activity')}</h3>
-          {s.activity
-            .filter(entry => entry.actorUserId === member.user_id)
-            .slice(0, 8)
-            .map(entry => (
-              <p key={entry.id}>{entry.verb}</p>
-            ))}
+          <ContextHistory key={member.user_id} snapshot={s} repo={p.repo} actorId={member.user_id} limit={8} openTask={p.openTask} t={t} />
         </>
       ) : tab === 'permissions' ? (
         <p className="configuration-note">

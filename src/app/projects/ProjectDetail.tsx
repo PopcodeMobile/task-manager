@@ -10,7 +10,7 @@ import { TaskList, statuses, statusLabel } from '../tasks/TaskList';
 import { prepareTaskAction, readTaskView, saveTaskView, type TaskView } from '../tasks/task-view-model';
 import { ScheduleView } from '../schedules/ScheduleView';
 import { FilesView } from '../files/FilesView';
-import { ActivityPage } from '../activity/ActivityPage';
+import { ContextHistory } from '../activity/ContextHistory';
 import { projectStatusLabel } from './project-model';
 import { projectError } from './ProjectEditor';
 import type { ViewEdit } from './SavedViewEditor';
@@ -95,38 +95,6 @@ export function ProjectDetail({
   const initial = { ...(saved ? { filters: saved.filters } : {}), ...raw };
   const [currentView, setCurrentView] = useState<TaskView>(() => readTaskView(initial));
   const members = snapshot.projectMembers.filter(m => m.projectId === project.id).map(m => m.userId);
-  const events = [
-    ...snapshot.events.filter(
-      e =>
-        e.operation !== 'batch' &&
-        e.operation !== 'add_task_comment' &&
-        (e.payload.projectId === project.id ||
-          e.entityId === project.id ||
-          snapshot.tasks.some(task => task.projectId === project.id && (task.id === e.entityId || task.id === e.payload.taskId))),
-    ),
-    ...snapshot.activity
-      .filter(a => a.projectId === project.id)
-      .map(a => ({
-        id: 'history:' + a.id,
-        operation: a.verb,
-        entityId: a.taskId,
-        actorUserId: a.actorUserId ?? '',
-        actorAgentId: null,
-        createdAt: a.createdAt,
-        payload: { projectId: project.id, ...(a.taskId ? { taskId: a.taskId } : {}) },
-      })),
-    ...snapshot.comments
-      .filter(c => snapshot.tasks.some(task => task.id === c.taskId && task.projectId === project.id))
-      .map(c => ({
-        id: 'comment:' + c.id,
-        operation: 'add_task_comment',
-        entityId: c.taskId,
-        actorUserId: c.authorUserId ?? '',
-        actorAgentId: null,
-        createdAt: c.createdAt,
-        payload: { projectId: project.id, taskId: c.taskId },
-      })),
-  ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   async function complete(task: Task) {
     setBusy(true);
     try {
@@ -150,14 +118,7 @@ export function ProjectDetail({
     }
   };
   const activity = (limit?: number) => (
-    <ActivityPage
-      events={limit ? events.slice(-limit) : events}
-      members={snapshot.members}
-      agents={snapshot.agents}
-      tasks={snapshot.tasks}
-      openTask={openTask}
-      t={t}
-    />
+    <ContextHistory key={project.id} snapshot={snapshot} repo={repo} projectId={project.id} limit={limit} openTask={openTask} t={t} />
   );
   return (
     <>
@@ -319,24 +280,7 @@ export function ProjectDetail({
               selectFile={selectFile}
             />
           )}
-          {mode === 'activity' && (
-            <div className="project-activity">
-              {[...new Set(events.map(e => e.createdAt.slice(0, 10)))].reverse().map(day => (
-                <section key={day}>
-                  <h2>{day}</h2>
-                  <ActivityPage
-                    events={events.filter(e => e.createdAt.startsWith(day))}
-                    members={snapshot.members}
-                    agents={snapshot.agents}
-                    tasks={snapshot.tasks}
-                    openTask={openTask}
-                    t={t}
-                  />
-                </section>
-              ))}
-              {!events.length && activity()}
-            </div>
-          )}
+          {mode === 'activity' && <div className="project-activity">{activity()}</div>}
           {mode === 'overview' && (
             <div className="project-overview">
               <section>

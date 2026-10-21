@@ -49,7 +49,7 @@ export function RemainingRoutes(p: PanelProps) {
   if (p.route === 'settings') return <SettingsPage {...p} />;
   if (p.route === 'system' || p.route === 'states') return <CataloguePage {...p} />;
   if (p.route === 'inbox' || p.route === 'notifications') return <NotificationsPage {...p} />;
-  if (p.route === 'search') return <SearchPage {...p} />;
+  if (p.route === 'search') return <SearchPage key={JSON.stringify([p.params.get('q'), p.params.get('category')])} {...p} />;
   if (p.route === 'archive') return <ArchivePage {...p} />;
   if (p.route === 'activity') return <HistoryPage {...p} />;
   if (p.route === 'mytasks') return <MyTasks {...p} />;
@@ -504,7 +504,7 @@ function SearchPage(p: PanelProps) {
   const commentPage = usePagedCollection<Comment>(p.repo, 'list_comments', {}, s.events.length);
   const visibleTaskIds = new Set(s.tasks.map(task => task.id));
   const [q, setQ] = useState(p.params.get('q') ?? ''),
-    [category, setCategory] = useState('all'),
+    [category, setCategory] = useState(p.params.get('category') ?? 'all'),
     [error, setError] = useState('');
   const recent = Array.isArray(p.prefs.recentSearches) ? p.prefs.recentSearches.filter((v): v is string => typeof v === 'string') : [];
   const results = [

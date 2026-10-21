@@ -787,6 +787,13 @@ export function WorkspacePanel({
         onOpenChange={setPalette}
         opener={paletteOpener.current}
         initialMode={paletteMode}
+        searchHistory={(q, category) =>
+          go('search', {
+            q,
+            category:
+              ({ task: 'tasks', project: 'projects', person: 'people', file: 'files', comment: 'comments' } as Record<string, string>)[category] ?? 'all',
+          })
+        }
         t={t}
         items={
           [

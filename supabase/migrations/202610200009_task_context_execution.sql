@@ -17,19 +17,20 @@ end $$;
 revoke all on function public.operation_validate(text,jsonb),public.operation_validate_before_execution(text,jsonb) from public,anon,authenticated;
 alter function public.operation_task(jsonb) rename to operation_task_before_execution;
 create function public.operation_task(p_row jsonb) returns jsonb language plpgsql volatile set search_path='' as $$
-declare data jsonb;
+declare data jsonb; execution_active boolean;
 begin
  data:=public.operation_task_before_execution(p_row);
- if coalesce((data->'reservation'->>'active')::boolean,false) and not exists(
+ execution_active:=coalesce((data->'reservation'->>'active')::boolean,false);
+ if execution_active and not exists(
   select 1 from public.agents a join public.workspace_memberships m on m.workspace_id=a.workspace_id and m.user_id=a.auth_user_id and m.role<>'guest'
   where a.workspace_id=(p_row->>'workspace_id')::uuid and a.id=data->'reservation'->>'agentId' and
    (a.client_id is null or exists(select 1 from public.integration_connections ic join public.integration_grants g on g.connection_id=ic.id
     join auth.oauth_consents oc on oc.user_id=ic.user_id and oc.client_id=ic.client_id and oc.revoked_at is null
     join auth.oauth_clients cl on cl.id=ic.client_id and cl.deleted_at is null
     where ic.user_id=a.auth_user_id and ic.client_id::text=a.client_id and ic.status='active' and g.workspace_id=a.workspace_id and g.agent_id=a.id and g.capability='write'))
- ) then data:=jsonb_set(data,'{reservation,active}','false');end if;
+ ) then execution_active:=false;end if;
 
- return (data-'executionState'-'blockingReason')||jsonb_build_object('execution',case when p_row->>'execution_state' is null then null else jsonb_build_object('state',p_row->>'execution_state','reason',p_row->>'blocking_reason','active',coalesce((data->'reservation'->>'active')::boolean,false)) end);
+ return (data-'executionState'-'blockingReason')||jsonb_build_object('execution',case when p_row->>'execution_state' is null then null else jsonb_build_object('state',p_row->>'execution_state','reason',p_row->>'blocking_reason','active',execution_active) end);
 end $$;
 revoke all on function public.operation_task(jsonb),public.operation_task_before_execution(jsonb) from public,anon,authenticated;
 create or replace function public.execute_operation(p_workspace_id uuid,p_operation text,p_command jsonb,p_idempotency_key text,p_expected_version bigint default null) returns jsonb

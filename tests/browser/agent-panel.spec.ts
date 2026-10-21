@@ -190,10 +190,10 @@ async function fixture(page: Page) {
   });
   return {
     commands,
-    blocked: () => {
+    blocked: (executionActive = true) => {
       tasks[0] = {
         ...tasks[0],
-        execution: { state: 'blocked', reason: 'Preciso de uma decisão humana', active: true },
+        execution: { state: 'blocked', reason: 'Preciso de uma decisão humana', active: executionActive },
         reservation: { agentId: 'agent-1', active: true, expiresAt: '2099-01-01T00:00:00Z' },
       };
     },
@@ -2088,4 +2088,105 @@ test('final fix blocked execution reason is visible independently from workflow 
   await expect(page.getByRole('status')).toContainText('Execução bloqueada: Preciso de uma decisão humana');
   await page.screenshot({ path: '/tmp/final-execution-blocked.png', fullPage: true });
   await expect(page.getByRole('combobox', { name: 'Status', exact: true })).toHaveValue('todo');
+});
+
+test('residual contextual history survives reload, continues later pages, and palette preserves comment query', async ({ page }) => {
+  await fixture(page);
+  const history = Array.from({ length: 105 }, (_, i) => ({
+    id: `history-${String(i).padStart(3, '0')}`,
+    projectId: i === 0 || i === 104 ? 'project-1' : 'other-project',
+    taskId: i === 0 || i === 104 ? 'task-1' : 'other-task',
+    actorUserId: i === 0 || i === 104 ? userId : 'other-user',
+    verb: i === 104 ? 'Atividade na página seguinte' : i === 0 ? 'Atividade histórica inicial' : 'Outro contexto',
+    createdAt: '2026-10-04T00:00:00Z',
+  }));
+  const comments = Array.from({ length: 105 }, (_, i) => ({
+    id: `comment-${String(i).padStart(3, '0')}`,
+    taskId: 'task-1',
+    authorUserId: userId,
+    body: i === 104 ? 'Instrução singular posterior' : `Comentário histórico ${i}`,
+    createdAt: '2026-10-02T00:00:00Z',
+    version: 1,
+    legacyMetadata: {},
+  }));
+  const events = [
+    {
+      id: 'historic',
+      operation: 'create_task',
+      entityId: 'task-1',
+      actorUserId: userId,
+      actorAgentId: null,
+      createdAt: '2026-10-03T00:00:00Z',
+      payload: { projectId: 'project-1', taskId: 'task-1' },
+    },
+  ];
+  const calls: string[] = [];
+  await page.route('**/rest/v1/rpc/read_operation', async route => {
+    const { p_operation: operation, p_query: q = {} } = route.request().postDataJSON();
+    if (!['list_activity', 'list_comments', 'list_domain_events', 'get_event_cursor'].includes(operation)) return route.fallback();
+    calls.push(operation);
+    if (operation === 'get_event_cursor') {
+      const last = events.at(-1)!;
+      return route.fulfill({ json: { data: { cursor: JSON.stringify([last.createdAt, last.id]) } } });
+    }
+    const cursor = q.cursor ? JSON.parse(q.cursor) : null;
+    const rows =
+      operation === 'list_domain_events'
+        ? events.filter(event => !cursor || JSON.stringify([event.createdAt, event.id]) > JSON.stringify(cursor))
+        : (operation === 'list_activity' ? history : comments).filter(row => !q.taskId || row.taskId === q.taskId).filter(row => !cursor || row.id > cursor);
+    const items = rows.slice(0, q.limit ?? 100);
+    return route.fulfill({ json: { items, nextCursor: rows.length > items.length ? JSON.stringify(items.at(-1)!.id) : null } });
+  });
+  await login(page);
+  expect(calls.filter(op => op === 'list_comments')).toEqual([]);
+  // Login briefly mounts Home, whose compact history intentionally reads one bounded page.
+  expect(calls.filter(op => op === 'list_activity').length).toBeLessThanOrEqual(1);
+  await page.goto(`/app/w/${workspace}/project?project=project-1&tab=overview`);
+  const feed = page.locator('.context-history');
+  await expect(feed.getByText('Atividade histórica inicial', { exact: false })).toBeVisible();
+  await expect(feed.getByText('comentou na tarefa', { exact: false }).first()).toBeVisible();
+  await expect(feed.getByRole('status')).toContainText('Histórico parcial');
+  await page.getByRole('link', { name: 'Atividade', exact: true }).last().click();
+  await expect(feed.getByText('criou a tarefa', { exact: false })).toBeVisible();
+  await feed.getByRole('button', { name: 'Carregar mais histórico', exact: true }).click();
+  await expect(feed.getByText('Atividade na página seguinte', { exact: false })).toBeVisible();
+  events.push({ ...events[0], id: 'after-hydration', operation: 'update_task', createdAt: '2026-10-21T00:00:00Z' });
+  await expect(feed.getByText('alterou a tarefa', { exact: false })).toBeVisible({ timeout: 15000 });
+  await page.reload();
+  await expect(feed.getByText('criou a tarefa', { exact: false })).toBeVisible();
+  await page.goto(`/app/w/${workspace}/member?id=${userId}`);
+  await expect(feed.getByText('Atividade histórica inicial', { exact: false })).toBeVisible();
+  await feed.getByRole('button', { name: 'Carregar mais histórico', exact: true }).click();
+  await expect(feed.getByText('Atividade na página seguinte', { exact: false })).toBeVisible();
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('gr8r:palette', { detail: { mode: 'search' } })));
+  const palette = page.getByRole('dialog');
+  await palette.locator('.button-row').getByRole('button', { name: 'Busca', exact: true }).click();
+  await palette.getByRole('textbox', { name: 'Buscar comandos', exact: true }).fill('Instrução singular posterior');
+  await palette.getByRole('combobox', { name: 'Categoria da busca' }).selectOption('comment');
+  await palette.getByRole('button', { name: 'Continuar busca no histórico' }).click();
+  await expect(page.getByRole('textbox', { name: 'Buscar no espaço' })).toHaveValue('Instrução singular posterior');
+  await expect(page).toHaveURL(/category=comments/);
+  await expect(page.getByText('Nenhum resultado.', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Carregar mais comentários' }).click();
+  await expect(page.locator('.panel-row').filter({ hasText: 'Instrução singular posterior' })).toBeVisible();
+  await page.screenshot({ path: '/tmp/residual-palette-context.png', fullPage: true });
+  await page.evaluate(() => document.dispatchEvent(new Event('gr8r:palette')));
+  await page.getByRole('dialog').locator('.button-row').getByRole('button', { name: 'Busca', exact: true }).click();
+  await page.getByRole('dialog').getByRole('textbox', { name: 'Buscar comandos' }).fill('Comentário histórico 0');
+  await page.getByRole('dialog').getByRole('combobox', { name: 'Categoria da busca' }).selectOption('comment');
+  await page.getByRole('dialog').getByRole('button', { name: 'Continuar busca no histórico' }).click();
+  await expect(page.getByRole('textbox', { name: 'Buscar no espaço' })).toHaveValue('Comentário histórico 0');
+  await expect(page.locator('.panel-row').filter({ hasText: 'Comentário histórico 0' })).toBeVisible();
+});
+
+test('residual revoked execution keeps future reservation action gates and explicit intervention', async ({ page }) => {
+  const f = await fixture(page);
+  f.blocked(false);
+  await login(page);
+  await page.getByText('Revisar navegação', { exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('sem execução ativa');
+  await expect(page.getByText('Reserva até', { exact: false })).toBeVisible();
+  await expect(page.getByText('Reserva expirada em', { exact: false })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Concluir tarefa', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Retomar controle humano', exact: true })).toBeEnabled();
 });

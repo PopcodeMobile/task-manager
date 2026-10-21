@@ -196,3 +196,25 @@ test('009 completed creation is atomic, replay safe, and deletion cascades calen
     await db.close();
   }
 });
+test('residual revoked authority keeps an unexpired reservation locked until explicit human intervention', async () => {
+  const { db, ws, cmd, read } = await setup();
+  try {
+    await db.query("insert into public.agents(workspace_id,id,name,auth_user_id) values($1,'agent','Agent',$2)", [ws, member]);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [member]);
+    await cmd('claim_task', { id: 't1' }, 1);
+    await db.query("update public.workspace_memberships set role='guest' where workspace_id=$1 and user_id=$2", [ws, member]);
+    await db.query("select set_config('request.jwt.claim.sub',$1,false)", [owner]);
+    const task = (await read('get_task', { id: 't1' })).data;
+    assert.equal(task.execution.active, false);
+    assert.equal(task.reservation.active, true);
+    await assert.rejects(cmd('complete_task', { id: 't1' }, task.version), /already_claimed/);
+    await cmd('intervene_task', { id: 't1', action: 'release' }, task.version);
+    const released = (await read('get_task', { id: 't1' })).data;
+    assert.equal(released.reservation, null);
+    assert.equal(released.execution, null);
+    await cmd('complete_task', { id: 't1' }, released.version);
+    assert.equal((await read('get_task', { id: 't1' })).data.status, 'done');
+  } finally {
+    await db.close();
+  }
+});
