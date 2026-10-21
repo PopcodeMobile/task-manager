@@ -59,6 +59,7 @@ export function PeoplePages(p: PanelProps) {
     [submission, setSubmission] = useState<BatchCommand[] | null>(null),
     [conflict, setConflict] = useState(false),
     [reviewed, setReviewed] = useState(false);
+  const removed = !!edit && originalTeam.current && !s.teams.some(team => team.id === edit.id);
   useEffect(() => {
     if (!edit) return;
     p.registerDraft({
@@ -84,7 +85,7 @@ export function PeoplePages(p: PanelProps) {
     };
   }, [!!edit, p.registerDraft, t]);
   async function saveTeam() {
-    if (!edit || conflict || busy) return;
+    if (!edit || conflict || busy || (removed && !submission)) return;
     await action(async () => {
       const commands = submission ?? teamCommands(edit, baseline.teams, baseline.relations);
       setSubmission(commands);
@@ -176,13 +177,14 @@ export function PeoplePages(p: PanelProps) {
       {!s.teams.length && <p>{t('Nenhuma equipe. Crie a primeira equipe.', 'No teams. Create your first team.')}</p>}
     </div>
   );
-  if ((p.route === 'team' && !team) || (p.route === 'member' && !member))
-    return (
-      <div>
-        <p>{t('Página não encontrada', 'Page not found')}</p>
-        <Button onClick={() => p.go('home')}>{t('Ir para início', 'Go to Home')}</Button>
-      </div>
-    );
+  const missing = (p.route === 'team' && !team) || (p.route === 'member' && !member);
+  const notFound = (
+    <div>
+      <p>{t('Página não encontrada', 'Page not found')}</p>
+      <Button onClick={() => p.go('home')}>{t('Ir para início', 'Go to Home')}</Button>
+    </div>
+  );
+  if (missing && !edit) return notFound;
   const assigned = member ? s.tasks.filter(task => !task.archived && task.assigneeUserId === member.user_id) : [];
   return (
     <section className="panel-page">
@@ -200,14 +202,16 @@ export function PeoplePages(p: PanelProps) {
           ))}
         </div>
       )}
-      {(teamList || p.route === 'team') && (
+      {(teamList || (p.route === 'team' && team)) && (
         <div className="button-row">
           <Button disabled={p.readOnly} onClick={() => editor(p.route === 'team' ? team : undefined)}>
             {p.route === 'team' ? t('Editar equipe', 'Edit team') : t('Criar equipe', 'Create team')}
           </Button>
         </div>
       )}
-      {teamList ? (
+      {missing ? (
+        notFound
+      ) : teamList ? (
         teamsUI
       ) : p.route === 'team' && team ? (
         <>
@@ -393,7 +397,7 @@ export function PeoplePages(p: PanelProps) {
       <Sheet
         open={!!edit}
         onOpenChange={open => {
-          if (!open && !busy && !submission) setEdit(null);
+          if (!open && !busy && !submission && !removed) setEdit(null);
         }}
       >
         <SheetContent onCloseAutoFocus={restore} closeLabel={t('Fechar', 'Close')}>
@@ -406,7 +410,15 @@ export function PeoplePages(p: PanelProps) {
                 void saveTeam();
               }}
             >
-              <fieldset disabled={busy || !!submission || conflict}>
+              {removed && (
+                <p role="alert">
+                  {t(
+                    'Esta equipe foi removida. Seu rascunho continua disponível abaixo. Descarte-o quando estiver pronto para sair.',
+                    'This team was removed. Your draft is still available below. Discard it when you are ready to leave.',
+                  )}
+                </p>
+              )}
+              <fieldset disabled={busy || !!submission || conflict || removed}>
                 <label className="form-field">
                   {t('Nome', 'Name')}
                   <Input required value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} />
@@ -443,7 +455,7 @@ export function PeoplePages(p: PanelProps) {
                   ))}
                 </fieldset>
               </fieldset>
-              {error && (
+              {error && !removed && (
                 <p role="alert">
                   {conflict
                     ? t(
@@ -453,7 +465,7 @@ export function PeoplePages(p: PanelProps) {
                     : error}
                 </p>
               )}
-              {conflict && (
+              {conflict && !removed && (
                 <Button type="button" variant="outline" disabled={busy} onClick={() => void reviewMemberships()}>
                   {t('Revisar relações atuais e manter rascunho', 'Review current memberships and keep draft')}
                 </Button>
@@ -481,7 +493,21 @@ export function PeoplePages(p: PanelProps) {
                 </section>
               )}
               <div className="button-row">
-                <Button disabled={busy || conflict}>{t('Salvar equipe', 'Save team')}</Button>
+                <Button disabled={busy || conflict || (removed && !submission)}>{t('Salvar equipe', 'Save team')}</Button>
+                {removed && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy || !!submission}
+                    onClick={() => {
+                      p.registerDraft(null);
+                      setEdit(null);
+                      setError('');
+                    }}
+                  >
+                    {t('Descartar rascunho da equipe', 'Discard team draft')}
+                  </Button>
+                )}
                 {s.teams.some(team => team.id === edit.id) && (
                   <Button
                     type="button"

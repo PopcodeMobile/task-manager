@@ -141,21 +141,21 @@ export function SettingsPage(p: PanelProps) {
                 void action(async () => {
                   const updated = await p.execute<{ version: number }>('update_workspace', workspace, workspaceVersion);
                   setWorkspaceVersion(updated.version);
-                  p.workspaceChanged();
+                  await p.workspaceChanged();
                 });
               }}
             >
               <label className="form-field">
                 {t('Nome do espaço', 'Workspace name')}
-                <Input required value={workspace.name} onChange={e => setWorkspace({ ...workspace, name: e.target.value })} />
+                <Input disabled={busy} required value={workspace.name} onChange={e => setWorkspace({ ...workspace, name: e.target.value })} />
               </label>
               <label className="form-field">
                 {t('Endereço', 'Address')}
-                <Input required value={workspace.slug} onChange={e => setWorkspace({ ...workspace, slug: e.target.value })} />
+                <Input disabled={busy} required value={workspace.slug} onChange={e => setWorkspace({ ...workspace, slug: e.target.value })} />
               </label>
               <label className="form-field">
                 {t('Cor', 'Color')}
-                <Input value={workspace.color} onChange={e => setWorkspace({ ...workspace, color: e.target.value })} />
+                <Input disabled={busy} value={workspace.color} onChange={e => setWorkspace({ ...workspace, color: e.target.value })} />
               </label>
               <Button disabled={!p.admin || busy}>{t('Salvar espaço', 'Save workspace')}</Button>
             </form>
@@ -594,6 +594,10 @@ export function SettingsPage(p: PanelProps) {
                     void action(async () => {
                       await p.execute('local_reset_demo', { confirmWorkspaceId: p.workspace.id });
                       await p.refresh();
+                      const current = (await p.workspaceChanged()).find(workspace => workspace.id === p.workspace.id);
+                      if (!current) throw { code: 'not_found' };
+                      setWorkspace({ name: current.name, slug: current.slug, color: current.color });
+                      setWorkspaceVersion(current.version);
                     })
                   }
                 >

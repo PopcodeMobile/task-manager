@@ -2230,3 +2230,76 @@ test('6c evidence activity category and actor filters retain historical literals
   await page.goto('/app-local/w/w1/system');
   await expect(page.getByRole('combobox', { name: 'Tema', exact: true }).locator('option')).toHaveText(['Claro', 'Escuro', 'Sistema']);
 });
+
+test('6c fix2 deleted team preserves visible draft through polling and explicit discard releases navigation', async ({ page, context }) => {
+  await page.clock.install();
+  await prepareRemaining(page, 'teams');
+  await projectLocalCommand(page, 'create_team', { id: 'fix2-team', name: 'Removal target' });
+  await page.goto('/app-local/w/w1/teams');
+  await page.getByRole('button', { name: 'Removal target', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit team', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Name', { exact: true }).fill('Retained removed team draft');
+  await dialog.getByRole('textbox', { name: 'Description', exact: true }).fill('Keep this text until I discard');
+  const other = await context.newPage();
+  await other.goto('/app-local/w/w1/teams');
+  await projectLocalCommand(other, 'delete_team', { id: 'fix2-team' }, 1);
+  await page.clock.runFor(10001);
+  await expect(page.locator('#work-content').getByText('Page not found', { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue('Retained removed team draft');
+  const description = dialog.getByRole('textbox', { name: 'Description', exact: true });
+  await expect(description).toHaveValue('Keep this text until I discard');
+  await expect(description).toHaveAccessibleName('Description');
+  const label = await description.evaluate(element => ({
+    markup: element.closest('label')!.outerHTML,
+    alerts: element.closest('label')!.querySelectorAll('[role=alert]').length,
+  }));
+  expect(label.alerts).toBe(0);
+  await test.info().attach('removed-team-label-contract', { body: JSON.stringify(label), contentType: 'application/json' });
+  await expect(dialog.getByRole('button', { name: 'Save team', exact: true })).toBeDisabled();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/team\?id=fix2-team$/);
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeVisible();
+  await page.screenshot({ path: '/tmp/task6c-fix2-deleted-team.png', fullPage: true });
+  await dialog.getByRole('button', { name: 'Discard team draft', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole('button', { name: 'Go to Home', exact: true }).click();
+  await expect(page).toHaveURL(/\/home$/);
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.teams.some((team: { id: string }) => team.id === 'fix2-team'),
+    ),
+  ).toBe(false);
+  await other.close();
+});
+
+test('6c fix2 reset refreshes settings baseline and discovery while external workspace edits still reject stale saves', async ({ page, context }) => {
+  await prepareRemaining(page, 'settings?sec=workspace');
+  const other = await context.newPage();
+  await other.goto('/app-local/w/w1/settings?sec=workspace');
+  await other.getByLabel('Workspace name', { exact: true }).fill('Draft opened before reset');
+  await page.getByRole('button', { name: 'Reset demo data', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('textbox').fill(data.ws.name);
+  await page.getByRole('button', { name: 'Reset demo', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
+  await other.getByRole('button', { name: 'Save workspace', exact: true }).click();
+  await expect(other.getByRole('alert')).toContainText('draft was kept');
+  await expect(other.getByLabel('Workspace name', { exact: true })).toHaveValue('Draft opened before reset');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.ws.name)).toBe(data.ws.name);
+  await page.getByLabel('Workspace name', { exact: true }).fill('Renamed after reset');
+  await page.getByRole('button', { name: 'Save workspace', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Workspace', exact: true }).locator('option:checked')).toHaveText('Renamed after reset');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.getByLabel('Workspace name', { exact: true }).fill('Retained stale workspace draft');
+  await other.reload();
+  await other.getByLabel('Workspace name', { exact: true }).fill('External winner');
+  await other.getByRole('button', { name: 'Save workspace', exact: true }).click();
+  await expect(other.getByRole('combobox', { name: 'Workspace', exact: true }).locator('option:checked')).toHaveText('External winner');
+  await page.getByRole('button', { name: 'Save workspace', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('draft was kept');
+  await expect(page.getByLabel('Workspace name', { exact: true })).toHaveValue('Retained stale workspace draft');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.ws.name)).toBe('External winner');
+  await other.close();
+});

@@ -716,13 +716,10 @@ export function WorkspacePanel({
                   markNotifications={markNotifications}
                   toggleFavorite={toggleFavorite}
                   refresh={() => refresh(true)}
-                  workspaceChanged={() => {
-                    void repo
-                      .workspaces(true)
-                      .then(rows => {
-                        if (!repo.controller.signal.aborted) setWorkspaces(rows);
-                      })
-                      .catch(err => setError(errorMessage(err, t)));
+                  workspaceChanged={async () => {
+                    const rows = await repo.workspaces(true);
+                    if (!repo.controller.signal.aborted) setWorkspaces(rows);
+                    return rows;
                   }}
                 />
               ) : (

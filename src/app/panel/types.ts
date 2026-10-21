@@ -23,5 +23,5 @@ export type PanelProps = {
   markNotifications: (ids: string[], read: boolean) => Promise<void>;
   toggleFavorite: (id: string, kind?: 'task' | 'project') => Promise<void>;
   refresh: () => Promise<unknown>;
-  workspaceChanged: () => void;
+  workspaceChanged: () => Promise<Workspace[]>;
 };
