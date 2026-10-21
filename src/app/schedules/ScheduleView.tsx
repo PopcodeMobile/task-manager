@@ -69,6 +69,13 @@ export function ScheduleView(props: ScheduleViewProps) {
     [event, setEvent] = useState<CalendarEvent | null>(null),
     [overflow, setOverflow] = useState<string | null>(null);
   const [context, setContext] = useState<{ task: Task; x: number; y: number; trigger: HTMLElement } | null>(null);
+  const panelOpener = useRef<HTMLElement | null>(null);
+  function openTask(id: string) {
+    panelOpener.current = null;
+    setOverflow(null);
+    setEvent(null);
+    props.openTask(id);
+  }
   function contextTask(task: Task, trigger: HTMLElement, x: number, y: number) {
     setContext({ task, trigger, x, y });
   }
@@ -133,10 +140,7 @@ export function ScheduleView(props: ScheduleViewProps) {
         e.dataTransfer.setData('application/x-gr8r-schedule', JSON.stringify({ scope, task }));
         e.dataTransfer.effectAllowed = 'move';
       }}
-      onClick={() => {
-        setOverflow(null);
-        props.openTask(task.id);
-      }}
+      onClick={() => openTask(task.id)}
       title={`${task.title} · ${dateLabel(task.dueDate!)}`}
     >
       {task.title}
@@ -147,7 +151,11 @@ export function ScheduleView(props: ScheduleViewProps) {
       key={e.id}
       style={{ '--schedule-color': projectTone(projects.find(p => p.id === e.projectId)) } as CSSProperties}
       className="schedule-event"
-      onClick={() => setEvent(e)}
+      onClick={click => {
+        // An event opened inside overflow removes its button; retain the calendar opener.
+        if (!overflow && !event) panelOpener.current = click.currentTarget;
+        setEvent(e);
+      }}
     >
       <small>{e.eventTime}</small> {e.title}
     </button>
@@ -243,7 +251,13 @@ export function ScheduleView(props: ScheduleViewProps) {
                         </header>
                         {view.calendarMode === 'week' ? rows : rows.slice(0, 3)}
                         {view.calendarMode === 'month' && rows.length > 3 && (
-                          <Button variant="ghost" onClick={() => setOverflow(date)}>
+                          <Button
+                            variant="ghost"
+                            onClick={e => {
+                              panelOpener.current = e.currentTarget;
+                              setOverflow(date);
+                            }}
+                          >
                             +{rows.length - 3} {t('mais', 'more')}
                           </Button>
                         )}
@@ -285,7 +299,7 @@ export function ScheduleView(props: ScheduleViewProps) {
             if (restore) context.trigger.focus();
             setContext(null);
           }}
-          open={props.openTask}
+          open={openTask}
           extraActions={props.extraTaskMenuActions}
         />
       )}
@@ -298,7 +312,15 @@ export function ScheduleView(props: ScheduleViewProps) {
           }
         }}
       >
-        <SheetContent closeLabel={t('Fechar painel', 'Close panel')}>
+        <SheetContent
+          closeLabel={t('Fechar painel', 'Close panel')}
+          onCloseAutoFocus={e => {
+            e.preventDefault();
+            const opener = panelOpener.current;
+            panelOpener.current = null;
+            if (!signal.aborted && opener?.isConnected) opener.focus();
+          }}
+        >
           <SheetTitle>{event?.title ?? (overflow ? dateLabel(overflow) : '')}</SheetTitle>
           <SheetDescription>
             {event ? t('Detalhes do evento', 'Event details') : t('Tarefas e eventos nesta data.', 'Tasks and events on this date.')}
@@ -314,6 +336,8 @@ export function ScheduleView(props: ScheduleViewProps) {
               {event.projectId && (
                 <Button
                   onClick={() => {
+                    panelOpener.current = null;
+                    setOverflow(null);
                     setEvent(null);
                     props.openProject(event.projectId!);
                   }}

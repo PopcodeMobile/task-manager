@@ -1162,3 +1162,51 @@ test('local file selection simulates metadata atomically and shared surfaces res
   await page.goto(`${base}/files?project=${other.project}`);
   await expect(page.getByRole('button', { name: 'Scoped renamed.pdf', exact: true })).toHaveCount(0);
 });
+
+for (const panel of ['event', 'overflow', 'overflow event'] as const) {
+  test(`calendar ${panel} restores keyboard opener after Escape and close`, async ({ page }) => {
+    const fixture = structuredClone(data),
+      today = new Date().toLocaleDateString('sv-SE');
+    fixture.tasks = [{ ...fixture.tasks[0], title: 'Focus task', due: today }];
+    fixture.events = Array.from({ length: 3 }, (_, i) => ({ id: `focus-event-${i}`, project: 'p1', title: `Focus event ${i}`, date: today, time: '09:00' }));
+    await page.addInitScript(value => localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en', theme: 'light' } })), fixture);
+    await page.goto('/app-local');
+    await page.getByRole('link', { name: 'Calendar', exact: true }).click();
+    const day = page.locator(`[data-calendar-day="${today}"]`);
+    const opener =
+      panel === 'event' ? day.getByRole('button', { name: '09:00 Focus event 0', exact: true }) : day.getByRole('button', { name: '+1 more', exact: true });
+    for (const dismiss of ['Escape', 'close']) {
+      await opener.focus();
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('dialog')).toBeVisible();
+      if (panel === 'overflow event') {
+        const nested = page.getByRole('dialog').getByRole('button', { name: '09:00 Focus event 2', exact: true });
+        await nested.focus();
+        await page.keyboard.press('Enter');
+        await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Focus event 2');
+      }
+      if (dismiss === 'Escape') await page.keyboard.press('Escape');
+      else {
+        await page.getByRole('button', { name: 'Close panel', exact: true }).focus();
+        await page.keyboard.press('Enter');
+      }
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(opener).toBeFocused();
+    }
+    if (panel === 'overflow') {
+      await page.keyboard.press('Enter');
+      const task = page.getByRole('dialog').getByRole('button', { name: 'Focus task', exact: true });
+      await task.focus();
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('Task details');
+      await expect(page.getByLabel('Title', { exact: true })).toBeFocused();
+    }
+    if (panel === 'overflow event') {
+      await opener.press('Enter');
+      await page.getByRole('dialog').getByRole('button', { name: '09:00 Focus event 2', exact: true }).press('Enter');
+      await page.getByRole('button', { name: 'Open project', exact: true }).press('Enter');
+      await expect(page).toHaveURL(/\/tasks\?project=p1/);
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+    }
+  });
+}
