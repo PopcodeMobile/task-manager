@@ -7445,6 +7445,11 @@
               "color": {
                 "type": "string",
                 "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "logoPath": {
+                "type": ["string", "null"],
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.webp$",
+                "description": "Private organization-logos Storage object in this workspace prefix. Upload before saving; null removes the logo. No URLs or image data."
               }
             },
             "minProperties": 1
@@ -8502,6 +8507,11 @@
           },
           "role": {
             "enum": ["owner", "admin", "member", "guest"]
+          },
+          "logoPath": {
+            "type": ["string", "null"],
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.webp$",
+            "description": "Private organization-logos Storage object in this workspace prefix. Upload before saving; null removes the logo. No URLs or image data."
           }
         }
       },

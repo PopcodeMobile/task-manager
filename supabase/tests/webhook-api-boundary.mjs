@@ -65,7 +65,46 @@ export function auditWebhookApiSurface({ sql, exposedSchemas, extraSearchPath })
         assert.match(source, /c.workspace_id=\(p_row->>'workspace_id'\)::uuid and c.task_id=p_row->>'id'/);
       }
     }
-    if (object.name === 'read_operation' && (hasPredecessor('read_operation_before_context') || source.includes('read_operation_before_context'))) {
+    const brandingRead = hasPredecessor('read_operation_before_branding');
+    if (object.name === 'read_operation' && (brandingRead || source.includes('read_operation_before_branding'))) {
+      predecessor('read_operation_before_branding');
+      assert.equal(object.definer, true, 'reviewed read entrypoint must retain its authorization boundary');
+      assert.match(
+        source,
+        /result\s*:=\s*public\.read_operation_before_branding\(p_workspace_id,p_operation,p_query\);/,
+        'reviewed branding read delegation must preserve workspace, operation and query',
+      );
+      assert.match(
+        source,
+        /if p_operation='get_workspace' and jsonb_typeof\(result->'data'\)='object' then/,
+        'branding get projection requires its authorized result',
+      );
+      assert.match(
+        source,
+        /select logo_path from public\.workspaces where id=\(result->'data'->>'id'\)::uuid/,
+        'branding get projection must retain its returned workspace ID',
+      );
+      assert.match(source, /elsif p_operation='list_workspaces' then/, 'branding list projection must retain its operation');
+      assert.match(
+        source,
+        /from jsonb_array_elements\(result->'items'\) with ordinality as x\(item,ord\)\s+join public\.workspaces w on w.id=\(item->>'id'\)::uuid/,
+        'branding list projection must retain only authorized returned IDs',
+      );
+    }
+    if (object.name === 'read_operation_before_branding') {
+      assert.equal(object.anon || object.authenticated, false, 'branding read predecessor must remain private, never an RPC');
+      assert.equal(object.definer, true, 'branding read predecessor retains the reviewed authorization boundary');
+      assert.match(
+        predecessor('read_operation').source.toLowerCase(),
+        /result\s*:=\s*public\.read_operation_before_branding\(p_workspace_id,p_operation,p_query\);/,
+        'reviewed branding predecessor requires its scoped delegation',
+      );
+    }
+    if (
+      ['read_operation', 'read_operation_before_branding'].includes(object.name) &&
+      !(object.name === 'read_operation' && brandingRead) &&
+      (hasPredecessor('read_operation_before_context') || source.includes('read_operation_before_context'))
+    ) {
       predecessor('read_operation_before_context');
       assert.equal(object.definer, true, 'reviewed read entrypoint must retain its authorization boundary');
       assert.match(
@@ -78,9 +117,26 @@ export function auditWebhookApiSurface({ sql, exposedSchemas, extraSearchPath })
       assert.equal(object.anon || object.authenticated, false, 'read predecessor must remain private, never an RPC');
       assert.equal(object.definer, true, 'read predecessor retains the reviewed authorization boundary');
       assert.match(
-        predecessor('read_operation').source.toLowerCase(),
+        predecessor(brandingRead ? 'read_operation_before_branding' : 'read_operation').source.toLowerCase(),
         /return public\.read_operation_before_context\(p_workspace_id,p_operation,p_query\);/,
         'reviewed read predecessor requires its scoped delegation',
+      );
+    }
+    if (object.name === 'organization_logo_access') {
+      assert.equal(object.definer, true, 'logo authority retains its security definer boundary');
+      assert.equal(object.anon, false, 'logo authority is never an anonymous RPC');
+      assert.match(
+        source,
+        /a\s*:=\s*public\.operation_authorize\(split_part\(p_name,'\/',1\)::uuid,false\);/,
+        'logo authority must preserve exact workspace authorization',
+      );
+      const pathPattern =
+        "'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.webp$'";
+      assert.ok(source.includes(`if p_name is null or p_name !~ ${pathPattern} then return false;end if;`), 'logo authority must reject arbitrary paths');
+      assert.match(
+        source,
+        /return not p_write or \(a->>'role' in \('owner','admin'\) and a->>'clientid' is null and a->>'agentid' is null\);/,
+        'logo authority permits writes only to owner/admin humans',
       );
     }
     if (
@@ -89,6 +145,7 @@ export function auditWebhookApiSurface({ sql, exposedSchemas, extraSearchPath })
         'operation_batch_allowed',
         'operation_validate',
         'operation_validate_before_execution',
+        'operation_validate_before_branding',
         'operation_validate_before_file_duplication',
         'operation_graph',
         'operation_graph_before_file_duplication',

@@ -345,6 +345,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
           const panel = (record.reactPanel = panelState(record));
           data._panel = panel;
           try {
+            assertLocalLogoActor(data, operation, command.input);
             const signature = JSON.stringify([operation, command.input, command.expectedVersion]);
             const requestKey = JSON.stringify([identity, command.idempotencyKey]);
             const previous = panel.requests[requestKey];
@@ -391,6 +392,15 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     },
   };
   return adapter;
+}
+/** @param {any} data @param {string} operation @param {Record<string, any>} input */
+function assertLocalLogoActor(data, operation, input) {
+  if (operation === 'batch' && Array.isArray(input?.commands)) {
+    for (const child of input.commands) if (child?.operation === 'update_workspace') assertLocalLogoActor(data, child.operation, child.input);
+  } else if (operation === 'update_workspace' && input && Object.hasOwn(input, 'logoDataUrl')) {
+    const actor = data.members?.find(/** @param {any} member */ member => member.id === data.me);
+    if (!['owner', 'admin'].includes(String(actor?.role).toLowerCase())) fail('forbidden');
+  }
 }
 /** @param {any} data @param {string} operation @param {Record<string, unknown>} input @param {any} result */
 function appendEvent(data, operation, input, result) {
@@ -532,7 +542,15 @@ function validateLocalInput(data, operation, input) {
   if (operation === 'local_update_profile' && Object.values(input).some(value => typeof value !== 'string' || value.length > 500)) fail('validation_error');
   if (
     operation === 'update_workspace' &&
-    Object.entries(input).some(([key, value]) => typeof value !== 'string' || value.length > 120 || (key === 'slug' && !/^[a-z0-9][a-z0-9-]*$/.test(value)))
+    (Object.keys(input).length === 0 ||
+      Object.entries(input).some(([key, value]) =>
+        key === 'logoDataUrl'
+          ? value !== null &&
+            (typeof value !== 'string' ||
+              value.length > 65536 ||
+              !/^data:image\/webp;base64,(?:[A-Za-z0-9+/]{4})+(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value))
+          : typeof value !== 'string' || value.length > 120 || (key === 'slug' && !/^[a-z0-9][a-z0-9-]*$/.test(value)),
+      ))
   )
     fail('validation_error');
   if (
@@ -610,6 +628,7 @@ function validateLocalInput(data, operation, input) {
           'teamId',
           'leadUserId',
           'sizeLabel',
+          ...(operation === 'update_workspace' ? ['logoDataUrl'] : []),
           ...(/_(file|view)$/.test(operation) ? ['taskId', 'projectId'] : []),
         ].includes(key)
       )

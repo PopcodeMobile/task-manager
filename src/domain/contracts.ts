@@ -13,7 +13,16 @@ export type TaskPriority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
 export type Recurrence = 'Daily' | 'Weekly' | 'Every 2 weeks' | 'Monthly';
 export type VersionedEntity = EntityRef & { version: number; legacyMetadata: LegacyMetadata };
 export type TaskReservation = { agentId: string; claimedAt: string; expiresAt: string; active: boolean };
-export type Workspace = { id: string; name: string; slug: string; color: string; version: number; storageVersion: number; role: WorkspaceRole };
+export type Workspace = {
+  id: string;
+  name: string;
+  slug: string;
+  color: string;
+  logoPath?: string | null;
+  version: number;
+  storageVersion: number;
+  role: WorkspaceRole;
+};
 export type SubtaskAttributes = { assignee?: string | null; due?: string | null; note?: string | null };
 export type BatchCommand = { operation: string; input: Record<string, Json>; expectedVersion?: number };
 export type BatchInput = { commands: BatchCommand[] };

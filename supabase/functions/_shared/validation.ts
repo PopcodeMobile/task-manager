@@ -9,7 +9,7 @@ const rule = (fields: string, required = '', version = false): Rule => ({
 });
 export const commandRules: Record<string, Rule> = {
   batch: rule('commands', 'commands'),
-  update_workspace: rule('name slug color', '', true),
+  update_workspace: rule('name slug color logoPath', '', true),
   delete_comment: rule('id', 'id', true),
   create_task: rule('id projectId title description status priority assigneeUserId recurrence dueDate startDate sortOrder attributes', 'projectId title'),
   update_task: rule('id title description status priority assigneeUserId recurrence dueDate startDate sortOrder claimToken attributes', 'id', true),
@@ -165,6 +165,16 @@ export function validateCommand(operation: string, value: unknown): Command<Reco
     return value as Command<Record<string, unknown>>;
   }
   for (const [key, item] of Object.entries(input)) {
+    if (operation === 'update_workspace' && key === 'logoPath') {
+      if (
+        item !== null &&
+        (typeof item !== 'string' ||
+          !item.startsWith(`${(value.workspaceId as string).toLowerCase()}/`) ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/.test(item))
+      )
+        invalid();
+      continue;
+    }
     if (key === 'expectedMemberships') {
       if (!validTeamMembershipBaselines(item, true)) invalid();
       continue;

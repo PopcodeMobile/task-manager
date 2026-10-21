@@ -15,6 +15,7 @@ import { createLocalRepository } from '../workspace/local.js';
 import { seed } from '../data/seed.js';
 import { emptyWorkspace } from '../data/workspace.js';
 import { loadAppearance, saveAppearance } from '../workspace/device-preferences.js';
+import { applyAccentPreference } from '../core/custom-accent.js';
 import { errorMessage } from './shell/messages';
 export function App() {
   const { session } = useAuth();
@@ -66,10 +67,11 @@ function AppearanceApp({ identityKey, local }: { identityKey: string; local: boo
     document.documentElement.lang = locale;
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
     document.documentElement.dataset.density = density;
-    document.documentElement.dataset.accent = String(extras.accent ?? 'indigo');
+    applyAccentPreference(document.documentElement, extras.accent, dark);
     document.documentElement.dataset.side = String(extras.side ?? 'comfortable');
     if (extras.motion === 'reduce') document.documentElement.dataset.motion = 'reduce';
     else delete document.documentElement.dataset.motion;
+    return () => applyAccentPreference(document.documentElement, undefined);
   }, [locale, dark, density, extras]);
   const appearance = (patch: { lang?: string; theme?: string; density?: string }) => {
     try {

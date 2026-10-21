@@ -9,7 +9,7 @@ export const localCommandRules = {
   delete_team: rule('id', 'id'),
   set_team_member: rule('id userId', 'id userId'),
   remove_team_member: rule('id userId', 'id userId'),
-  update_workspace: rule('name slug color'),
+  update_workspace: rule('name slug color logoDataUrl'),
   local_update_profile: rule('name title avatar color'),
   local_workspace_member: rule('action userId email role', 'action'),
   local_demo_setting: rule('section key value', 'section key value'),

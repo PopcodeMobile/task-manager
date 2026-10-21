@@ -10,6 +10,7 @@ export function mutatePanel({ data, find, cas, bump, dto, initialize }, operatio
     if (input.name !== undefined) data.ws.name = input.name;
     if (input.slug !== undefined) data.ws.url = input.slug;
     if (input.color !== undefined) data.ws.c = input.color;
+    if (Object.hasOwn(input, 'logoDataUrl')) data.ws.logoPath = input.logoDataUrl;
     bump('workspace', data.ws);
     data.ws.version = data._panel.versions[`workspace:${data.ws.id}`];
     return localWorkspaceDTO(data.ws);

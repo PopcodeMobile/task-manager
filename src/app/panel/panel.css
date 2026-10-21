@@ -2325,3 +2325,47 @@
     margin-left: auto;
   }
 }
+
+.work-shell .custom-accent {
+  max-width: var(--auth-max);
+  margin-top: var(--s-4);
+}
+.work-shell .custom-accent .custom-accent-picker {
+  flex: 0 0 var(--s-10);
+  width: var(--s-10);
+  padding: var(--s-1);
+  cursor: pointer;
+}
+.work-shell .custom-accent > .ui-button {
+  justify-self: start;
+}
+.work-shell .custom-accent [role='alert'],
+.work-shell .organization-logo-editor [role='alert'] {
+  color: var(--danger);
+}
+.work-shell .workspace-logo-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
+}
+.work-shell .organization-logo-editor {
+  margin-bottom: var(--s-4);
+}
+.work-shell .organization-logo-preview {
+  width: var(--s-12);
+  height: var(--s-12);
+  flex: 0 0 var(--s-12);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.work-shell .organization-logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  align-items: center;
+}

@@ -51,6 +51,9 @@ import { PermissionMatrix } from './PermissionMatrix';
 import type { PanelProps } from './types';
 import type { Project } from '../../domain/contracts';
 import { KairosMark } from '../design/KairosMark';
+import { CustomAccent } from './CustomAccent';
+import { OrganizationLogoEditor } from '../workspaces/OrganizationLogoEditor';
+import { LogoError, uploadOrganizationLogo, type PreparedLogo } from '../workspaces/organization-logo';
 export function SettingsPage(p: PanelProps) {
   const { t, snapshot: s, prefs } = p,
     sec = p.params.get('sec') ?? 'appearance',
@@ -63,7 +66,9 @@ export function SettingsPage(p: PanelProps) {
     [reset, setReset] = useState(false),
     [resetName, setResetName] = useState(''),
     [workspaceVersion, setWorkspaceVersion] = useState(p.workspace.version),
-    [workspace, setWorkspace] = useState({ name: p.workspace.name, slug: p.workspace.slug, color: p.workspace.color }),
+    [workspace, setWorkspace] = useState({ name: p.workspace.name, slug: p.workspace.slug, color: p.workspace.color, logoPath: p.workspace.logoPath ?? null }),
+    [logoDraft, setLogoDraft] = useState<PreparedLogo | null | undefined>(undefined),
+    [logoPreparing, setLogoPreparing] = useState(false),
     [profile, setProfile] = useState({ name: me?.name ?? '', title: me?.title ?? '', avatar: me?.avatar ?? '', color: String(me?.color ?? 'indigo') }),
     [password, setPassword] = useState({ current: '', next: '', confirm: '' }),
     [demo, setDemo] = useState<{
@@ -93,7 +98,14 @@ export function SettingsPage(p: PanelProps) {
       await fn();
       if (!p.repo.controller.signal.aborted) setSaved(true);
     } catch (e) {
-      setError(errorMessage(e, t));
+      setError(
+        e instanceof LogoError
+          ? t(
+              'Não foi possível enviar o logo. Sua seleção foi mantida. Confira sua conexão e tente salvar novamente.',
+              'Could not upload the logo. Your selection was kept. Check your connection and save again.',
+            )
+          : errorMessage(e, t),
+      );
     } finally {
       setBusy(false);
     }
@@ -301,13 +313,30 @@ export function SettingsPage(p: PanelProps) {
                 <form
                   onSubmit={e => {
                     e.preventDefault();
+                    if (busy || logoPreparing || !p.admin) return;
                     void action(async () => {
-                      const updated = await p.execute<{ version: number }>('update_workspace', workspace, workspaceVersion);
+                      const input: Record<string, unknown> = { name: workspace.name, slug: workspace.slug, color: workspace.color };
+                      if (logoDraft !== undefined) {
+                        if (p.repo.mode === 'local') input.logoDataUrl = logoDraft?.dataUrl ?? null;
+                        else input.logoPath = logoDraft ? await uploadOrganizationLogo(p.workspace.id, logoDraft) : null;
+                      }
+                      const updated = await p.execute<{ version: number; logoPath?: string | null }>('update_workspace', input, workspaceVersion);
                       setWorkspaceVersion(updated.version);
+                      setWorkspace(previous => ({ ...previous, logoPath: updated.logoPath ?? null }));
+                      setLogoDraft(undefined);
                       await p.workspaceChanged();
                     });
                   }}
                 >
+                  <OrganizationLogoEditor
+                    name={workspace.name}
+                    logoPath={workspace.logoPath}
+                    draft={logoDraft}
+                    onChange={setLogoDraft}
+                    onPreparing={setLogoPreparing}
+                    disabled={busy || !p.admin}
+                    t={t}
+                  />
                   <div className="row settings-identity">
                     <span className="workspace-identity" style={{ background: workspace.color }}>
                       {workspace.name === 'Kairos' ? <KairosMark /> : workspace.name.slice(0, 1)}
@@ -351,7 +380,7 @@ export function SettingsPage(p: PanelProps) {
                     </span>
                     <span className="hint">{t('Alterar o endereço pode quebrar links existentes.', 'Changing the URL will break existing links.')}</span>
                   </label>
-                  <Button disabled={!p.admin || busy}>{t('Salvar espaço', 'Save workspace')}</Button>
+                  <Button disabled={!p.admin || busy || logoPreparing}>{t('Salvar espaço', 'Save workspace')}</Button>
                 </form>
                 <div className="sblock settings-danger">
                   <h2>{t('Zona de perigo', 'Danger zone')}</h2>
@@ -460,6 +489,7 @@ export function SettingsPage(p: PanelProps) {
                       )}
                     </div>
                   </div>
+                  <CustomAccent value={String(prefs.accent ?? 'indigo')} busy={busy} t={t} onSave={accent => p.savePrefs({ accent })} />
                 </div>
                 <div className="sblock">
                   <h2>{t('Densidade', 'Density')}</h2>
@@ -1214,7 +1244,8 @@ export function SettingsPage(p: PanelProps) {
                         await p.refresh();
                         const current = (await p.workspaceChanged()).find(workspace => workspace.id === p.workspace.id);
                         if (!current) throw { code: 'not_found' };
-                        setWorkspace({ name: current.name, slug: current.slug, color: current.color });
+                        setWorkspace({ name: current.name, slug: current.slug, color: current.color, logoPath: current.logoPath ?? null });
+                        setLogoDraft(undefined);
                         setWorkspaceVersion(current.version);
                       })
                     }

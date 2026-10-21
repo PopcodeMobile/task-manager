@@ -32,10 +32,12 @@ At `/`, sign in when cloud is configured or select **Continue on this device** f
 - `src/components/ui/`: shadcn/Radix primitives; native labels, focus behavior and semantic token classes.
 - `src/domain/`: typed operation contracts. `src/workspace/normalized.ts` sends human JWT RPCs with CAS/idempotency; `local-panel-repository.ts` exposes the same panel contract over device persistence.
 - `src/styles/tokens.css`, `src/core/design-tokens.js`: public token definitions and tooling inventory. Shared calendar, seed, local mutations and locale modules remain live; the old HTML renderer, global store, delegated actions and cloud snapshot writer are retired.
-- `supabase/functions/`, `supabase/migrations/`: shared authorization/operations, API, MCP and webhook worker; additive normalized migrations through `202610200008`.
+- `supabase/functions/`, `supabase/migrations/`: shared authorization/operations, API, MCP and webhook worker; additive normalized migrations through `202610210010`.
 - `tests/fixtures/legacy-workspace-*`: historical compatibility fixtures only. They are outside the frontend import closure and are not the current React lifecycle proof.
 
-Use React escaping for literal user content and DOMPurify only for explicitly supported rich content. Keep operations scoped to workspace, use authoritative versions, preserve drafts on failures and follow every cursor. Project privacy, byte uploads and actual invitations require separate contracts.
+Use React escaping for literal user content and DOMPurify only for explicitly supported rich content. Keep operations scoped to workspace, use authoritative versions, preserve drafts on failures and follow every cursor. Project privacy, task attachment byte uploads and actual invitations require separate contracts.
+
+Appearance supports custom HEX accents, saved per identity on this device with readable theme variants. Organization owners/admins can upload PNG/JPG/WebP logos up to 2 MB, preview, then save or remove them. Cloud logos are normalized to WebP thumbnails in the private `organization-logos` Storage bucket. Members read images with their current authenticated session; the workspace stores only a scoped `logoPath`. Local demonstrations instead persist a bounded WebP `logoDataUrl` command, which the cloud API rejects. See [branding verification](docs/verification/agent-platform/branding-2026-10-21.md).
 
 The [design-system guide](docs/design-system.md) describes token policy. `check:tokens` audits authored CSS plus JS/TS/JSX/TSX styles and static `cn`/`cva` utility sources; semantic aliases must resolve to declared foundation variables. Dynamic geometry and validated domain colors remain runtime data. No component directory is exempt.
 
@@ -43,4 +45,4 @@ The [design-system guide](docs/design-system.md) describes token policy. `check:
 
 `vercel.json` builds Vite, serves `dist/` and rewrites SPA routes to `/index.html`. Only public Supabase URL/publishable keys belong in frontend build variables. Private provisioning/worker/consumer secrets stay outside Git and frontend bundles.
 
-The dedicated hosted backend has separately recorded API/MCP proof. Final frontend publication, production Auth URLs/CORS, real Hermes acceptance and two actual Claude-user connections remain activation gates. Local cloud-mode browser proof uses real local Auth/DB; it is not hosted frontend proof. See [verification](docs/verification.md), [architecture](docs/superpowers/specs/2026-10-20-agent-platform-design.md) and [Hermes setup](docs/hermes-integration.md).
+The panel is published on [Vercel](https://task-manager-chi-eight-19.vercel.app), with production Auth URLs/CORS configured. The dedicated hosted backend has separately recorded API/MCP proof. Real Hermes acceptance, two actual Claude-user connections and the remaining Task7 retention/recovery checks are still activation gates; the webhook scheduler stays off. Local cloud-mode browser proof uses real local Auth/DB; it is not hosted frontend proof. See [verification](docs/verification.md), [architecture](docs/superpowers/specs/2026-10-20-agent-platform-design.md) and [Hermes setup](docs/hermes-integration.md).
