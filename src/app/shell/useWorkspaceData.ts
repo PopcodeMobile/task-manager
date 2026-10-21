@@ -1,12 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Task, Project, UserPreferences } from '../../domain/contracts';
+import type { Task, Project, UserPreferences, Label, TaskLabel, TaskDependency, Subtask } from '../../domain/contracts';
 import { eventCursor, type Agent, type DomainEvent, type Member } from '../../workspace/normalized';
 import type { WorkspaceRepository } from '../../workspace/repository';
 import type { Translate } from '../auth/ConsentPage';
 import type { Execute } from '../projects/ProjectsPage';
 import { errorMessage } from './messages';
-type Snapshot = { tasks: Task[]; projects: Project[]; agents: Agent[]; members: Member[]; events: DomainEvent[]; preferences: UserPreferences['preferences'] };
+export type TaskGraph = { labels: Label[]; taskLabels: TaskLabel[]; dependencies: TaskDependency[]; subtasks: Subtask[]; events: DomainEvent[] };
+type Snapshot = {
+  labels: Label[];
+  taskLabels: TaskLabel[];
+  dependencies: TaskDependency[];
+  subtasks: Subtask[];
+  tasks: Task[];
+  projects: Project[];
+  agents: Agent[];
+  members: Member[];
+  events: DomainEvent[];
+  preferences: UserPreferences['preferences'];
+};
 export const emptySnapshot: Snapshot = {
+  labels: [],
+  taskLabels: [],
+  dependencies: [],
+  subtasks: [],
   tasks: [],
   projects: [],
   agents: [],
@@ -26,21 +42,37 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
     refreshSerial = useRef(0),
     idempotency = useRef(new Map<string, string>());
   const refresh = useCallback(
-    async (initial = false) => {
+    async (initial = false, operations: string[] = []) => {
       const serial = ++refreshSerial.current;
       try {
         // Capture the event boundary BEFORE reading mutable rows. Later commits remain visible to polling.
         const events = initial ? await repo.list<DomainEvent>('list_domain_events', {}, true) : null;
-        const [tasks, projects, agents, members, preferences] = await Promise.all([
+        const [tasks, projects, agents, members, preferences, labels, taskLabels, dependencies, subtasks] = await Promise.all([
           repo.list<Task>('list_tasks', {}, true),
           repo.list<Project>('list_projects', {}, true),
           repo.list<Agent>('list_agents', {}, true),
           initial ? repo.rpc<Member[]>('list_workspace_members', { p_workspace_id: repo.workspaceId }) : Promise.resolve(null),
           initial ? repo.preferences() : Promise.resolve(null),
+          initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
+            ? repo.list<Label>('list_labels', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
+            ? repo.list<TaskLabel>('list_task_labels', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /dependency$|delete_project|delete_task/.test(op))
+            ? repo.list<TaskDependency>('list_dependencies', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /subtask$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
+            ? repo.list<Subtask>('list_subtasks', {}, true)
+            : Promise.resolve(null),
         ]);
         if (repo.controller.signal.aborted || serial !== refreshSerial.current) return;
         setSnapshot(old => ({
           tasks,
+          labels: labels ?? old.labels,
+          taskLabels: taskLabels ?? old.taskLabels,
+          dependencies: dependencies ?? old.dependencies,
+          subtasks: subtasks ?? old.subtasks,
           projects,
           agents,
           events: events ?? old.events,
@@ -87,7 +119,13 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
           if (!alive) return;
           if (events.length) {
             setSnapshot(old => ({ ...old, events: [...new Map([...old.events, ...events].map(e => [e.id, e])).values()] }));
-            if (await refresh()) eventWatermark.current = eventCursor(events.at(-1)!);
+            if (
+              await refresh(
+                false,
+                events.map(event => event.operation),
+              )
+            )
+              eventWatermark.current = eventCursor(events.at(-1)!);
           }
         }
       } catch (err) {
@@ -123,7 +161,14 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
     } catch (err) {
       if (!repo.controller.signal.aborted) setError(errorMessage(err, t));
     }
-    const updated = await refresh();
+    // The command is authoritative even if its subsequent event read failed.
+    const operations = [operation, ...events.map(event => event.operation)];
+    if (operation === 'batch' && Array.isArray(input.commands)) {
+      for (const child of input.commands) {
+        if (child && typeof child === 'object' && 'operation' in child && typeof child.operation === 'string') operations.push(child.operation);
+      }
+    }
+    const updated = await refresh(false, operations);
     if (events.length && !repo.controller.signal.aborted) {
       setSnapshot(old => ({ ...old, events: [...new Map([...old.events, ...events].map(e => [e.id, e])).values()] }));
       if (updated) eventWatermark.current = eventCursor(events.at(-1)!);
@@ -131,5 +176,77 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
     return result.data;
   };
 
-  return { snapshot, snapshotScope, loading, error, setError, revision, search, setSearch, refresh, execute };
+  async function toggleFavorite(taskId: string) {
+    const preferences = await repo.preferences();
+    const next = {
+      ...preferences,
+      favoriteTaskIds: preferences.favoriteTaskIds.includes(taskId)
+        ? preferences.favoriteTaskIds.filter(id => id !== taskId)
+        : [...preferences.favoriteTaskIds, taskId],
+    };
+    if (repo.mode === 'local' && repo.savePersonal) await repo.savePersonal({ preferences: { favoriteTaskIds: next.favoriteTaskIds } });
+    else await execute('set_preferences', { preferences: { favoriteTaskIds: next.favoriteTaskIds } });
+    if (!repo.controller.signal.aborted) setSnapshot(old => ({ ...old, preferences: next }));
+  }
+  return { snapshot, snapshotScope, loading, error, setError, revision, search, setSearch, refresh, execute, toggleFavorite };
+}
+
+export function useTaskDetails(repo: WorkspaceRepository, taskId: string | undefined, revision: number, t: Translate, graph: TaskGraph) {
+  const [details, setDetails] = useState<{
+    comments: import('../../domain/contracts').Comment[];
+    files: import('../../domain/contracts').FileMetadata[];
+    attachments: import('../../domain/contracts').TaskAttachment[];
+    reactions: import('../../domain/contracts').CommentReaction[];
+    history: import('../../domain/contracts').ActivityEntry[];
+    actorId: string | null;
+  }>({
+    comments: [],
+    files: [],
+    attachments: [],
+    reactions: [],
+    history: [],
+    actorId: null,
+  });
+  const [error, setError] = useState(''),
+    [loading, setLoading] = useState(true),
+    [attempt, retry] = useState(0);
+  useEffect(() => {
+    if (!taskId) return;
+    let alive = true;
+    setLoading(true);
+    void Promise.all([
+      repo.list<import('../../domain/contracts').Comment>('list_comments', { taskId }, true),
+      repo.list<import('../../domain/contracts').FileMetadata>('list_files', {}, true),
+      repo.list<import('../../domain/contracts').TaskAttachment>('list_attachments', {}, true),
+      repo.list<import('../../domain/contracts').CommentReaction>('list_reactions', {}, true),
+      repo.list<import('../../domain/contracts').ActivityEntry>('list_activity', { taskId }, true),
+      repo.mode === 'local' ? repo.rpc<{ currentMemberId: string }>('get_local_actor').then(r => r.currentMemberId) : Promise.resolve(repo.userId),
+    ])
+      .then(([comments, files, attachments, reactions, history, actorId]) => {
+        if (alive && !repo.controller.signal.aborted) {
+          setDetails({ comments, files, attachments, reactions, history, actorId });
+          setError('');
+        }
+      })
+      .catch(err => {
+        if (alive && !repo.controller.signal.aborted) setError(errorMessage(err, t));
+      })
+      .finally(() => {
+        if (alive && !repo.controller.signal.aborted) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [repo, taskId, revision, t, attempt]);
+  return {
+    ...details,
+    subtasks: graph.subtasks.filter(s => s.taskId === taskId),
+    dependencies: graph.dependencies,
+    labels: graph.labels,
+    links: graph.taskLabels.filter(l => l.taskId === taskId),
+    events: graph.events.filter(event => event.entityId === taskId || event.payload?.taskId === taskId),
+    error,
+    loading,
+    retry: () => retry(value => value + 1),
+  };
 }

@@ -18,6 +18,7 @@ export function mutateSubtask({ data, find, cas, bump, dto, initialize }, operat
     } else if (!row) fail('not_found');
     if (operation === 'delete_subtask') task.subtasks = task.subtasks.filter(s => s.id !== row.id);
     else patchLocal(row, input);
+    if (operation === 'update_subtask') bump('subtask', row);
     bump('task', task);
     return dto('subtask', { ...row, taskId: task.id });
   }

@@ -150,6 +150,10 @@ export function bulkCommands(tasks: Task[], operation: string, input: Record<str
         { operation: 'complete_task', input: { id: t.id }, expectedVersion: t.version + (Object.keys(patch).length ? 1 : 0) },
       ];
     }
+    if (operation === 'update_subtask') {
+      if (typeof input.id !== 'string' || input.taskId !== t.id) throw new RepositoryError('validation_error');
+      return [{ operation, input, expectedVersion: t.version }];
+    }
     if (operation === 'complete_task' && t.status === 'done') return [];
     return [{ operation, input: { ...input, id: t.id }, expectedVersion: t.version }];
   });

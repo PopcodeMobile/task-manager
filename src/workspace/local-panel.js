@@ -1,11 +1,12 @@
 // @ts-check
 import { RepositoryError } from './normalized.ts';
-import { localDTO, localWorkspaceDTO, entityVersion } from './local-dto.js';
+import { localDTO, localWorkspaceDTO, entityVersion, localFiles } from './local-dto.js';
 import { localCommandRules as commandRules } from './local-command-rules.js';
 import { mutateTask } from './local-mutations/tasks.js';
 import { mutateProject } from './local-mutations/projects.js';
-import { mutateComment } from './local-mutations/comments.js';
+import { mutateComment, assertCommentReplay } from './local-mutations/comments.js';
 import { mutateSubtask } from './local-mutations/subtasks.js';
+import { mutateTaskDetails } from './local-mutations/task-details.js';
 import { mutateDependency } from './local-mutations/dependencies.js';
 /** @param {string} code @returns {never} */
 const fail = code => {
@@ -90,7 +91,12 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
         value = { ...value, ...latest, prefs: { ...value.prefs, ...latest.prefs }, views: { ...value.views, ...latest.views } };
         writePersonal(storage, identity, value);
       }
-      return { ...value, prefs: value.prefs ?? {}, views: value.views?.[/** @type {string} */ (workspaceId)] ?? {} };
+      return {
+        ...value,
+        prefs: value.prefs ?? {},
+        views: value.views?.[/** @type {string} */ (workspaceId)] ?? {},
+        preferences: value.preferences?.[/** @type {string} */ (workspaceId)] ?? emptyPreferences(),
+      };
     });
   }
   /** @param {Partial<import('./repository').PersonalState>} patch */
@@ -98,7 +104,15 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     return guarded(async () => {
       await personal();
       const previous = readPersonal(storage, identity);
-      const next = { ...previous, ...patch, prefs: { ...previous.prefs, ...patch.prefs }, views: { ...previous.views } };
+      const next = {
+        ...previous,
+        prefs: { ...previous.prefs, ...patch.prefs },
+        views: { ...previous.views },
+        ...(patch.collapsed === undefined ? {} : { collapsed: patch.collapsed }),
+        ...(patch.activeWorkspace === undefined ? {} : { activeWorkspace: patch.activeWorkspace }),
+      };
+      if (workspaceId && patch.preferences)
+        next.preferences = { ...previous.preferences, [workspaceId]: { ...emptyPreferences(), ...previous.preferences?.[workspaceId], ...patch.preferences } };
       if (workspaceId && patch.views) next.views[workspaceId] = patch.views;
       writePersonal(storage, identity, next);
     });
@@ -111,6 +125,8 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     const record = await persistence.loadPanel(workspaceId);
     /** @type {Record<string, any> & {tasks: any[], members?: any[], comments?: any[], projects: any[], _panel: import('./local-panel-types').LocalPanelBookkeeping}} */
     const data = { ...record.data, _panel: panelState(record) };
+    if (operation === 'list_task_activity')
+      return data._panel.events.filter(event => event.entityId === query.taskId || event.payload?.taskId === query.taskId);
     if (operation === 'list_agents') return [];
     if (operation === 'list_domain_events') {
       let events = data._panel?.events ?? [];
@@ -122,6 +138,12 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     }
     if (operation === 'list_members')
       return (data.members ?? []).map(m => ({ user_id: m.id, name: m.name, email: m.email, role: String(m.role).toLowerCase() }));
+    if (operation === 'list_labels') {
+      const labels = new Map((data.labels ?? []).map((/** @type {any} */ label) => [label.id, label]));
+      for (const task of data.tasks) for (const id of task.labels ?? []) if (!labels.has(id)) labels.set(id, { id, name: id });
+      return [...labels.values()].map(label => localDTO(data, workspaceId, 'label', label));
+    }
+    if (operation === 'list_files') return localFiles(data).map(file => localDTO(data, workspaceId, 'file', file));
     if (operation === 'list_subtasks')
       return data.tasks.flatMap(t => (t.subtasks ?? []).map(/** @param {any} s */ s => localDTO(data, workspaceId, 'subtask', { ...s, taskId: t.id })));
     if (operation === 'list_dependencies')
@@ -143,8 +165,18 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
           (row.members ?? []).map(/** @param {string} userId */ userId => ({ workspaceId, [team ? 'teamId' : 'projectId']: row.id, userId })),
       );
     }
-    if (operation === 'list_notifications' || operation === 'list_activity' || operation === 'list_task_activity')
-      return structuredClone(data[operation === 'list_notifications' ? 'notifs' : 'activity'] ?? []);
+    if (operation === 'list_activity')
+      return (data.activity ?? []).map((/** @type {any} */ row) => ({
+        id: row.id,
+        workspaceId,
+        projectId: row.project ?? null,
+        taskId: row.task ?? null,
+        actorUserId: row.by ?? null,
+        verb: row.verb,
+        createdAt: typeof row.at === 'number' ? new Date(row.at).toISOString() : row.at,
+        legacyMetadata: structuredClone(row),
+      }));
+    if (operation === 'list_notifications') return structuredClone(data[operation === 'list_notifications' ? 'notifs' : 'activity'] ?? []);
     const kind = Object.keys(collections).find(k => `list_${k === 'calendar_event' ? 'calendar_events' : k === 'view' ? 'views' : `${k}s`}` === operation);
     if (!kind) fail('validation_error');
     return (data[collections[kind]] ?? []).map(/** @param {any} row */ row => localDTO(data, workspaceId, kind, row));
@@ -170,7 +202,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
     },
     async preferences() {
       const value = await personal();
-      return { ...emptyPreferences(), ...value.preferences?.[/** @type {string} */ (workspaceId)] };
+      return { ...emptyPreferences(), ...value.preferences };
     },
     async list(operation, query = {}) {
       return guarded(async () => {
@@ -178,7 +210,7 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
         return structuredClone(
           values.filter(
             row =>
-              (!query.taskId || row.taskId === query.taskId || row.task === query.taskId) &&
+              (!query.taskId || operation === 'list_task_activity' || row.taskId === query.taskId || row.task === query.taskId) &&
               (!query.projectId || row.projectId === query.projectId || row.project === query.projectId),
           ),
         );
@@ -194,6 +226,12 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
       return { items, nextCursor: null };
     },
     async rpc(name, args = {}) {
+      if (name === 'get_local_actor')
+        return guarded(async () => {
+          const { data } = await persistence.loadPanel(workspaceId);
+          if (typeof data.me !== 'string' || !data.members?.some((/** @type {{id: string}} */ member) => member.id === data.me)) fail('not_found');
+          return { currentMemberId: data.me };
+        });
       if (name === 'list_workspace_members') return adapter.list('list_members');
       if (name === 'create_workspace_v2')
         return guarded(async () => ({
@@ -226,6 +264,10 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
             const previous = panel.requests[requestKey];
             if (previous) {
               if (previous.signature !== signature) fail('idempotency_conflict');
+              if (operation === 'batch' && Array.isArray(command.input.commands)) {
+                const cached = /** @type {{results?: {data: unknown}[]}} */ (previous.result.data);
+                command.input.commands.forEach((child, index) => assertCommentReplay(data, child.operation, cached.results?.[index]?.data));
+              } else assertCommentReplay(data, operation, previous.result.data);
               return { changed: false, value: previous.result };
             }
             if (!command.idempotencyKey) fail('validation_error');
@@ -237,11 +279,12 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
               value = {
                 results: command.input.commands.map(c => {
                   if (c.operation === 'batch') fail('validation_error');
-                  return { data: apply(c.operation, c.input, c.expectedVersion), eventId: appendEvent(data, c.operation, c.input) };
+                  const dataResult = apply(c.operation, c.input, c.expectedVersion);
+                  return { data: dataResult, eventId: appendEvent(data, c.operation, c.input, dataResult) };
                 }),
               };
             } else value = apply(operation, command.input, command.expectedVersion);
-            const result = { data: value, eventId: appendEvent(data, operation, command.input), requestId: command.idempotencyKey };
+            const result = { data: value, eventId: appendEvent(data, operation, command.input, value), requestId: command.idempotencyKey };
             panel.requests[requestKey] = { signature, result };
             panel.storageRevision = revision + 1;
             return { changed: true, value: result };
@@ -255,8 +298,8 @@ export function createLocalPanelAdapter({ persistence, workspaceId, storage, ide
   };
   return adapter;
 }
-/** @param {any} data @param {string} operation @param {Record<string, unknown>} input */
-function appendEvent(data, operation, input) {
+/** @param {any} data @param {string} operation @param {Record<string, unknown>} input @param {any} result */
+function appendEvent(data, operation, input, result) {
   const events = data._panel.events;
   const createdAt = new Date(Math.max(Date.now(), events.length ? Date.parse(events.at(-1).createdAt) + 1 : 0)).toISOString();
   const id = crypto.randomUUID();
@@ -267,7 +310,14 @@ function appendEvent(data, operation, input) {
     actorUserId: data.me,
     actorAgentId: null,
     createdAt,
-    payload: { taskId: input.taskId ?? (operation.includes('task') ? input.id : undefined), projectId: input.projectId },
+    payload: {
+      taskId:
+        input.taskId ??
+        result?.taskId ??
+        data.comments?.find((/** @type {any} */ c) => c.id === input.commentId)?.task ??
+        (operation.includes('task') ? input.id : undefined),
+      projectId: input.projectId,
+    },
   });
   return id;
 }
@@ -276,7 +326,11 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
   if (/claim|intervene|executor|webhook|connection/.test(operation)) fail('cloud_required');
   validateLocalInput(data, operation, input);
   /** @param {string} kind @param {string} id */
-  const find = (kind, id) => (data[collections[kind]] ?? []).find(/** @param {any} row */ row => row.id === id) ?? fail('not_found');
+  const find = (kind, id) =>
+    (data[collections[kind]] ?? []).find(/** @param {any} row */ row => row.id === id) ??
+    (kind === 'file' ? localFiles(data).find(file => file.id === id) : null) ??
+    (kind === 'label' && data.tasks.some((/** @type {any} */ task) => (task.labels ?? []).includes(id)) ? { id, name: id } : null) ??
+    fail('not_found');
   /** @param {string} kind @param {any} row */
   const cas = (kind, row) => {
     if (expectedVersion !== entityVersion(data, kind, row.id)) fail('version_conflict');
@@ -318,9 +372,11 @@ function mutate(data, workspaceId, operation, input, expectedVersion) {
     return mutateTask(context, operation, input);
   if (['create_project', 'update_project', 'delete_project', 'archive_project', 'restore_project'].includes(operation))
     return mutateProject(context, operation, input);
-  if (operation === 'add_task_comment' || operation === 'delete_comment') return mutateComment(context, operation, input);
+  if (['add_task_comment', 'delete_comment', 'add_reaction', 'remove_reaction'].includes(operation)) return mutateComment(context, operation, input);
   if (['create_subtask', 'update_subtask', 'delete_subtask'].includes(operation)) return mutateSubtask(context, operation, input);
   if (operation === 'set_task_dependency' || operation === 'remove_task_dependency') return mutateDependency(context, operation, input);
+  if (/^(set|remove)_task_(label|attachment)$/.test(operation) || /^(create|update|delete)_(label|file)$/.test(operation))
+    return mutateTaskDetails(context, operation, input);
   fail('validation_error');
 }
 /** @param {any} data @param {string} operation @param {Record<string, any>} input */
@@ -357,14 +413,39 @@ function validateLocalInput(data, operation, input) {
       Object.keys(input.attributes).some(key => !allowed.includes(key))
     )
       fail('validation_error');
+    if (operation.endsWith('subtask'))
+      for (const [key, value] of Object.entries(input.attributes)) {
+        if (value !== null && (typeof value !== 'string' || value.length > (key === 'note' ? 20000 : 128))) fail('validation_error');
+        if (
+          key === 'due' &&
+          value &&
+          (typeof value !== 'string' ||
+            !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
+            Number.isNaN(Date.parse(value)) ||
+            new Date(value).toISOString().slice(0, 10) !== value)
+        )
+          fail('validation_error');
+      }
   }
   for (const [key, value] of Object.entries(input)) {
     if (value == null) {
-      if (!['assigneeUserId', 'recurrence', 'dueDate', 'startDate', 'teamId', 'leadUserId'].includes(key)) fail('validation_error');
+      if (
+        ![
+          'assigneeUserId',
+          'recurrence',
+          'dueDate',
+          'startDate',
+          'teamId',
+          'leadUserId',
+          'sizeLabel',
+          ...(/_file$/.test(operation) ? ['taskId', 'projectId'] : []),
+        ].includes(key)
+      )
+        fail('validation_error');
       continue;
     }
     if (
-      ['id', 'projectId', 'taskId', 'dependsOnTaskId', 'teamId'].includes(key) &&
+      ['id', 'projectId', 'taskId', 'dependsOnTaskId', 'teamId', 'labelId', 'fileId', 'commentId'].includes(key) &&
       (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value))
     )
       fail('validation_error');
@@ -391,6 +472,10 @@ function validateLocalInput(data, operation, input) {
       !(operation.endsWith('project') ? ['planning', 'active', 'risk', 'hold', 'complete'] : ['backlog', 'todo', 'progress', 'review', 'done']).includes(value)
     )
       fail('validation_error');
+    if (key === 'reaction' && (typeof value !== 'string' || !/^[\p{Extended_Pictographic}\p{Emoji_Modifier}\uFE0F\u200D]+$/u.test(value) || value.length > 32))
+      fail('validation_error');
+    if (key === 'fileType' && !['fig', 'pdf', 'zip', 'img', 'sheet', 'doc', 'code', 'other'].includes(value)) fail('validation_error');
+    if (key === 'sizeLabel' && (typeof value !== 'string' || value.length > 120)) fail('validation_error');
     if (key === 'priority' && !['none', 'low', 'medium', 'high', 'urgent'].includes(value)) fail('validation_error');
     if (key === 'recurrence' && !['Daily', 'Weekly', 'Every 2 weeks', 'Monthly'].includes(value)) fail('validation_error');
   }
@@ -403,11 +488,18 @@ function panelState(record) {
   const panel = structuredClone(record.reactPanel ?? { versions: {}, events: [], requests: {}, storageRevision: record.revision });
   const drift = Math.max(0, record.revision - panel.storageRevision);
   for (const [kind, collection] of Object.entries(/** @type {Record<string, string | null>} */ ({ ...collections, subtask: null }))) {
-    const rows =
+    let rows =
       kind === 'subtask'
         ? record.data.tasks.flatMap(/** @param {any} task */ task => task.subtasks ?? [])
         : (record.data[/** @type {string} */ (collection)] ?? []);
+    // Embedded files and referenced labels are canonical records before materialization.
+    if (kind === 'file') rows = localFiles(record.data);
+    if (kind === 'label')
+      rows = [...rows, ...record.data.tasks.flatMap((/** @type {any} */ task) => (task.labels ?? []).map((/** @type {string} */ id) => ({ id })))];
+    const seen = new Set();
     for (const row of rows) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
       panel.versions[`${kind}:${row.id}`] = (panel.versions[`${kind}:${row.id}`] ?? panel.storageRevision + 1) + drift;
     }
   }

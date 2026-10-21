@@ -9,7 +9,7 @@ import { prepareTaskAction } from './task-view-model';
 import { coreTaskLabels } from './TaskCoreActions';
 import { errorMessage } from '../shell/messages';
 /**6b2 may append real graph/favorite/copy-link items through this seam. */
-export type ExtraTaskMenuAction = { id: string; label: string; disabled?: boolean; run: (task: Task) => void };
+export type ExtraTaskMenuAction = { id: string; label: string; disabled?: boolean; personal?: boolean; run: (task: Task) => void };
 export function TaskContextMenu({
   task,
   projects,
@@ -155,7 +155,6 @@ export function TaskContextMenu({
           </div>
           <div role="separator" />
           {item(task.archived ? labels.restore_task : labels.archive_task, () => void run(task.archived ? 'restore_task' : 'archive_task'))}
-          {item(labels.delete_task, () => setConfirm(true))}
           {extraActions.map(action => (
             <div key={action.id}>
               {item(
@@ -164,10 +163,11 @@ export function TaskContextMenu({
                   close(false);
                   action.run(task);
                 },
-                locked || !!action.disabled,
+                (action.personal ? busy : locked) || !!action.disabled,
               )}
             </div>
           ))}
+          {item(labels.delete_task, () => setConfirm(true))}
           {active && (
             <p className="permission-note">
               {t('Retome o controle humano nos detalhes antes de alterar esta tarefa.', 'Resume human control in task details before changing this task.')}

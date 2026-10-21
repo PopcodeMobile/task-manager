@@ -38,7 +38,7 @@ test('the actual local adapter exposes concrete public result structures', t => 
   }
 });
 test('TypeScript rejects a numeric event ID produced by the actual local command', t => {
-  const source = replace('eventId: appendEvent(data, operation, command.input)', 'eventId: 123');
+  const source = replace('eventId: appendEvent(data, operation, command.input, value)', 'eventId: 123');
   const { diagnostics } = compile(source);
   const error = diagnostics.find(d => d.file?.fileName === target && /number.*string/s.test(ts.flattenDiagnosticMessageText(d.messageText, ' ')));
   assert.ok(error, 'actual command envelope must be checked in its source');

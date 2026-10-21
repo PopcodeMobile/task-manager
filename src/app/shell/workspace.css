@@ -901,3 +901,55 @@
 .task-title-cell .task-title {
   width: 100%;
 }
+
+.task-label-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-block: var(--s-2);
+}
+.task-label-choices label,
+.task-cell-details label {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  overflow-wrap: anywhere;
+}
+.task-cell-details {
+  white-space: normal;
+  max-width: 100%;
+}
+.task-cell-details[open] {
+  min-width: 10rem;
+}
+.task-cell-details summary {
+  cursor: pointer;
+}
+.task-cell-details label {
+  padding-block: var(--s-1);
+}
+.subtask-editor {
+  border: 1px solid var(--border);
+  padding: var(--s-3);
+  border-radius: var(--r);
+}
+.attachment-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-2);
+  align-items: center;
+}
+.attachment-row strong,
+.attachment-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.comment-reactions,
+.mention-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+}
+.comment-reactions [aria-pressed='true'] {
+  outline: 1px solid var(--accent);
+}

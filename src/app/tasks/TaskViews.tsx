@@ -1,7 +1,7 @@
 import { iso, addD } from '../../core/calendar.js';
 import { useEffect, useMemo, useState } from 'react';
 import { List, Columns3, Table2, Plus, GripVertical } from 'lucide-react';
-import type { Task, Project, Json, BatchCommand } from '../../domain/contracts';
+import type { Task, Project, Json, BatchCommand, Label, TaskLabel, TaskDependency, Subtask } from '../../domain/contracts';
 import type { Agent, Member } from '../../workspace/normalized';
 import type { WorkspaceRepository } from '../../workspace/repository';
 import type { Translate } from '../auth/ConsentPage';
@@ -37,6 +37,7 @@ import {
 import { statusLabel, priorityLabel } from './TaskList';
 export type TaskViewsProps = {
   tasks: Task[];
+  graph?: { labels: Label[]; taskLabels: TaskLabel[]; dependencies: TaskDependency[]; subtasks: Subtask[] };
   projects: Project[];
   agents: Agent[];
   members: Member[];
@@ -56,7 +57,21 @@ export type TaskViewsProps = {
   extraTaskMenuActions?: ExtraTaskMenuAction[];
 };
 export function TaskViews(props: TaskViewsProps) {
-  const { tasks, projects, members, t, repo, execute, board, table, open, projectId } = props;
+  const { projects, members, t, repo, execute, board, table, open, projectId } = props;
+  const tasks = useMemo(
+    () =>
+      props.graph
+        ? props.tasks.map(task => ({
+            ...task,
+            legacyMetadata: {
+              ...task.legacyMetadata,
+              labels: props.graph!.taskLabels.filter(l => l.taskId === task.id).map(l => l.labelId),
+              deps: props.graph!.dependencies.filter(d => d.taskId === task.id).map(d => d.dependsOnTaskId),
+            },
+          }))
+        : props.tasks,
+    [props.tasks, props.graph],
+  );
   const [context, setContext] = useState<{ task: Task; x: number; y: number; trigger: HTMLElement; scope: string } | null>(null);
   const dragScope = useMemo(() => crypto.randomUUID(), [repo]);
   const mode = board ? 'board' : table ? 'table' : 'list',
@@ -256,7 +271,19 @@ export function TaskViews(props: TaskViewsProps) {
     },
   });
   const cell = (task: Task, column: Column) => (
-    <TaskCell task={task} column={column} projects={projects} members={members} agents={props.agents} t={t} open={open} edit={edit} disabled={disabled(task)} />
+    <TaskCell
+      task={task}
+      column={column}
+      projects={projects}
+      members={members}
+      agents={props.agents}
+      t={t}
+      open={open}
+      edit={edit}
+      disabled={disabled(task)}
+      graph={props.graph}
+      tasks={tasks}
+    />
   );
   if (!ready)
     return loadFailed ? (

@@ -47,7 +47,9 @@ async function fixture(page: Page) {
     conflict = false,
     offline = false,
     late = false,
-    writeOffline = false;
+    writeOffline = false,
+    eventOffline = false;
+  const taskLabels: Record<string, unknown>[] = [];
   let reachedLate = () => {},
     releaseLate = () => {},
     finishedLate = () => {};
@@ -63,6 +65,7 @@ async function fixture(page: Page) {
     const name = route.request().url().split('/').pop(),
       body = route.request().postDataJSON() ?? {},
       op = body.p_operation;
+    if (eventOffline && op === 'list_domain_events') return route.abort('failed');
     if (offline && op === 'list_tasks') return route.abort('failed');
     const delayed = late && body.p_workspace_id === other && op === 'list_tasks';
     if (delayed) {
@@ -99,6 +102,10 @@ async function fixture(page: Page) {
       if (op === 'add_task_comment') {
         data = { ...input, id: 'comment-1', authorUserId: userId, version: 1, createdAt: '2026-10-20T00:00:00Z' };
         comments.push(data);
+      }
+      if (op === 'set_task_label') {
+        taskLabels.push({ taskId: input.id, labelId: input.labelId });
+        tasks = tasks.map(t => (t.id === input.id ? { ...t, version: Number(t.version) + 1 } : t));
       }
       if (op === 'delete_comment') comments = comments.filter(c => c.id !== input.id);
       if (op === 'delete_task') tasks = tasks.filter(t => t.id !== input.id);
@@ -146,6 +153,8 @@ async function fixture(page: Page) {
         nextCursor: null,
       };
     if (op === 'get_task') data = { data: tasks.find(t => t.id === body.p_query.id) };
+    if (op === 'list_labels') data = { items: [{ id: 'detail-label', name: 'Recovered label', version: 1 }], nextCursor: null };
+    if (op === 'list_task_labels') data = { items: taskLabels, nextCursor: null };
     if (op === 'list_comments') data = { items: comments, nextCursor: null };
     if (op === 'list_agents') data = { items: [{ id: 'agent-1', name: 'Assistente de produto', authUserId: userId, clientId: 'client-1' }], nextCursor: null };
     if (op === 'list_domain_events' || op === 'list_task_activity') data = { items: body.p_query?.cursor ? [] : events, nextCursor: null };
@@ -159,6 +168,9 @@ async function fixture(page: Page) {
   });
   return {
     commands,
+    eventOffline: (value: boolean) => {
+      eventOffline = value;
+    },
     writeOffline: (value: boolean) => {
       writeOffline = value;
     },
@@ -715,6 +727,19 @@ test('actual OAuth MCP agent write reaches already-open task and agent activity 
     expect(!!changed.isError).toBeFalsy();
     await expect(page.getByText('Alterada pelo MCP real', { exact: true })).toBeVisible({ timeout: 18000 });
     await page.screenshot({ path: '/tmp/task5-r1-real-mcp-task.png', fullPage: true });
+    await page.getByRole('button', { name: /Alterada pelo MCP real/ }).click();
+    await expect(page.getByLabel('Comentário', { exact: true })).toBeEnabled();
+    const discussion = await mcp.callTool({
+      name: 'add_task_comment',
+      arguments: {
+        workspace_id: ws,
+        idempotency_key: crypto.randomUUID(),
+        input: { taskId: task.id, body: 'Comentário externo pelo MCP real' },
+      },
+    });
+    expect(!!discussion.isError).toBeFalsy();
+    await expect(page.locator('article.comment .rich-content').filter({ hasText: 'Comentário externo pelo MCP real' })).toBeVisible({ timeout: 18000 });
+    await page.getByRole('button', { name: 'Fechar painel', exact: true }).click();
     await page.getByRole('link', { name: 'Atividade', exact: true }).click();
     await expect(page.getByText('Agente alterou a tarefa', { exact: false })).toBeVisible({ timeout: 1500 });
     expect(navigations).toBe(0);
@@ -788,26 +813,30 @@ test('actual cloud task views follow cursors, keep atomic CAS/claim guards and r
   const service = createClient(base, process.env.TEST_SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } }),
     human = createClient(base, key, { auth: { persistSession: false, autoRefreshToken: false } }),
     executor = createClient(base, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const builder = createClient(base, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const suffix = crypto.randomUUID(),
     email = `task6b1-${suffix}@example.test`,
     agentEmail = `task6b1-executor-${suffix}@example.test`,
+    builderEmail = `task6b1-setup-${suffix}@example.test`,
     password = `Task6b1-${crypto.randomUUID()}!`,
     users: string[] = [];
   let ws = '';
   const cleanupErrors: string[] = [];
   try {
-    for (const address of [email, agentEmail]) {
+    for (const address of [email, agentEmail, builderEmail]) {
       const result = await service.auth.admin.createUser({ email: address, password, email_confirm: true });
       expect(!!result.error).toBe(false);
       users.push(result.data.user!.id);
     }
     expect(!!(await human.auth.signInWithPassword({ email, password })).error).toBe(false);
     expect(!!(await executor.auth.signInWithPassword({ email: agentEmail, password })).error).toBe(false);
+    expect(!!(await builder.auth.signInWithPassword({ email: builderEmail, password })).error).toBe(false);
     const made = await human.rpc('create_workspace_v2', { p_name: 'Task views actual', p_slug: `task6b1-${suffix}`, p_idempotency_key: suffix });
     expect(!!made.error).toBe(false);
     ws = made.data.data.id;
     expect(!!(await service.from('workspace_memberships').insert({ workspace_id: ws, user_id: users[1], role: 'member' })).error).toBe(false);
     expect(!!(await service.from('agents').insert({ workspace_id: ws, id: 'views-agent', name: 'Views executor', auth_user_id: users[1] })).error).toBe(false);
+    expect(!!(await service.from('workspace_memberships').insert({ workspace_id: ws, user_id: users[2], role: 'member' })).error).toBe(false);
     const command = async (operation: string, input: Record<string, unknown>, version?: number, client = human) => {
       const result = await client.rpc('execute_operation', {
         p_workspace_id: ws,
@@ -830,8 +859,9 @@ test('actual cloud task views follow cursors, keep atomic CAS/claim guards and r
       operation: 'create_task',
       input: { id: `views-task-${i}`, projectId: project.id, title: `Cloud task ${String(i).padStart(3, '0')}` },
     }));
-    await command('batch', { commands: commands.slice(0, 100) });
-    await command('batch', { commands: commands.slice(100) });
+    // A separate normal JWT actor owns setup cost; the observed human keeps its real 240-unit budget.
+    await command('batch', { commands: commands.slice(0, 100) }, undefined, builder);
+    await command('batch', { commands: commands.slice(100) }, undefined, builder);
     await page.goto(`/app/w/${ws}/tasks`);
     await page.getByLabel('E-mail').fill(email);
     await page.getByLabel('Senha', { exact: true }).fill(password);
@@ -920,6 +950,7 @@ test('actual cloud task views follow cursors, keep atomic CAS/claim guards and r
     }
     await human.auth.signOut();
     await executor.auth.signOut();
+    await builder.auth.signOut();
   }
   if (cleanupErrors.length) throw Error('Fixture cleanup failed: ' + cleanupErrors.join(', '));
 });
@@ -1017,4 +1048,151 @@ test('actual cloud task context menu completes, reopens and respects active rese
     await executor.auth.signOut();
   }
   if (cleanupErrors.length) throw Error('Fixture cleanup failed: ' + cleanupErrors.join(', '));
+});
+
+test('actual cloud details persist canonical relations, personal stars, author reactions and protected claims', async ({ page }) => {
+  const rpcCounts: Record<string, number> = {};
+  page.on('response', response => {
+    if (!response.url().includes('/rest/v1/rpc/')) return;
+    const key = response.url().split('/').pop() + ':' + response.status();
+    rpcCounts[key] = (rpcCounts[key] ?? 0) + 1;
+  });
+  test.skip(!process.env.TEST_SUPABASE_URL || !process.env.TEST_SUPABASE_SERVICE_ROLE_KEY, 'Requires dedicated local Supabase');
+  test.setTimeout(45000);
+  const { createClient } = await import('@supabase/supabase-js');
+  const base = process.env.TEST_SUPABASE_URL!,
+    key = process.env.TEST_SUPABASE_ANON_KEY!;
+  const options = { auth: { persistSession: false, autoRefreshToken: false } };
+  const service = createClient(base, process.env.TEST_SUPABASE_SERVICE_ROLE_KEY!, options),
+    human = createClient(base, key, options),
+    executor = createClient(base, key, options);
+  const suffix = crypto.randomUUID(),
+    email = `details-${suffix}@example.test`,
+    agentEmail = `detail-agent-${suffix}@example.test`,
+    password = `Details-${crypto.randomUUID()}!`,
+    users: string[] = [];
+  let ws = '';
+  const cleanup: string[] = [];
+  try {
+    for (const address of [email, agentEmail]) {
+      const made = await service.auth.admin.createUser({ email: address, password, email_confirm: true });
+      expect(!!made.error).toBe(false);
+      users.push(made.data.user!.id);
+    }
+    expect(!!(await human.auth.signInWithPassword({ email, password })).error).toBe(false);
+    expect(!!(await executor.auth.signInWithPassword({ email: agentEmail, password })).error).toBe(false);
+    const made = await human.rpc('create_workspace_v2', { p_name: 'Details actual', p_slug: `details-${suffix}`, p_idempotency_key: suffix });
+    expect(!!made.error).toBe(false);
+    ws = made.data.data.id;
+    expect(!!(await service.from('workspace_memberships').insert({ workspace_id: ws, user_id: users[1], role: 'member' })).error).toBe(false);
+    expect(!!(await service.from('agents').insert({ workspace_id: ws, id: 'details-agent', name: 'Details executor', auth_user_id: users[1] })).error).toBe(
+      false,
+    );
+    const command = async (operation: string, input: Record<string, unknown>, version?: number, client = human) => {
+      const result = await client.rpc('execute_operation', {
+        p_workspace_id: ws,
+        p_operation: operation,
+        p_command: input,
+        p_expected_version: version ?? null,
+        p_idempotency_key: crypto.randomUUID(),
+      });
+      expect(result.error?.message ?? '').toBe('');
+      return result.data.data;
+    };
+    const read = async (operation: string, query = {}) => {
+      const result = await human.rpc('read_operation', { p_workspace_id: ws, p_operation: operation, p_query: query });
+      expect(result.error?.message ?? '').toBe('');
+      return result.data;
+    };
+    const project = await command('create_project', { name: 'Details project' });
+    const task = await command('create_task', { id: 'details-task', projectId: project.id, title: 'Cloud detail task' });
+    await page.goto(`/app/w/${ws}/tasks`);
+    await page.getByLabel('E-mail').fill(email);
+    await page.getByLabel('Senha', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await page.getByRole('button', { name: task.key + ' Cloud detail task', exact: true }).click();
+    await page.getByLabel('New label', { exact: true }).fill('Cloud label');
+    await page.getByRole('button', { name: 'Create and apply label', exact: true }).click();
+    await expect(page.getByRole('dialog').getByLabel('Label: Cloud label', { exact: true })).toBeChecked();
+    expect((await read('list_task_labels', { taskId: task.id })).items).toHaveLength(1);
+    await page.getByLabel('New subtask', { exact: true }).fill('Cloud child');
+    await page.getByRole('button', { name: 'Add subtask', exact: true }).click();
+    await page.getByRole('button', { name: 'Subtask details: Cloud child', exact: true }).click();
+    await page.getByLabel('Subtask notes', { exact: true }).fill('Canonical notes');
+    await page.getByRole('button', { name: 'Save subtask', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Convert to task', exact: true })).toBeEnabled();
+    expect((await read('list_subtasks', { taskId: task.id })).items[0].legacyMetadata.note).toBe('Canonical notes');
+    await page.getByLabel('Metadata name', { exact: true }).fill('Cloud metadata.pdf');
+    await page.getByRole('button', { name: 'Add metadata', exact: true }).click();
+    await expect(page.getByText('Cloud metadata.pdf', { exact: true })).toBeVisible();
+    expect((await read('list_attachments', { taskId: task.id })).items).toHaveLength(1);
+    await page.getByLabel('Comment', { exact: true }).fill('<b>Cloud discussion</b><img src=x onerror="window.unsafeDetail=1">');
+    await page.getByRole('button', { name: 'Post comment', exact: true }).click();
+    const comment = page.locator('article.comment').filter({ hasText: 'Cloud discussion' });
+    await expect(comment.locator('b')).toHaveText('Cloud discussion');
+    await expect(comment.locator('[onerror]')).toHaveCount(0);
+    await comment.getByRole('button', { name: 'React: 👍', exact: true }).click();
+    await expect(comment.getByRole('button', { name: 'React: 👍', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect((await read('list_reactions')).items[0].userId).toBe(users[0]);
+    await page.getByRole('button', { name: 'Add to favorites', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Remove from favorites', exact: true })).toBeVisible();
+    expect((await read('get_preferences')).data.preferences.favoriteTaskIds).toContain(task.id);
+    await page.reload();
+    await expect(page.getByRole('dialog').getByLabel('Label: Cloud label', { exact: true })).toBeChecked();
+    await page.locator('article.comment').filter({ hasText: 'Cloud discussion' }).getByRole('button', { name: 'Delete comment', exact: true }).click();
+    await expect(page.locator('article.comment')).toHaveCount(0);
+    expect((await read('list_reactions')).items).toHaveLength(0);
+    await page.getByRole('button', { name: 'Subtask details: Cloud child', exact: true }).click();
+    await page.getByRole('button', { name: 'Convert to task', exact: true }).click();
+    await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Cloud child');
+    await expect(page.getByLabel('Description', { exact: true })).toHaveValue('Canonical notes');
+    expect((await read('list_subtasks', { taskId: task.id })).items).toHaveLength(0);
+    const promoted = (await read('list_tasks')).items.find((row: { title: string }) => row.title === 'Cloud child');
+    const latest = (await read('get_task', { id: promoted.id })).data;
+    await command('claim_task', { id: latest.id }, latest.version, executor);
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Add subtask', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Add metadata', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Resume human control', exact: true })).toBeEnabled();
+    await page.screenshot({ path: '/tmp/task6b2-cloud-details-claim.png', fullPage: true });
+    await test.info().attach('browser-rpc-counts', { body: JSON.stringify(rpcCounts), contentType: 'application/json' });
+    console.log('Task 6b2 browser RPC counts:', JSON.stringify(rpcCounts));
+  } finally {
+    if (ws) {
+      if ((await service.from('task_claims').delete().eq('workspace_id', ws)).error) cleanup.push('claims');
+      if ((await service.from('workspaces').delete().eq('id', ws)).error) cleanup.push('workspace');
+    }
+    for (const id of users) if ((await service.auth.admin.deleteUser(id)).error) cleanup.push('user');
+    await human.auth.signOut();
+    await executor.auth.signOut();
+  }
+  expect(cleanup).toEqual([]);
+});
+
+test('successful relation command refreshes canonical links even when event reading fails', async ({ page }) => {
+  await page.clock.install();
+  const reads: string[] = [];
+  page.on('request', request => {
+    if (request.url().endsWith('/read_operation')) reads.push(request.postDataJSON().p_operation);
+  });
+  const control = await fixture(page);
+  await page.goto('/app/w/' + workspace + '/tasks');
+  await page.getByLabel('E-mail').fill(user.email);
+  await page.getByLabel('Senha', { exact: true }).fill('fixture-password');
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+  await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+  await page.getByRole('button', { name: /Revisar navegação/ }).click();
+  const label = page.getByRole('dialog').getByLabel('Label: Recovered label', { exact: true });
+  await expect(label).not.toBeChecked();
+  reads.length = 0;
+  const poll = page.waitForResponse(
+    response => response.url().endsWith('/read_operation') && response.request().postDataJSON().p_operation === 'list_domain_events',
+  );
+  await page.clock.fastForward(11000);
+  await poll;
+  expect(reads).toEqual(['list_domain_events']);
+  control.eventOffline(true);
+  await label.click();
+  await expect(label).toBeChecked();
 });

@@ -53,11 +53,13 @@ export type Project = VersionedEntity & {
 };
 export type Subtask = VersionedEntity & { taskId: string; title: string; done: boolean; sortOrder: number; legacyMetadata: LegacyMetadata };
 export type TaskDependency = { workspaceId: string; taskId: string; dependsOnTaskId: string };
-export type Label = EntityRef & { name: string; legacyMetadata: LegacyMetadata };
+export type TaskLabel = { workspaceId: string; taskId: string; labelId: string };
+export type TaskAttachment = { workspaceId: string; taskId: string; fileId: string; sortOrder?: number };
+export type Label = VersionedEntity & { name: string; legacyMetadata: LegacyMetadata };
 export type Comment = VersionedEntity & { taskId: string; authorUserId: string | null; body: string; createdAt: string; legacyMetadata: LegacyMetadata };
 export type CommentReaction = { workspaceId: string; commentId: string; reaction: string; legacyUserId: string; userId: string | null };
 export type Team = EntityRef & { name: string; legacyMetadata: LegacyMetadata };
-export type FileMetadata = EntityRef & {
+export type FileMetadata = VersionedEntity & {
   projectId: string | null;
   taskId: string | null;
   name: string;

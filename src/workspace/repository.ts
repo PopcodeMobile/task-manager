@@ -1,5 +1,11 @@
 import type { Command, CommandResult, Workspace, UserPreferences } from '../domain/contracts';
-export type PersonalState = { prefs: Record<string, unknown>; views: Record<string, unknown>; collapsed?: boolean; activeWorkspace?: string };
+export type PersonalState = {
+  prefs: Record<string, unknown>;
+  views: Record<string, unknown>;
+  collapsed?: boolean;
+  activeWorkspace?: string;
+  preferences?: Partial<UserPreferences['preferences']>;
+};
 /** Structural boundary shared by cloud and device adapters. No Auth/session fabrication. */
 export interface WorkspaceRepository {
   readonly mode: 'cloud' | 'local';

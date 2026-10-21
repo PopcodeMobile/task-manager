@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import { WorkspacePicker } from '../workspaces/WorkspacePicker';
+import { taskLink } from '../tasks/task-detail-model';
 import { TaskList } from '../tasks/TaskList';
 import { TaskDrawer, type DraftGuard } from '../tasks/TaskDrawer';
 import { ProjectsPage } from '../projects/ProjectsPage';
@@ -97,7 +98,7 @@ export function WorkspacePanel({
   const creationAttempt = useRef<{ name: string; key: string; slug: string } | null>(null);
   const current = workspaces.find(w => w.id === workspaceId);
   const repo = useMemo(() => repositoryFactory(workspaceId || null), [repositoryFactory, workspaceId]);
-  const { snapshot, snapshotScope, loading, error, setError, revision, refresh, execute } = useWorkspaceData(repo, current?.id, workspaceId, t);
+  const { snapshot, snapshotScope, loading, error, setError, revision, refresh, execute, toggleFavorite } = useWorkspaceData(repo, current?.id, workspaceId, t);
   useEffect(() => {
     if (current && repo.savePersonal) void repo.savePersonal({ activeWorkspace: current.id }).catch(err => setError(errorMessage(err, t)));
   }, [repo, current?.id, t]);
@@ -337,6 +338,7 @@ export function WorkspacePanel({
                   </div>
                   <TaskList
                     tasks={taskList}
+                    graph={shown}
                     projects={projects}
                     members={shown.members}
                     agents={shown.agents}
@@ -350,6 +352,28 @@ export function WorkspacePanel({
                     open={openTask}
                     t={t}
                     canCreate={!readOnly}
+                    extraTaskMenuActions={[
+                      {
+                        id: 'favorite',
+                        personal: true,
+                        label: t('Alternar favorito', 'Toggle favorite'),
+                        run: task => {
+                          void toggleFavorite(task.id).catch(err => {
+                            if (!repo.controller.signal.aborted) setError(errorMessage(err, t));
+                          });
+                        },
+                      },
+                      {
+                        id: 'copy-link',
+                        personal: true,
+                        label: t('Copiar link', 'Copy link'),
+                        run: task => {
+                          void navigator.clipboard.writeText(taskLink(task, repo.mode === 'local', location.origin)).catch(err => {
+                            if (!repo.controller.signal.aborted) setError(errorMessage(err, t));
+                          });
+                        },
+                      },
+                    ]}
                   />
                 </>
               ) : route === 'agents' ? (
@@ -374,6 +398,7 @@ export function WorkspacePanel({
               {taskId && !loading && route === 'tasks' && (selected || taskId === 'new') && (
                 <TaskDrawer
                   key={`${workspaceId}:${taskId}`}
+                  graph={shown}
                   task={selected ?? 'new'}
                   tasks={shown.tasks}
                   projects={projects}
@@ -392,6 +417,9 @@ export function WorkspacePanel({
                     await refresh(true);
                   }}
                   registerDraft={registerDraft}
+                  favorite={shown.preferences.favoriteTaskIds.includes(taskId)}
+                  toggleFavorite={() => toggleFavorite(taskId)}
+                  copyLink={() => (selected ? navigator.clipboard.writeText(taskLink(selected, repo.mode === 'local', location.origin)) : Promise.resolve())}
                 />
               )}{' '}
               {taskId && !loading && route === 'tasks' && !selected && taskId !== 'new' && (

@@ -4,8 +4,12 @@ import { TaskExecutionSection } from './TaskExecutionSection';
 import type { WorkspaceRepository } from '../../workspace/repository';
 import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
-import { MessageSquare, Plus, Unlink } from 'lucide-react';
-import type { Task, Project, Comment, Subtask, TaskDependency, TaskStatus, TaskPriority, Recurrence, Json } from '../../domain/contracts';
+import { TaskRelationSection } from './TaskRelationSection';
+import { TaskSubtasksSection } from './TaskSubtasksSection';
+import { TaskAttachmentsSection } from './TaskAttachmentsSection';
+import { TaskDiscussionSection } from './TaskDiscussionSection';
+import { useTaskDetails, type TaskGraph } from '../shell/useWorkspaceData';
+import type { Task, Project, TaskStatus, TaskPriority, Recurrence, Json } from '../../domain/contracts';
 import { type Agent, type Member } from '../../workspace/normalized';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '../../components/ui/sheet';
 import {
@@ -40,6 +44,10 @@ export function TaskDrawer({
   admin,
   refresh,
   registerDraft,
+  favorite,
+  toggleFavorite,
+  copyLink,
+  graph,
 }: {
   task: Task | 'new';
   projects: Project[];
@@ -57,6 +65,10 @@ export function TaskDrawer({
   admin: boolean;
   refresh: () => Promise<void>;
   registerDraft: (guard: DraftGuard | null) => void;
+  favorite: boolean;
+  toggleFavorite: () => Promise<void>;
+  copyLink: () => Promise<void>;
+  graph: TaskGraph;
 }) {
   const initial = task === 'new' ? null : task;
   const [newTaskId] = useState(() => crypto.randomUUID());
@@ -71,18 +83,12 @@ export function TaskDrawer({
     [estimate, setEstimate] = useState(String(initial?.legacyMetadata.estimate ?? '')),
     [assignee, setAssignee] = useState(initial?.assigneeUserId ?? ''),
     [agent, setAgent] = useState(initial?.executorAgentId ?? ''),
-    [comments, setComments] = useState<Comment[]>([]),
-    [subtasks, setSubtasks] = useState<Subtask[]>([]),
-    [dependencies, setDependencies] = useState<TaskDependency[]>([]),
-    [incoming, setIncoming] = useState<TaskDependency[]>([]),
     [deleteConfirm, setDeleteConfirm] = useState(false),
-    [comment, setComment] = useState(''),
-    [subtask, setSubtask] = useState(''),
-    [dependency, setDependency] = useState(''),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
     [confirm, setConfirm] = useState(false),
-    [conflict, setConflict] = useState(false);
+    [conflict, setConflict] = useState(false),
+    [subDirty, setSubDirty] = useState(false);
   const current = task === 'new' ? null : task,
     active = !!current?.reservation?.active && Date.parse(current.reservation.expiresAt) > Date.now();
   const version = current?.version;
@@ -92,6 +98,10 @@ export function TaskDrawer({
   const savedFingerprint = useRef(fingerprint);
   const dirty = fingerprint !== savedFingerprint.current;
   async function save() {
+    if (subDirty) {
+      setError(t('Salve a subtarefa antes de continuar.', 'Save subtask before continuing.'));
+      return false;
+    }
     if (conflict || busy) return false;
     if (!title.trim() || !project) {
       setError(t('Informe o título e o projeto antes de continuar.', 'Enter a title and project before continuing.'));
@@ -133,19 +143,19 @@ export function TaskDrawer({
     }
   }
   useEffect(() => {
-    registerDraft({ dirty: dirty || busy, flush: save });
+    registerDraft({ dirty: dirty || busy || subDirty, flush: save });
     return () => registerDraft(null);
   });
   useEffect(() => {
     const before = (event: BeforeUnloadEvent) => {
-      if (dirty || busy) {
+      if (dirty || busy || subDirty) {
         event.preventDefault();
         event.returnValue = '';
       }
     };
     addEventListener('beforeunload', before);
     return () => removeEventListener('beforeunload', before);
-  }, [dirty, busy]);
+  }, [dirty, busy, subDirty]);
   useEffect(() => {
     if (!current || dirty || busy) return;
     setTitle(current.title);
@@ -172,29 +182,11 @@ export function TaskDrawer({
       String(current.legacyMetadata.estimate ?? ''),
     ]);
   }, [current?.version, busy, dirty]);
-  useEffect(() => {
-    if (!current) return;
-    let alive = true;
-    Promise.all([
-      repo.list<Comment>('list_comments', { taskId: current.id }, true),
-      repo.list<Subtask>('list_subtasks', { taskId: current.id }, true),
-      repo.list<TaskDependency>('list_dependencies', {}, true),
-    ])
-      .then(([c, s, d]) => {
-        if (alive) {
-          setComments(c);
-          setSubtasks(s);
-          setDependencies(d.filter(item => item.taskId === current.id));
-          setIncoming(d.filter(item => item.dependsOnTaskId === current.id));
-        }
-      })
-      .catch(err => {
-        if (alive) setError(errorMessage(err, t));
-      });
-    return () => {
-      alive = false;
-    };
-  }, [repo, current?.id, revision, t]);
+  const details = useTaskDetails(repo, current?.id, revision, t, graph);
+  const incoming = details.dependencies.filter(d => d.dependsOnTaskId === current?.id);
+  const sharedFiles = details.attachments.filter(
+    link => link.taskId !== current?.id && details.files.some(file => file.id === link.fileId && file.taskId === current?.id),
+  );
   async function action(run: () => Promise<unknown>) {
     if (busy) return;
     setBusy(true);
@@ -210,11 +202,19 @@ export function TaskDrawer({
       setBusy(false);
     }
   }
-  function requireSaved() {
+  function requireSaved(includeSubtask = true) {
+    if (includeSubtask && subDirty) {
+      setError(t('Salve a subtarefa antes de continuar.', 'Save subtask before continuing.'));
+      return false;
+    }
     if (!dirty && !conflict) return true;
     setError(t('Salve as alterações antes desta ação. O rascunho foi mantido.', 'Save changes before this action. Your draft was kept.'));
     saveButton.current?.focus();
     return false;
+  }
+  async function detailAction(run: () => Promise<unknown>, parent = false, subtask = false) {
+    if (parent && !requireSaved(!subtask)) return;
+    await action(run);
   }
   function taskAction(operation: string, input: Record<string, Json> = {}, after?: 'open' | 'close') {
     if (!current || !requireSaved()) return;
@@ -252,12 +252,12 @@ export function TaskDrawer({
         >
           <label className="form-field">
             {t('Título', 'Title')}
-            <Input required maxLength={500} value={title} onChange={e => setTitle(e.target.value)} disabled={readOnly || busy} />
+            <Input required maxLength={500} value={title} onChange={e => setTitle(e.target.value)} disabled={readOnly || busy || subDirty} />
           </label>
           <div className="drawer-fields">
             <label className="form-field">
               {t('Projeto', 'Project')}
-              <select value={project} onChange={e => setProject(e.target.value)} disabled={!!current || readOnly || busy} required>
+              <select value={project} onChange={e => setProject(e.target.value)} disabled={!!current || readOnly || busy || subDirty} required>
                 {projects.map(p => (
                   <option value={p.id} key={p.id}>
                     {p.name}
@@ -267,7 +267,7 @@ export function TaskDrawer({
             </label>
             <label className="form-field">
               {t('Status', 'Status')}
-              <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)} disabled={readOnly || busy}>
+              <select value={status} onChange={e => setStatus(e.target.value as TaskStatus)} disabled={readOnly || busy || subDirty}>
                 {statuses
                   .filter(s => s !== 'done' || current?.status === 'done')
                   .map(s => (
@@ -279,7 +279,7 @@ export function TaskDrawer({
             </label>
             <label className="form-field">
               {t('Prioridade', 'Priority')}
-              <select value={priority} onChange={e => setPriority(e.target.value as TaskPriority)} disabled={readOnly || busy}>
+              <select value={priority} onChange={e => setPriority(e.target.value as TaskPriority)} disabled={readOnly || busy || subDirty}>
                 {['none', 'low', 'medium', 'high', 'urgent'].map(p => (
                   <option key={p} value={p}>
                     {priorityLabel(p, t)}
@@ -289,7 +289,7 @@ export function TaskDrawer({
             </label>
             <label className="form-field">
               {t('Responsável', 'Assignee')}
-              <select value={assignee} onChange={e => setAssignee(e.target.value)} disabled={readOnly || busy}>
+              <select value={assignee} onChange={e => setAssignee(e.target.value)} disabled={readOnly || busy || subDirty}>
                 <option value="">{t('Sem responsável', 'Unassigned')}</option>
                 {members.map(member => (
                   <option key={member.user_id} value={member.user_id}>
@@ -300,11 +300,11 @@ export function TaskDrawer({
             </label>
             <label className="form-field">
               {t('Prazo', 'Due date')}
-              <Input type="date" value={due} onChange={e => setDue(e.target.value)} disabled={readOnly || busy} />
+              <Input type="date" value={due} onChange={e => setDue(e.target.value)} disabled={readOnly || busy || subDirty} />
             </label>
             <label className="form-field">
               {t('Início', 'Start date')}
-              <Input type="date" value={start} onChange={e => setStart(e.target.value)} disabled={readOnly || busy} />
+              <Input type="date" value={start} onChange={e => setStart(e.target.value)} disabled={readOnly || busy || subDirty} />
             </label>
             <label className="form-field">
               {t('Recorrência', 'Recurrence')}
@@ -312,7 +312,7 @@ export function TaskDrawer({
                 aria-label={t('Recorrência', 'Recurrence')}
                 value={recurrence}
                 onChange={e => setRecurrence(e.target.value as Recurrence | '')}
-                disabled={readOnly || busy}
+                disabled={readOnly || busy || subDirty}
               >
                 <option value="">{t('Nenhuma', 'None')}</option>
                 {(['Daily', 'Weekly', 'Every 2 weeks', 'Monthly'] as const).map(r => (
@@ -331,12 +331,18 @@ export function TaskDrawer({
             </label>
             <label className="form-field">
               {t('Estimativa', 'Estimate')}
-              <Input value={estimate} maxLength={120} onChange={e => setEstimate(e.target.value)} disabled={readOnly || busy} />
+              <Input value={estimate} maxLength={120} onChange={e => setEstimate(e.target.value)} disabled={readOnly || busy || subDirty} />
             </label>
           </div>
           <label className="form-field">
             {t('Descrição', 'Description')}
-            <textarea value={description} maxLength={100000} onChange={e => setDescription(e.target.value)} disabled={readOnly || busy} />
+            <textarea
+              aria-label={t('Descrição', 'Description')}
+              value={description}
+              maxLength={100000}
+              onChange={e => setDescription(e.target.value)}
+              disabled={readOnly || busy || subDirty}
+            />
           </label>
           {description && (
             <div className="rich-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(description, { USE_PROFILES: { html: true } }) }} />
@@ -405,143 +411,83 @@ export function TaskDrawer({
               onComplete={() => taskAction('complete_task')}
             />
             <TaskCoreActions task={current} projects={projects} t={t} disabled={busy || readOnly || active} run={taskAction} />
-            <section className="drawer-section">
-              <h3>{t('Subtarefas', 'Subtasks')}</h3>
-              {subtasks.map(item => (
-                <label className="subtask-row" key={item.id}>
-                  <input
-                    type="checkbox"
-                    checked={item.done}
-                    disabled={busy || readOnly}
-                    onChange={() => void action(() => execute('update_subtask', { id: item.id, taskId: current.id, done: !item.done }, version))}
-                  />
-                  <span>{item.title}</span>
-                </label>
-              ))}
-              <form
-                className="inline-form"
-                onSubmit={e => {
-                  e.preventDefault();
-                  void action(async () => {
-                    await execute('create_subtask', { taskId: current.id, title: subtask }, version);
-                    setSubtask('');
-                  });
-                }}
-              >
-                <Input
-                  aria-label={t('Nova subtarefa', 'New subtask')}
-                  value={subtask}
-                  onChange={e => setSubtask(e.target.value)}
-                  required
-                  maxLength={500}
-                  disabled={readOnly || busy}
-                />
-                <Button variant="outline" type="submit" disabled={busy || readOnly}>
-                  <Plus size={16} />
-                  <span className="sr-only">{t('Adicionar subtarefa', 'Add subtask')}</span>
+            <div className="button-row">
+              <Button variant="outline" disabled={busy} onClick={() => void action(toggleFavorite)}>
+                {favorite ? t('Remover dos favoritos', 'Remove from favorites') : t('Adicionar aos favoritos', 'Add to favorites')}
+              </Button>
+              <Button variant="ghost" onClick={() => void action(copyLink)}>
+                {t('Copiar link', 'Copy link')}
+              </Button>
+            </div>
+            {details.error && (
+              <p role="alert">
+                {details.error}
+                <Button variant="outline" onClick={details.retry}>
+                  {t('Tentar novamente', 'Try again')}
                 </Button>
-              </form>
-            </section>
-            <section className="drawer-section">
-              <h3>{t('Dependências', 'Dependencies')}</h3>
-              {incoming.length > 0 && (
-                <div className="configuration-note">
-                  <p>
-                    {t(
-                      'Outras tarefas dependem desta. Desvincule a dependência na tarefa relacionada antes de excluir.',
-                      'Other tasks depend on this one. Unlink the dependency in the related task before deleting.',
-                    )}
-                  </p>
-                  {incoming.map(item => (
-                    <Button variant="ghost" key={item.taskId} onClick={() => created(item.taskId)}>
-                      {tasks.find(x => x.id === item.taskId)?.title ?? item.taskId}
-                    </Button>
-                  ))}
-                </div>
-              )}
-              {dependencies.map(item => (
-                <div className="subtask-row" key={item.dependsOnTaskId}>
-                  <span>{tasks.find(x => x.id === item.dependsOnTaskId)?.title ?? item.dependsOnTaskId}</span>
-                  <Button
-                    variant="ghost"
-                    disabled={busy || readOnly}
-                    aria-label={t('Desvincular dependência', 'Unlink dependency')}
-                    onClick={() => void action(() => execute('remove_task_dependency', { id: current.id, dependsOnTaskId: item.dependsOnTaskId }, version))}
-                  >
-                    <Unlink size={15} />
+              </p>
+            )}
+            <TaskRelationSection
+              task={current}
+              tasks={tasks}
+              labels={details.labels}
+              links={details.links}
+              dependencies={details.dependencies}
+              execute={execute}
+              action={detailAction}
+              disabled={busy || readOnly || active || details.loading || !!details.error}
+              t={t}
+              open={created}
+            />
+            <TaskSubtasksSection
+              task={current}
+              subtasks={details.subtasks}
+              members={members}
+              execute={execute}
+              action={(run, parent) => detailAction(run, parent, true)}
+              registerDirty={setSubDirty}
+              canOpen={requireSaved}
+              disabled={busy || readOnly || active || details.loading || !!details.error}
+              t={t}
+              open={id => {
+                registerDraft(null);
+                created(id);
+              }}
+            />
+            <TaskAttachmentsSection
+              task={current}
+              files={details.files}
+              attachments={details.attachments}
+              execute={execute}
+              action={detailAction}
+              disabled={busy || readOnly || active || details.loading || !!details.error}
+              t={t}
+            />
+            <TaskDiscussionSection
+              task={current}
+              comments={details.comments}
+              reactions={details.reactions}
+              events={details.events}
+              history={details.history}
+              members={members}
+              agents={agents}
+              actorId={details.actorId}
+              admin={repo.mode === 'cloud' && admin}
+              execute={execute}
+              action={detailAction}
+              disabled={busy || readOnly || details.loading || !!details.error}
+              t={t}
+            />
+            {!!sharedFiles.length && (
+              <section className="drawer-section">
+                <p>{t('Desvincule os arquivos nas tarefas relacionadas antes de excluir:', 'Unlink files in related tasks before deleting:')}</p>
+                {sharedFiles.map(link => (
+                  <Button key={`${link.taskId}:${link.fileId}`} variant="ghost" onClick={() => created(link.taskId)}>
+                    {tasks.find(task => task.id === link.taskId)?.title ?? link.taskId}
                   </Button>
-                </div>
-              ))}
-              <form
-                className="inline-form"
-                onSubmit={e => {
-                  e.preventDefault();
-                  void action(async () => {
-                    await execute('set_task_dependency', { id: current.id, dependsOnTaskId: dependency }, version);
-                    setDependency('');
-                  });
-                }}
-              >
-                <select
-                  aria-label={t('Adicionar dependência', 'Add dependency')}
-                  value={dependency}
-                  onChange={e => setDependency(e.target.value)}
-                  required
-                  disabled={readOnly || busy}
-                >
-                  <option value="">{t('Selecionar tarefa', 'Select task')}</option>
-                  {tasks
-                    .filter(x => x.id !== current.id && !dependencies.some(d => d.dependsOnTaskId === x.id))
-                    .map(x => (
-                      <option key={x.id} value={x.id}>
-                        {x.title}
-                      </option>
-                    ))}
-                </select>
-                <Button variant="outline" disabled={busy || readOnly} type="submit">
-                  <Plus size={16} />
-                  <span className="sr-only">{t('Vincular tarefa', 'Link task')}</span>
-                </Button>
-              </form>
-            </section>
-            <section className="drawer-section">
-              <h3>
-                <MessageSquare size={16} />
-                {t('Comentários', 'Comments')}
-              </h3>
-              {comments.map(item => (
-                <article className="comment" key={item.id}>
-                  <strong>{members.find(m => m.user_id === item.authorUserId)?.name ?? t('Autor histórico', 'Historical author')}</strong>
-                  <div className="rich-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.body, { USE_PROFILES: { html: true } }) }} />
-                  {(admin || item.authorUserId === repo.userId) && (
-                    <Button
-                      variant="ghost"
-                      disabled={busy || readOnly}
-                      onClick={() => void action(() => execute('delete_comment', { id: item.id }, item.version))}
-                    >
-                      {t('Excluir comentário', 'Delete comment')}
-                    </Button>
-                  )}
-                </article>
-              ))}
-              <form
-                onSubmit={e => {
-                  e.preventDefault();
-                  void action(async () => {
-                    await execute('add_task_comment', { taskId: current.id, body: comment });
-                    setComment('');
-                  });
-                }}
-              >
-                <label className="form-field">
-                  {t('Comentário', 'Comment')}
-                  <textarea required maxLength={20000} value={comment} onChange={e => setComment(e.target.value)} disabled={readOnly || busy} />
-                </label>
-                <Button type="submit" disabled={busy || readOnly}>
-                  {t('Comentar', 'Post comment')}
-                </Button>
-              </form>
-            </section>
+                ))}
+              </section>
+            )}
             <section className="drawer-section">
               <Button
                 variant="destructive"
@@ -580,7 +526,7 @@ export function TaskDrawer({
                   <AlertDialogAction asChild>
                     <Button
                       variant="destructive"
-                      disabled={!!incoming.length}
+                      disabled={!!incoming.length || !!sharedFiles.length || details.loading || !!details.error}
                       onClick={() =>
                         void action(async () => {
                           await execute('delete_task', { id: current.id }, version);

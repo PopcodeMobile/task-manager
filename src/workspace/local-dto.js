@@ -89,3 +89,19 @@ export function patchLocal(row, input) {
     else if (key !== 'id' && key !== 'taskId') row[fieldMap[key] ?? key] = value;
   }
 }
+
+/** Canonical projection: global records win; embedded-only records retain first-parent provenance.
+ * @param {any} data @returns {any[]}
+ */
+export function localFiles(data) {
+  const files = new Map((data.files ?? []).map((/** @type {any} */ file) => [file.id, file]));
+  for (const task of data.tasks)
+    for (const file of task.attachments ?? [])
+      if (!files.has(file.id))
+        files.set(file.id, {
+          ...file,
+          project: Object.hasOwn(file, 'project') ? file.project : task.project,
+          task: Object.hasOwn(file, 'task') ? file.task : task.id,
+        });
+  return [...files.values()];
+}

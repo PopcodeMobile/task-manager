@@ -1,3 +1,4 @@
+import { localFiles } from '../local-dto.js';
 import { RepositoryError } from '../normalized.ts';
 const fail = code => {
   throw new RepositoryError(code);
@@ -21,7 +22,11 @@ export function copyTask(task, project, keyFor) {
 }
 
 export function protectRemoval(data, taskIds, projectId) {
-  const fileIds = new Set((data.files ?? []).filter(f => taskIds.has(f.task) || (projectId && f.project === projectId)).map(f => f.id));
+  const fileIds = new Set(
+    localFiles(data)
+      .filter(f => taskIds.has(f.task) || (projectId && f.project === projectId))
+      .map(f => f.id),
+  );
   if (data.tasks.some(t => !taskIds.has(t.id) && ((t.deps ?? []).some(id => taskIds.has(id)) || (t.attachments ?? []).some(f => fileIds.has(f.id)))))
     fail('validation_error');
 }

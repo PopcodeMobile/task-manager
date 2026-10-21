@@ -656,3 +656,204 @@ test('group composer creates in the hydrated default project and preserves an ex
   expect(projects).toEqual(['p1', 'p2']);
   await expect(group.getByRole('combobox', { name: 'New task project: todo', exact: true })).toHaveValue('p2');
 });
+
+test('task details compose labels, subtask promotion, metadata, discussion and personal actions', async ({ page }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await prepare(page);
+  await page.goto('/app-local/w/' + data.workspaces[0].id + '/tasks');
+  await page.getByRole('button', { name: firstTitle }).click();
+  await expect(page.getByRole('heading', { name: 'Labels', exact: true })).toBeVisible();
+  await page.getByLabel('New label', { exact: true }).fill('Details <literal>');
+  await page.getByRole('button', { name: 'Create and apply label', exact: true }).click();
+  await expect(page.getByRole('dialog').getByLabel('Label: Details <literal>', { exact: true })).toBeChecked();
+  await page.getByLabel('Description', { exact: true }).fill('Dirty description');
+  await page.getByLabel('New subtask', { exact: true }).fill('Promote detail');
+  await page.getByRole('button', { name: 'Add subtask', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Save changes before');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Add subtask', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Add subtask', exact: true }).click();
+  await expect(page.getByLabel('New subtask', { exact: true })).toHaveValue('');
+  await page.getByRole('button', { name: 'Subtask details: Promote detail', exact: true }).click();
+  await page.getByLabel('Subtask notes', { exact: true }).fill('Promoted notes');
+  await page.getByLabel('Subtask due date', { exact: true }).fill('2026-10-25');
+  await page.getByRole('button', { name: 'Save subtask', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Save subtask', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Convert to task', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Convert to task', exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.tasks.filter((task: { title: string }) => task.title === 'Promote detail')
+            .length,
+      ),
+    )
+    .toBe(1);
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Promote detail');
+  await expect(page.getByLabel('Description', { exact: true })).toHaveValue('Promoted notes');
+  await expect(page.getByLabel('Due date', { exact: true })).toHaveValue('2026-10-25');
+  await page.getByLabel('Metadata name', { exact: true }).fill('Only metadata.pdf');
+  await page.getByRole('button', { name: 'Add metadata', exact: true }).click();
+  await expect(page.getByText('Only metadata.pdf', { exact: true })).toBeVisible();
+  await page.getByText('View metadata: Only metadata.pdf', { exact: true }).click();
+  await expect(page.getByText('No file content is stored here.', { exact: true })).toBeVisible();
+  await page.getByRole('heading', { name: 'Attachments', exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/task6b2-metadata-preview.png', fullPage: false });
+  await page.getByLabel('Comment', { exact: true }).fill('Hello @');
+  await page.getByRole('button', { name: 'Mention: ' + data.members[0].name, exact: true }).click();
+  await page.getByRole('button', { name: 'Post comment', exact: true }).click();
+  const comment = page.locator('article.comment').filter({ hasText: 'Hello @' });
+  await expect(comment).toBeVisible();
+  await comment.getByRole('button', { name: 'React: 👍', exact: true }).click();
+  await expect(comment.getByRole('button', { name: 'React: 👍', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Add to favorites', exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Remove from favorites', exact: true })).toBeVisible();
+  await expect(page.getByText('Only metadata.pdf', { exact: true })).toBeVisible();
+  await page.locator('article.comment').filter({ hasText: 'Hello @' }).getByRole('button', { name: 'Delete comment', exact: true }).click();
+  await expect(page.locator('article.comment').filter({ hasText: 'Hello @' })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Activity', exact: true }).click();
+  await expect(page.locator('.activity-feed')).toContainText('created the task');
+  await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toBe(page.url());
+  await page.screenshot({ path: '/tmp/task6b2-local-details.png', fullPage: false });
+});
+
+test('subtask draft blocks drawer close and relation edits until explicitly saved', async ({ page }) => {
+  await prepare(page);
+  await page.goto('/app-local');
+  const parent = data.tasks.find(task => task.subtasks.length > 0)!;
+  await page.getByRole('button', { name: parent.title }).click();
+  await page.getByRole('button', { name: 'Subtask details: ' + parent.subtasks[0].title, exact: true }).click();
+  await page.getByLabel('Subtask notes', { exact: true }).fill('Unsaved child notes');
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await expect(page.getByLabel('Subtask notes', { exact: true })).toHaveValue('Unsaved child notes');
+  await expect(page.getByRole('alert')).toContainText('Save subtask');
+  await page.getByRole('button', { name: 'Save subtask', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Convert to task', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.getByRole('button', { name: parent.title }).click();
+  await page.getByRole('button', { name: 'Subtask details: ' + parent.subtasks[0].title, exact: true }).click();
+  await expect(page.getByLabel('Subtask notes', { exact: true })).toHaveValue('Unsaved child notes');
+});
+
+test('canonical detail controls reject cycles and keep unsafe literal metadata separate from rich content on mobile', async ({ page }) => {
+  await prepare(page);
+  await page.addInitScript(() => {
+    const saved = JSON.parse(localStorage.getItem('gr8r.v2')!);
+    saved.data.tasks[0].title = '<img src=x onerror=alert(1)> literal task';
+    saved.data.tasks[0].desc = '<b>Rich safe</b><img src=x onerror="window.detailUnsafe=1"><script>window.detailUnsafe=1</script>';
+    saved.data.tasks[0].deps = [];
+    saved.data.tasks[1].deps = [saved.data.tasks[0].id];
+    saved.data.members[0].name = '<img src=x> literal author';
+    saved.data.comments.push({
+      id: 'unsafe-comment',
+      task: saved.data.tasks[0].id,
+      by: saved.data.members[0].id,
+      text: '<b>Rich comment</b><img src=x onerror="window.detailUnsafe=1">',
+      at: Date.now(),
+      re: { '👍': [saved.data.members[0].id] },
+    });
+    (saved.data.labels ??= []).push({ id: 'literal-label', name: '<img src=x> literal label' });
+    localStorage.setItem('gr8r.v2', JSON.stringify(saved));
+  });
+  await page.goto('/app-local');
+  await page.getByRole('button', { name: '<img src=x onerror=alert(1)> literal task' }).click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer.locator('.rich-content b').filter({ hasText: 'Rich safe' })).toBeVisible();
+  await expect(drawer.locator('[onerror],script')).toHaveCount(0);
+  const comment = drawer.locator('article.comment').filter({ hasText: 'Rich comment' });
+  await expect(comment.locator('strong')).toHaveText('<img src=x> literal author');
+  await expect(comment.getByRole('button', { name: 'React: 👍', exact: true })).toHaveAttribute('title', '<img src=x> literal author');
+  await drawer.getByLabel('Label: <img src=x> literal label', { exact: true }).click();
+  await expect(drawer.getByLabel('Label: <img src=x> literal label', { exact: true })).toBeChecked();
+  await drawer.getByLabel('Add dependency', { exact: true }).selectOption(data.tasks[1].id);
+  await drawer.getByRole('button', { name: 'Link task', exact: true }).click();
+  await expect(drawer.getByRole('alert')).toBeVisible();
+  const deps = await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.tasks[0].deps);
+  expect(deps).toEqual([]);
+  await drawer.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await page.getByRole('link', { name: 'Table', exact: true }).click();
+  const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: /literal task/ }) });
+  await row.locator('[data-task-column=labels] summary').click();
+  await expect(row.getByLabel('Label: <img src=x> literal label', { exact: true })).toBeChecked();
+  await row.getByLabel('Label: <img src=x> literal label', { exact: true }).click();
+  await expect(row.getByLabel('Label: <img src=x> literal label', { exact: true })).not.toBeChecked();
+  await page.reload();
+  await page.getByRole('button', { name: /literal task/ }).click();
+  await expect(page.getByRole('dialog').getByLabel('Label: <img src=x> literal label', { exact: true })).not.toBeChecked();
+  await page.getByRole('button', { name: 'Close panel', exact: true }).click();
+  await page.getByLabel('Language', { exact: true }).selectOption('pt-BR');
+  await page.getByRole('button', { name: 'Alternar tema', exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: /literal task/ }).click();
+  await expect(page.getByRole('heading', { name: 'Etiquetas', exact: true })).toBeVisible();
+  await page.getByRole('heading', { name: 'Anexos', exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/tmp/task6b2-mobile-light-pt.png', fullPage: false });
+  const bounds = await page.getByRole('dialog').boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.width).toBeLessThanOrEqual(390);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('detailed table completes subtasks and explicitly links and unlinks canonical dependencies', async ({ page }) => {
+  await prepare(page);
+  const parent = data.tasks.find(task => task.subtasks.length > 0)!;
+  const target = data.tasks.find(task => task.id !== parent.id)!;
+  await page.addInitScript(() => {
+    const saved = JSON.parse(localStorage.getItem('gr8r.v2')!);
+    for (const task of saved.data.tasks) task.deps = [];
+    localStorage.setItem('gr8r.v2', JSON.stringify(saved));
+  });
+  await page.goto('/app-local');
+  await page.getByRole('link', { name: 'Table', exact: true }).click();
+  const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: parent.title }) });
+  await row.locator('[data-task-column=title] summary').click();
+  const child = row.getByLabel(parent.subtasks[0].title, { exact: true });
+  await child.click();
+  await expect(child).toBeChecked({ checked: !parent.subtasks[0].done });
+  await page.getByText('Columns', { exact: true }).click();
+  await page.getByLabel('Show column: Dependencies', { exact: true }).check();
+  await page.getByText('Columns', { exact: true }).click();
+  await row.locator('[data-task-column=deps] summary').click();
+  const dependency = row.getByLabel(target.title, { exact: true });
+  await dependency.click();
+  await expect(dependency).toBeChecked();
+  await page.reload();
+  await row.locator('[data-task-column=deps] summary').click();
+  await expect(dependency).toBeChecked();
+  await dependency.click();
+  await expect(dependency).not.toBeChecked();
+  const stored = await page.evaluate(
+    id => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.tasks.find((task: { id: string }) => task.id === id),
+    parent.id,
+  );
+  expect(stored.deps).toEqual([]);
+  expect(stored.subtasks[0].done).toBe(!parent.subtasks[0].done);
+});
+
+test('late personal menu failure cannot publish an error in a different workspace', async ({ page }) => {
+  await prepare(page);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: () =>
+          new Promise((_, reject) => {
+            window.addEventListener('reject-clipboard', () => reject(new Error('clipboard rejected')), { once: true });
+          }),
+      },
+    });
+  });
+  await page.goto('/app-local');
+  await page.getByRole('button', { name: firstTitle }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Copy link', exact: true }).click();
+  await page.getByLabel('Workspace', { exact: true }).selectOption('w2');
+  await expect(page.locator('.work-breadcrumb')).toContainText('Pessoal');
+  await page.evaluate(() => window.dispatchEvent(new Event('reject-clipboard')));
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
