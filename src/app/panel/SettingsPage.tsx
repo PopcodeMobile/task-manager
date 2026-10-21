@@ -27,6 +27,7 @@ import {
   Pencil,
   ShieldAlert,
   CircleCheck,
+  Plug,
 } from 'lucide-react';
 import { Fragment, useEffect, useState, type CSSProperties } from 'react';
 import { Button } from '../../components/ui/button';
@@ -48,6 +49,7 @@ import { radioKeys } from './choice-navigation';
 import { PersonAvatar, ProjectMark } from './PanelVisual';
 import { PeoplePages } from './PeoplePages';
 import { PermissionMatrix } from './PermissionMatrix';
+import { IntegrationsPanel } from '../agents/IntegrationsPanel';
 import type { PanelProps } from './types';
 import type { Project } from '../../domain/contracts';
 import { KairosMark } from '../design/KairosMark';
@@ -132,6 +134,7 @@ export function SettingsPage(p: PanelProps) {
     teams: t('Equipes agrupam pessoas e projetos.', 'Teams group people and projects.'),
     projects: t('Padrões de novos projetos e trabalhos arquivados.', 'Defaults for new projects and archived work.'),
     permissions: t('Veja o que cada papel pode fazer neste painel.', 'Control what each role can do.'),
+    integrations: t('Conecte agentes e aplicativos à organização.', 'Connect agents and apps to your workspace.'),
     'notif-email': t('Escolha quais emails você recebe.', 'Choose which emails you receive.'),
     'notif-push': t('Notificações no computador e celular.', 'Notifications on desktop and mobile.'),
     'notif-mentions': t('Escolha quais menções chegam até você.', 'Decide which mentions reach you.'),
@@ -192,6 +195,7 @@ export function SettingsPage(p: PanelProps) {
     ['teams', t('Equipes', 'Teams')],
     ['projects', t('Projetos', 'Projects')],
     ['permissions', t('Permissões', 'Permissions')],
+    ['integrations', t('Integrações', 'Integrations')],
     ['notif-email', 'Email'],
     ['notif-push', 'Push'],
     ['notif-mentions', t('Menções', 'Mentions')],
@@ -223,10 +227,10 @@ export function SettingsPage(p: PanelProps) {
               {
                 0: t('Geral', 'General'),
                 4: t('Espaço', 'Workspace'),
-                8: t('Notificações', 'Notifications'),
-                12: t('Pessoal', 'Personal'),
-                15: t('Segurança', 'Security'),
-                18: t('Cobrança', 'Billing'),
+                9: t('Notificações', 'Notifications'),
+                13: t('Pessoal', 'Personal'),
+                16: t('Segurança', 'Security'),
+                19: t('Cobrança', 'Billing'),
               } as Record<number, string>
             )[index] && (
               <div className="gh">
@@ -235,10 +239,10 @@ export function SettingsPage(p: PanelProps) {
                     {
                       0: t('Geral', 'General'),
                       4: t('Espaço', 'Workspace'),
-                      8: t('Notificações', 'Notifications'),
-                      12: t('Pessoal', 'Personal'),
-                      15: t('Segurança', 'Security'),
-                      18: t('Cobrança', 'Billing'),
+                      9: t('Notificações', 'Notifications'),
+                      13: t('Pessoal', 'Personal'),
+                      16: t('Segurança', 'Security'),
+                      19: t('Cobrança', 'Billing'),
                     } as Record<number, string>
                   )[index]
                 }
@@ -255,6 +259,7 @@ export function SettingsPage(p: PanelProps) {
                   UsersRound,
                   FolderKanban,
                   Shield,
+                  Plug,
                   Mail,
                   Smartphone,
                   AtSign,
@@ -657,6 +662,14 @@ export function SettingsPage(p: PanelProps) {
                   {t('Abrir arquivo', 'Open archive')}
                 </Button>
               </>
+            ) : sec === 'integrations' ? (
+              p.repo.mode === 'cloud' ? (
+                <IntegrationsPanel repo={p.repo} t={t} admin={p.admin} members={s.members} />
+              ) : (
+                <p role="status" className="configuration-note">
+                  {t('OAuth, agentes e webhooks exigem uma organização na nuvem.', 'OAuth, agents and webhooks require a cloud workspace.')}
+                </p>
+              )
             ) : sec === 'permissions' ? (
               <>
                 {toggle('permCreate', t('Membros podem criar projetos', 'Members can create projects'))}

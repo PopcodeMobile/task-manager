@@ -51,15 +51,22 @@ export function ShellPopover({
     const close = (event: PointerEvent) => {
       if (!contains(event.target as Node)) setOpen(false);
     };
+    const blur = () => setOpen(false);
     document.addEventListener('pointerdown', close);
-    return () => document.removeEventListener('pointerdown', close);
+    window.addEventListener('blur', blur);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      window.removeEventListener('blur', blur);
+    };
   }, [open]);
   return (
     <div
       ref={container}
       className={`shell-popover ${className}`}
       onBlur={event => {
-        if (!contains(event.relatedTarget as Node)) setOpen(false);
+        // Safari mouse clicks can blur a button without focusing the next one.
+        // Outside pointer/window blur handlers cover dismissals with no focus target.
+        if (event.relatedTarget && !contains(event.relatedTarget as Node)) setOpen(false);
       }}
       onKeyDown={event => {
         if (event.key === 'Escape') {

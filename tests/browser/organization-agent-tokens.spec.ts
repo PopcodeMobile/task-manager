@@ -264,3 +264,55 @@ test('a maximum-length token name keeps its status inside the mobile viewport', 
   const name = await page.locator('.agent-token-row .connection-heading strong').boundingBox();
   expect(name!.x + name!.width).toBeLessThanOrEqual(bounds!.x);
 });
+
+for (const entry of [
+  ['Arquivos', 'files'],
+  ['Agentes', 'agents'],
+  ['Integrações', 'integrations'],
+  ['Busca', 'search'],
+  ['Sistema visual', 'system'],
+  ['Estados', 'states'],
+  ['Atalhos de teclado', 'settings?sec=shortcuts'],
+])
+  test(`help menu navigates by mouse: ${entry[0]}`, async ({ page }) => {
+    await fixture(page);
+    await page.goto(`/app/w/${workspace}/settings?sec=payment`);
+    await page.getByRole('button', { name: 'Ajuda e recursos', exact: true }).click();
+    await page.getByRole('menuitem', { name: entry[0], exact: true }).click();
+    await expect(page).toHaveURL(`/app/w/${workspace}/${entry[1]}`);
+    await expect(page.getByRole('menu', { name: 'Ajuda e recursos', exact: true })).toHaveCount(0);
+  });
+test('organization integrations are reachable from settings and can issue a token', async ({ page }) => {
+  const f = await fixture(page);
+  await page.locator('.work-sidebar-bottom').getByRole('link', { name: 'Configurações', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Seções de configurações', exact: true }).getByRole('button', { name: 'Integrações', exact: true }).click();
+  await expect(page).toHaveURL(`/app/w/${workspace}/settings?sec=integrations`);
+  await expect(page.getByRole('heading', { name: 'Tokens de agentes', exact: true })).toBeVisible();
+  await page.getByLabel('Nome do token', { exact: true }).fill('Hermes settings');
+  await page.getByRole('button', { name: 'Gerar token', exact: true }).click();
+  await expect(page.getByLabel('Token gerado', { exact: true })).toHaveValue(secret);
+  expect(f.calls.find(c => c.name === 'create_organization_agent_token')?.body.p_workspace_id).toBe(workspace);
+});
+
+test('help menu supports keyboard navigation and external dismissal', async ({ page }) => {
+  await fixture(page);
+  const trigger = page.getByRole('button', { name: 'Ajuda e recursos', exact: true });
+  const menu = page.getByRole('menu', { name: 'Ajuda e recursos', exact: true });
+  await trigger.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menuitem', { name: 'Arquivos', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(`/app/w/${workspace}/agents`);
+  await expect(menu).toHaveCount(0);
+  await trigger.click();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page.locator('.work-content').click({ position: { x: 10, y: 10 } });
+  await expect(menu).toHaveCount(0);
+  await trigger.click();
+  await page.locator('.work-sidebar-bottom').getByRole('link', { name: 'Configurações', exact: true }).focus();
+  await expect(menu).toHaveCount(0);
+});

@@ -5,7 +5,7 @@ Tokens permitem conectar agentes externos ao MCP/API do Kairos sem login interat
 ## Gerar no painel
 
 1. Entre no Kairos e selecione a organização desejada.
-2. Abra **Ajuda e recursos → Integrações → Tokens de agentes**. Também é possível buscar Integrações no menu de comandos.
+2. Abra **Configurações → Integrações → Tokens de agentes**. Integrações fica na seção da organização. O atalho em Ajuda e recursos e a busca no menu de comandos também continuam disponíveis.
 3. Informe um nome, como Hermes VPS.
 4. Selecione **Somente leitura** ou **Leitura e escrita**. Para criar tarefas, use leitura e escrita. O projeto de destino precisa existir.
 5. Escolha 30, 90 ou 365 dias, ou **Sem expiração**. O padrão é 90 dias.
