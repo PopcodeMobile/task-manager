@@ -2,6 +2,8 @@
 
 2026-10-21. Backend009 is applied locally and to the dedicated hosted task-manager project. API and MCP are deployed from the frozen reviewed backend source. Source reviews and real synthetic-user transport gates pass. **Public frontend, real Hermes/personal Claude activation and Task7 integration are not complete.** Cron remains disabled. No push or merge is implied.
 
+Operational update2026-10-21: DNS/HTTPS and public Hermes health are now verified; see the [new public preflight](task-7-hermes-public-preflight-2026-10-21.md). The remaining-gate observations below retain their original chronology. This update does not establish Task Manager route/MCP authority or real delivery acceptance.
+
 ## Exact source and independent gates
 
 - Final runtime/UI product:6976360e94ece2407dffc926eb1c7654449e8fef, delivered by432e43efc69cb9cc4eb026ad8f93467562ae2414. N3 [exact review](final-visibility-review.md): Spec/QualityPASS. Earlier [N1/N2 review](final-residual-review.md) and [consolidated rereview](final-fix-rereview.md) retain their original scope and findings; all named findings are now addressed.

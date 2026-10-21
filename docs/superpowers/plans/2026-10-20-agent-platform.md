@@ -622,7 +622,10 @@ Ativação real permanece separada; resultados anteriores não substituem o novo
 - [x] Fechar todos os achados originais/residuais e o auditor de ativação com revisão independente.
 - [x] Provar Auth/API/MCP reais local/hosted, catalog51objetos,001–009, cleanup e builds finais; preservar limites de usuários sintéticos.
 - [ ] Publicar frontend e configurar Auth/redirects/CORS para sua URLHTTPS real (acesso Vercel pendente).
-- [ ] Concluir Hermes/DNS/TLS/receiver/retention e duas contas Claude reais; só depois habilitar entregas e integrar branch conformeTask7.
+- [x] Confirmar DNS/HTTPS do Hermes e `/health` público200; [preflight de2026-10-21](../../verification/agent-platform/task-7-hermes-public-preflight-2026-10-21.md).
+- [ ] Concluir rota Task Manager/OAuth/MCP/receiver/retention e duas contas Claude reais; só depois habilitar entregas e integrar branch conformeTask7.
+
+O usuário confirmou que o painel ainda não está publicado e disponibilizará acesso à Vercel. O listener Hermes atual contém a rota diagnóstica `infra-ping`; a configuração principal ainda não tem `task_manager` em `mcp_servers`. Não confundir saúde pública/teste assinado com aceite da integração real.
 
 A [prova009](../../verification/agent-platform/runtime-009-proof.md) é o estado atual. Relatórios anteriores mantêm sua cronologia. Nenhuma conta/segredo real é compartilhado.
 
