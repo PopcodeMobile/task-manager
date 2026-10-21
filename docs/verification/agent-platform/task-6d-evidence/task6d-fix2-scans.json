@@ -1,0 +1,10 @@
+{
+  "privateScan": {
+    "privateCandidates": 2,
+    "files": 346,
+    "issues": []
+  },
+  "srcAndChangedAuditorDebugMatches": [],
+  "stagedDiffCheckExit": 0,
+  "scope": "tooling/docs only; no browser or listener started"
+}

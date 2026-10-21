@@ -1,0 +1,32 @@
+✔ the complete token inventory and CSS consumers pass the guard (174.429625ms)
+✔ unknown references, hardcoded CSS and inline regressions fail the guard (86.668833ms)
+✔ runtime geometry and user-owned color values are permitted (0.523292ms)
+✔ foundation overrides reach the supported React button, drawer and sidebar styles (2.739459ms)
+✔ template migration is idempotent and preserves runtime geometry and data (0.607542ms)
+✔ catalogue demonstrations never call entity writers (0.448167ms)
+✔ source discovery includes the final React TS and TSX consumers (0.12225ms)
+✔ React controlled styles follow constants, spreads, assertions and conditional branches (0.96925ms)
+✔ static cn and cva utilities reject framework scales and modified arbitrary literals (0.953417ms)
+✔ semantic aliases require authored theme declarations; token utilities and runtime geometry stay valid (1.596084ms)
+✔ foundation formulas in React preserve token multipliers while bare radius utilities cannot bypass the guard (0.767083ms)
+✔ signed numeric styles and computed literal keys cannot bypass controlled spacing (0.503208ms)
+✔ static local style template cannot bypass the token policy (0.434416ms)
+✔ static local class template cannot bypass the token policy (0.395791ms)
+✔ static local computed const key cannot bypass the token policy (0.3965ms)
+✔ nested static templates and computed class keys retain modifier and arbitrary-value checks (0.593709ms)
+✔ static token templates and dynamic imported generated values retain geometry and domain-color tolerance (1.702291ms)
+✔ unknown template substitutions do not turn partial utilities or shadowed parameters into static values (0.986958ms)
+✔ nearest unknown destructured local shadows outer static values (0.428583ms)
+✔ nearest unknown uninitialized local shadows outer static values (0.38275ms)
+✔ nearest unknown renamed nested destructuring shadows outer static values (0.408333ms)
+✔ nearest unknown array binding shadows outer static values (0.392625ms)
+✔ nearest unknown catch binding shadows outer static values (0.390916ms)
+✔ destructuring property names do not shadow outer bindings and shorthand const values remain checked (0.589125ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 453.420583

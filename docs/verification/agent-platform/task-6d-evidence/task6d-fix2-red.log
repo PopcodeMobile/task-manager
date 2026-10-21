@@ -1,0 +1,159 @@
+✔ the complete token inventory and CSS consumers pass the guard (97.899834ms)
+✔ unknown references, hardcoded CSS and inline regressions fail the guard (50.518458ms)
+✔ runtime geometry and user-owned color values are permitted (0.33975ms)
+✔ foundation overrides reach the supported React button, drawer and sidebar styles (2.924125ms)
+✔ template migration is idempotent and preserves runtime geometry and data (0.701666ms)
+✔ catalogue demonstrations never call entity writers (0.446083ms)
+✔ source discovery includes the final React TS and TSX consumers (0.096041ms)
+✔ React controlled styles follow constants, spreads, assertions and conditional branches (0.796042ms)
+✔ static cn and cva utilities reject framework scales and modified arbitrary literals (0.712875ms)
+✔ semantic aliases require authored theme declarations; token utilities and runtime geometry stay valid (1.007291ms)
+✔ foundation formulas in React preserve token multipliers while bare radius utilities cannot bypass the guard (0.478584ms)
+✔ signed numeric styles and computed literal keys cannot bypass controlled spacing (0.297375ms)
+✔ static local style template cannot bypass the token policy (0.282125ms)
+✔ static local class template cannot bypass the token policy (0.27825ms)
+✔ static local computed const key cannot bypass the token policy (0.277042ms)
+✔ nested static templates and computed class keys retain modifier and arbitrary-value checks (0.375167ms)
+✔ static token templates and dynamic imported generated values retain geometry and domain-color tolerance (0.409875ms)
+✔ unknown template substitutions do not turn partial utilities or shadowed parameters into static values (0.687833ms)
+✖ nearest unknown destructured local shadows outer static values (0.820542ms)
+✖ nearest unknown uninitialized local shadows outer static values (0.369667ms)
+✖ nearest unknown renamed nested destructuring shadows outer static values (0.312083ms)
+✖ nearest unknown array binding shadows outer static values (0.284375ms)
+✖ nearest unknown catch binding shadows outer static values (0.281584ms)
+✔ destructuring property names do not shadow outer bindings and shorthand const values remain checked (0.315083ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 19
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 331.161583
+
+✖ failing tests:
+
+test at tests/tokens.test.mjs:264:3
+✖ nearest unknown destructured local shadows outer static values (0.820542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   'src/probe.tsx:1:111: fixed color: color: #123456'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/tokens.test.mjs:265:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'src/probe.tsx:1:111: fixed color: color: #123456' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/tokens.test.mjs:264:3
+✖ nearest unknown uninitialized local shadows outer static values (0.369667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   'src/probe.tsx:1:105: fixed padding: padding: 12px'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/tokens.test.mjs:265:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'src/probe.tsx:1:105: fixed padding: padding: 12px' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/tokens.test.mjs:264:3
+✖ nearest unknown renamed nested destructuring shadows outer static values (0.312083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   'src/probe.tsx:1:133: fixed color: color: #123456'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/tokens.test.mjs:265:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'src/probe.tsx:1:133: fixed color: color: #123456' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/tokens.test.mjs:264:3
+✖ nearest unknown array binding shadows outer static values (0.284375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   'src/probe.tsx:1:106: fixed padding: padding: 12px'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/tokens.test.mjs:265:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'src/probe.tsx:1:106: fixed padding: padding: 12px' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at tests/tokens.test.mjs:264:3
+✖ nearest unknown catch binding shadows outer static values (0.281584ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+  + [
+  +   'src/probe.tsx:1:120: fixed color: color: #123456'
+  + ]
+  - []
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/tokens.test.mjs:265:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'src/probe.tsx:1:120: fixed color: color: #123456' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

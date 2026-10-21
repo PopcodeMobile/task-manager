@@ -1,0 +1,8 @@
+{"kind":"BindingElement","property":"color","name":"localColor"}
+{"kind":"BindingElement","property":"nested","name":"{ color }"}
+{"kind":"BindingElement","name":"color"}
+{"kind":"BindingElement","property":"list","name":"[item]"}
+{"kind":"BindingElement","name":"item"}
+{"reference":"color","declarations":[{"kind":"BindingElement","name":"color","initializer":false}]}
+{"reference":"pad","declarations":[{"kind":"VariableDeclaration","name":"pad","initializer":false}]}
+{"typescript":"5.9.3","parseDiagnostics":0}

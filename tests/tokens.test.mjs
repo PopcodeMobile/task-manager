@@ -238,3 +238,34 @@ test('unknown template substitutions do not turn partial utilities or shadowed p
   assert.equal(faults.length, 3);
   for (const value of ['hover:gap-4', 'p-4', 'md:gap-6']) assert.ok(faults.some(fault => fault.includes(value)));
 });
+
+for (const [name, source] of [
+  ['destructured local', 'const color = "#123456"; export const Probe = props => { const { color } = props; return <div style={{ color: `${color}` }} />; };'],
+  ['uninitialized local', 'const pad = 12; export const Probe = props => { let pad; pad = props.pad; return <div style={{ padding: `${pad}px` }} />; };'],
+  [
+    'renamed nested destructuring',
+    'const color = "#123456"; export const Probe = props => { const { appearance: { tone: color } } = props; return <div style={{ color: `${color}` }} />; };',
+  ],
+  ['array binding', 'const pad = 12; export const Probe = props => { const [pad] = props.sizes; return <div style={{ padding: `${pad}px` }} />; };'],
+  [
+    'catch binding',
+    'const color = "#123456"; export const Probe = () => { try { readColor(); } catch (color) { return <div style={{ color: `${color}` }} />; } };',
+  ],
+]) {
+  test(`nearest unknown ${name} shadows outer static values`, () => {
+    assert.deepEqual(auditTokenSources([sources.find(file => file.path.endsWith('/tokens.css')), { path: 'src/probe.tsx', source }]), []);
+  });
+}
+
+test('destructuring property names do not shadow outer bindings and shorthand const values remain checked', () => {
+  const source = [
+    'const pad = 12; const padding = 8;',
+    'export const Probe = props => { const { pad: runtimePad } = props;',
+    '  return <><div style={{ padding: `${runtimePad}px` }} /><div style={{ padding: `${pad}px` }} /><div style={{ padding }} /></>;',
+    '};',
+  ].join('\n');
+  const faults = auditTokenSources([sources.find(file => file.path.endsWith('/tokens.css')), { path: 'src/probe.tsx', source }]);
+  assert.equal(faults.length, 2);
+  assert.ok(faults.some(fault => fault.includes('padding: 12px')));
+  assert.ok(faults.some(fault => fault.includes('padding: 8')));
+});

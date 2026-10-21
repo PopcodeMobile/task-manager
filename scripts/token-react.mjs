@@ -76,32 +76,37 @@ function styleViolation(property, value, numeric = false) {
 export function auditReactSource(path, source, aliases) {
   const root = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, /\.[jt]sx$/.test(path) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const failures = [];
-  const declarations = new Map();
-  const scope = node => {
-    for (let current = node.parent; current; current = current.parent)
-      if (ts.isBlock(current) || ts.isSourceFile(current) || ts.isArrowFunction(current)) return current;
-    return root;
+  // Use the installed binder for lexical identity, including unknown shadowing declarations.
+  // This single-source virtual program cannot load imports/libs or emit files.
+  const options = { allowJs: true, noLib: true, noResolve: true, noEmit: true, types: [], jsx: ts.JsxEmit.Preserve };
+  const host = {
+    getSourceFile: file => (file === path ? root : undefined),
+    getDefaultLibFileName: () => 'lib.d.ts',
+    getCurrentDirectory: () => '/',
+    getDirectories: () => [],
+    directoryExists: () => false,
+    fileExists: file => file === path,
+    readFile: file => (file === path ? source : undefined),
+    getCanonicalFileName: file => file,
+    useCaseSensitiveFileNames: () => true,
+    getNewLine: () => '\n',
+    writeFile: () => {
+      throw new Error('Token audit does not emit files');
+    },
   };
-  const collect = node => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-      const entries = declarations.get(node.name.text) ?? [];
-      entries.push({ scope: scope(node), value: node.initializer, constant: !!(node.parent.flags & ts.NodeFlags.Const) });
-      declarations.set(node.name.text, entries);
-    }
-    ts.forEachChild(node, collect);
-  };
-  collect(root);
-  function binding(node, constantsOnly = false) {
+  const checker = ts.createProgram([path], options, host).getTypeChecker();
+  function binding(node) {
     if (!ts.isIdentifier(node)) return null;
-    const entries = declarations.get(node.text) ?? [];
-    const declares = name =>
-      ts.isIdentifier(name) ? name.text === node.text : name.elements.some(element => ts.isBindingElement(element) && declares(element.name));
-    for (let parent = node; parent; parent = parent.parent) {
-      const entry = entries.find(candidate => candidate.scope === parent);
-      if (entry) return !constantsOnly || entry.constant ? entry.value : null;
-      if (ts.isFunctionLike(parent) && parent.parameters.some(parameter => declares(parameter.name))) return null;
-    }
-    return null;
+    const symbol = ts.isShorthandPropertyAssignment(node.parent) ? checker.getShorthandAssignmentValueSymbol(node.parent) : checker.getSymbolAtLocation(node);
+    const declaration = symbol?.declarations?.length === 1 ? symbol.declarations[0] : undefined;
+    // A nearest destructuring/parameter/import/mutable binding stays unknown; never fall through it.
+    return declaration &&
+      ts.isVariableDeclaration(declaration) &&
+      ts.isIdentifier(declaration.name) &&
+      ts.isVariableDeclarationList(declaration.parent) &&
+      declaration.parent.flags & ts.NodeFlags.Const
+      ? declaration.initializer
+      : null;
   }
   function staticValue(node, seen = new Set()) {
     node = unbox(node);
@@ -109,7 +114,7 @@ export function auditReactSource(path, source, aliases) {
     seen = new Set(seen).add(node);
     if (ts.isStringLiteralLike(node)) return node.text;
     if (ts.isNumericLiteral(node)) return Number(node.text);
-    if (ts.isIdentifier(node)) return staticValue(binding(node, true), seen);
+    if (ts.isIdentifier(node)) return staticValue(binding(node), seen);
     if (ts.isPrefixUnaryExpression(node) && [ts.SyntaxKind.MinusToken, ts.SyntaxKind.PlusToken].includes(node.operator)) {
       const value = staticValue(node.operand, seen);
       if (typeof value === 'number') return node.operator === ts.SyntaxKind.MinusToken ? -value : value;
