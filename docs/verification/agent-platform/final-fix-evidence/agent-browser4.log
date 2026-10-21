@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/browser/agent-panel.spec.ts:2031:1 › final fix discussion guard composes with core draft and uncertain send retry (855ms)
+
+  1 passed (1.7s)

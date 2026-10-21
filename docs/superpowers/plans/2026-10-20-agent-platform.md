@@ -10,7 +10,7 @@
 
 **Spec:** [Desenho e critérios de aceite](../specs/2026-10-20-agent-platform-design.md).
 
-Estado: escopo completo aprovado pelo usuário; execução por etapas autorizada.
+Estado: escopo completo aprovado pelo usuário; execução por etapas autorizada. Revisão ampla em0630425 pediu I1–I9/M1/M2; onda única de correções implementada, aguardando uma revisão scoped do root.009 possui prova isolada; runtime local/hosted permanece008 e ativação real segue separada.
 
 ## Global Constraints
 
@@ -595,6 +595,15 @@ ferramentas não comprova Docker ativo, projeto remoto acessível ou clientes co
 
 Gates6a–6c aprovados, incluindo6b0–6b4 e correções6c: [arquivo de relatórios e revisões](../../verification/agent-platform/README.md). O aggregate6b foi concluído pelos cinco commits/gates menores, não por um commit agregado adicional.
 
-Task6d: [relatório de implementação e comandos](../../verification/agent-platform/task-6d-report.md); revisão independente do corte e revisão ampla final ainda pertencem ao root. Marcação de implementação não equivale a aprovação ou publicação.
+Task6d: [relatório de implementação e comandos](../../verification/agent-platform/task-6d-report.md); gate scoped aprovado emfb881aa. A revisão ampla subsequente pediu as correções registradas no [relatório final](../../verification/agent-platform/final-fix-report.md); rerevisão scoped e ativação pertencem ao root. Marcação de implementação não equivale a aprovação ou publicação.
 
 Task7: backend hospedado até008/API/MCP e wake-up vazio possuem [prova própria](../../verification/agent-platform/hosted-preactivation-proof.md); Cron desabilitado, frontend/Auth/CORS de produção, Hermes real e dois usuários Claude reais continuam pendentes. [Hermes isolado5/5](../../verification/agent-platform/task-7-hermes-isolated-runtime.md) não substitui esses gates.
+
+## Onda única após revisão ampla
+
+- [x] Implementar I1–I9 e M1, com M2 limitado a observação de contenção; preservar12tools,240quota e migrations001–008.
+- [x] Documentar contratos/custo/hash009, testes focados, falhas anteriores e limites no [relatório final](../../verification/agent-platform/final-fix-report.md).
+- [x] Preservar [revisão imutável](../../verification/agent-platform/final-review.md), três decisões novas e [preflight de retenção Hermes](../../verification/agent-platform/task-7-hermes-retention-preflight.md).
+- [ ] Root: uma rerevisão scoped do pacote de correções.
+- [ ] Root: aplicar009 revisada nos alvos corretos e provar API/MCP com Auth/transportes reais, sem confundir SDK/PGlite com esse gate.
+- [ ] Root: confirmar política efetiva de retenção e horizonte completo de entrega/replay antes da ativação.604800segundos cobrem apenas sete esperas Retry-After máximas; fila/outage/replay podem exceder esse prazo.

@@ -1,0 +1,11 @@
+✔ real workspace hook captures high-water before hydration without exhausting 24,001 history rows and refreshes cascades (49.606292ms)
+✔ real paging hook consumes explicit retry then reuses complete graph; continuation failure retains cursor and retries (7.092375ms)
+✔ event committed during mutable hydration is applied from pre-hydration boundary (17.066ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 249.367125

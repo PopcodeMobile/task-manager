@@ -1,0 +1,32 @@
+✖ fresh preferences preserve sequential changes from another repository (1.196042ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 68.223666
+
+✖ failing tests:
+
+test at tests/final-integration.test.mjs:5:1
+✖ fresh preferences preserve sequential changes from another repository (1.196042ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+
+    [
+      'first',
+  -   'other'
+    ]
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/final-integration.test.mjs:14:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'first' ],
+    expected: [ 'first', 'other' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,20 @@
+Check supabase/functions/tests/api.test.ts
+Check supabase/functions/tests/mcp.test.ts
+Check supabase/functions/tests/operations.test.ts
+running 5 tests from ./supabase/functions/tests/api.test.ts
+API rejects missing tokens with safe request-correlated errors ... ok (11ms)
+API rejects unrecognized operations and spoofed identity before dispatch ... ok (493µs)
+input schemas reject unsafe shapes, missing CAS and unbounded lists ... ok (541µs)
+preflight grants CORS only to explicitly configured origins ... ok (359µs)
+005 panel command schemas accept clearable details and bounded atomic batches ... ok (1ms)
+running 2 tests from ./supabase/functions/tests/mcp.test.ts
+MCP discovery is public while tool transport requires delegated OAuth ... ok (135ms)
+Edge discovery advertises the public forwarded origin, never Docker-internal URLs ... ok (511µs)
+running 5 tests from ./supabase/functions/tests/operations.test.ts
+authentication never accepts unsigned decoded identity ... ok (4ms)
+commands cannot be executed using a constructed Actor ... ok (1ms)
+SQL/internal errors are mapped to stable safe errors ... ok (188µs)
+authentication rejects malformed Bearer credentials before contacting Auth ... ok (789µs)
+public error responses never leak underlying details ... ok (1ms)
+
+ok | 12 passed | 0 failed (206ms)

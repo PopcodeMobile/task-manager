@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/browser/agent-panel.spec.ts:2083:1 › final fix blocked execution reason is visible independently from workflow status (644ms)
+
+  1 passed (1.5s)

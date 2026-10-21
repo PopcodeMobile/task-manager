@@ -1,0 +1,41 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 tests/browser/agent-panel.spec.ts:2031:1 › final fix discussion guard composes with core draft and uncertain send retry (5.7s)
+
+
+  1) tests/browser/agent-panel.spec.ts:2031:1 › final fix discussion guard composes with core draft and uncertain send retry
+
+    Error: expect(locator).toHaveValue(expected) failed
+
+    Locator: getByLabel('Comentário', { exact: true })
+    Expected: "Resposta preservada"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveValue" getByLabel('Comentário', { exact: true }) with timeout 5000ms
+      - waiting for getByLabel('Comentário', { exact: true })
+
+
+      2035 |   await page.getByLabel('Comentário', { exact: true }).fill('Resposta preservada');
+      2036 |   await page.getByRole('button', { name: 'Fechar painel' }).click();
+    > 2037 |   await expect(page.getByLabel('Comentário', { exact: true })).toHaveValue('Resposta preservada');
+           |                                                                ^
+      2038 |   await page.getByLabel('Organização', { exact: true }).selectOption(other);
+      2039 |   await expect(page).toHaveURL(new RegExp(workspace));
+      2040 |   f.writeOffline(true);
+        at /Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/browser/agent-panel.spec.ts:2037:64
+
+    Error Context: ../../../../../../tmp/task-manager-finalfix-agent2-20261021/agent-panel-final-fix-disc-b7350-ft-and-uncertain-send-retry/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../tmp/task-manager-finalfix-agent2-20261021/agent-panel-final-fix-disc-b7350-ft-and-uncertain-send-retry/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../../../tmp/task-manager-finalfix-agent2-20261021/agent-panel-final-fix-disc-b7350-ft-and-uncertain-send-retry/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/browser/agent-panel.spec.ts:2031:1 › final fix discussion guard composes with core draft and uncertain send retry

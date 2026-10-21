@@ -1,0 +1,17 @@
+(node:86203) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 009 MCP SDK context pages exact human instructions, task cursor binding and revocation (928.331875ms)
+✔ 009 blocked execution preserves renewal, clears on running/intervention, fences stale claimant and receipts (696.057208ms)
+✔ 009 completed creation is atomic, replay safe, and deletion cascades calendar/notifications (650.822958ms)
+✔ real workspace hook captures high-water before hydration without exhausting 24,001 history rows and refreshes cascades (49.548875ms)
+✔ real paging hook consumes explicit retry then reuses complete graph; continuation failure retains cursor and retries (7.211958ms)
+✔ event committed during mutable hydration is applied from pre-hydration boundary (17.33125ms)
+✔ actual preference callers read fresh before replacing favorite and notification collections (9.992833ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2456.57025

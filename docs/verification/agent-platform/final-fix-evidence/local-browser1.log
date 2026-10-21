@@ -1,0 +1,43 @@
+
+Running 2 tests using 1 worker
+
+  ✓  1 tests/browser/local-panel.spec.ts:24:1 › local entry edits existing browser graph, creates/comments, switches blank workspace and reloads (4.5s)
+  ✘  2 tests/browser/local-panel.spec.ts:2314:1 › final fix completed group inline and drawer creation remain atomic completed tasks (6.0s)
+
+
+  1) tests/browser/local-panel.spec.ts:2314:1 › final fix completed group inline and drawer creation remain atomic completed tasks
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('button', { name: 'Created completed inline', exact: true })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByRole('button', { name: 'Created completed inline', exact: true }) with timeout 5000ms
+      - waiting for getByRole('button', { name: 'Created completed inline', exact: true })
+
+
+      2319 |   await page.getByRole('textbox', { name: 'New task in group: done', exact: true }).fill('Created completed inline');
+      2320 |   await page.getByRole('button', { name: 'Add to group: done', exact: true }).click();
+    > 2321 |   await expect(page.getByRole('button', { name: 'Created completed inline', exact: true })).toBeVisible();
+           |                                                                                             ^
+      2322 |   const url = new URL(page.url());
+      2323 |   url.searchParams.set('task', 'new');
+      2324 |   url.searchParams.set('status', 'done');
+        at /Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/browser/local-panel.spec.ts:2321:93
+
+    Error Context: ../../../../../../tmp/task-manager-finalfix-local-20261021/local-panel-final-fix-comp-c0813-main-atomic-completed-tasks/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../tmp/task-manager-finalfix-local-20261021/local-panel-final-fix-comp-c0813-main-atomic-completed-tasks/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../../../tmp/task-manager-finalfix-local-20261021/local-panel-final-fix-comp-c0813-main-atomic-completed-tasks/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/browser/local-panel.spec.ts:2314:1 › final fix completed group inline and drawer creation remain atomic completed tasks
+  1 passed (11.4s)

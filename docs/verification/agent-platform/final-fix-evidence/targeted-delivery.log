@@ -1,0 +1,53 @@
+(node:89159) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 009 MCP SDK context pages exact human instructions, task cursor binding and revocation (942.508792ms)
+✔ 009 blocked execution preserves renewal, clears on running/intervention, fences stale claimant and receipts (691.278792ms)
+✔ 009 completed creation is atomic, replay safe, and deletion cascades calendar/notifications (663.426875ms)
+✔ real workspace hook captures high-water before hydration without exhausting 24,001 history rows and refreshes cascades (49.285042ms)
+✔ real paging hook consumes explicit retry then reuses complete graph; continuation failure retains cursor and retries (7.693125ms)
+✔ event committed during mutable hydration is applied from pre-hydration boundary (19.599833ms)
+✔ actual preference callers read fresh before replacing favorite and notification collections (10.438667ms)
+✔ failed refresh of a complete history exposes retry and replaces rather than duplicates first page (4.083333ms)
+✔ fresh preferences preserve sequential changes from another repository (0.79375ms)
+✔ maps existing graph with text IDs and metadata, preserves original bytes and reload edits (10.079625ms)
+✔ atomic ordered batch rolls back writes, history and idempotency on stale child CAS (4.195209ms)
+✔ two adapters serialize CAS and persist deduplication across reload without losing unrelated writes (4.946084ms)
+✔ completion recurrence and protected relations are atomic and retry safe (6.252584ms)
+✔ existing workspace records and personal preferences retain unknown fields and isolate identities/views (3.032083ms)
+✔ corrupt/unavailable storage fails without resets, and disposed in-flight work never rehydrates (4.322292ms)
+✔ pre-auth language and account appearance preserve unknown keys without crossing identities (0.604667ms)
+✔ rejects invalid new values, missing local references and private executor fields without changing bytes (2.6145ms)
+✔ existing v1 records with unknown envelope metadata survive commands and storage failure (3.037208ms)
+✔ adapter bookkeeping stays outside graph and a legacy writer cannot bypass React CAS (4.598458ms)
+✔ workspace creation retries return one blank workspace (3.545458ms)
+✔ scalar/null and malformed persisted envelopes never seed or reset existing bytes (0.209042ms)
+✔ a disposed queued command cannot commit into a reactivated repository (1.954125ms)
+✔ attributes cannot change identities and dependency cycles roll back without touching the graph (2.068458ms)
+✔ an older writer replacing the record envelope preserves command deduplication and forces stale CAS recovery (4.997417ms)
+✔ deleting a task or project requires unlinking files referenced by surviving tasks (2.706042ms)
+✔ an existing identity language takes precedence over the shared pre-auth fallback (0.101791ms)
+✔ fresh first entry into a secondary workspace imports legacy views only under the original workspace (1.350583ms)
+✔ newly created task returns a stable version usable by the next CAS command (3.306042ms)
+✔ newly created project returns a stable version usable by the next CAS command (2.90275ms)
+✔ newly created comment returns a stable version usable by the next CAS command (3.892708ms)
+✔ generated tasks from duplicate_task start with stable versions and support immediate CAS (4.141042ms)
+✔ generated tasks from complete_task start with stable versions and support immediate CAS (4.129375ms)
+✔ a genuinely external legacy creation retains conservative revision-derived CAS initialization (3.949084ms)
+✔ combined completion uses effective fields for rescheduled weekly task and retries only once (3.209708ms)
+✔ combined completion uses effective fields for changed recurrence and retries only once (3.540625ms)
+✔ combined completion uses effective fields for removed recurrence and retries only once (2.800917ms)
+✔ combined completion uses effective fields for removed due date and retries only once (2.807083ms)
+✔ combined completion uses effective fields for newly enabled recurrence and retries only once (3.26025ms)
+✔ combined recurring completion rolls back its generated graph when a later batch child conflicts (2.302375ms)
+✔ a delayed first-import preference read cannot overwrite a concurrently saved selection or workspace views (1.584041ms)
+✔ an overlapping bootstrap preference write preserves both legacy migration and canonical current choices (1.3305ms)
+✔ completed creation uses atomic create then complete; raw done creation is denied and replay creates one row (3.667541ms)
+✔ local task-event continuation advances beyond the first hundred records (3.598834ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2469.675625

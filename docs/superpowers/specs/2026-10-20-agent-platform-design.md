@@ -279,3 +279,7 @@ identificar explicitamente o projeto de destino e revisar seu estado.
 - [Webhooks e assinaturas do Hermes](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/webhooks)
 - [Conectores remotos do Claude](https://support.claude.com/pt/articles/11175166-comece-com-conectores-personalizados-usando-mcp-remoto)
 - [Instalação shadcn com Vite](https://ui.shadcn.com/docs/installation/vite)
+
+## Contratos aditivos após revisão ampla
+
+A onda final preserva os12nomes MCP e formaliza os três seams aprovados pelo root no [relatório final](../../verification/agent-platform/final-fix-report.md), com decisões literais no arquivo de rulings. `get_task` recebe context opcional comments/subtasks/dependencies/files/attachments, Page limitado100 e cursor vinculado a workspace/tarefa/família. `renew_task_claim` recebe executionState running|blocked e blockingReason limitado2000, sob CAS/reserva vigente; execução permanece separada de backlog/todo/progress/review/done. `get_event_cursor` é leitura HTTP/repositório, capturada antes da hidratação; histórico usa continuação visível e completude explícita.009 é aditiva e ainda depende de rerevisão/runtime gate do root; não alterar retroativamente001–008.

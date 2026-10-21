@@ -1,0 +1,29 @@
+(node:68511) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ 009 MCP SDK context pages exact human instructions, task cursor binding and revocation (951.935709ms)
+✔ 009 blocked execution preserves renewal, clears on running/intervention, fences stale claimant and receipts (741.081709ms)
+✔ 009 completed creation is atomic, replay safe, and deletion cascades calendar/notifications (677.409292ms)
+✖ real workspace hook captures high-water before hydration without exhausting 24,001 history rows and refreshes cascades (56.202125ms)
+✔ real paging hook consumes explicit retry then reuses complete graph; continuation failure retains cursor and retries (9.218666ms)
+✔ fresh preferences preserve sequential changes from another repository (0.78175ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2561.347792
+
+✖ failing tests:
+
+test at tests/final-hooks.test.mjs:14:1
+✖ real workspace hook captures high-water before hydration without exhausting 24,001 history rows and refreshes cascades (56.202125ms)
+  SyntaxError: Unexpected token ':'
+      at new Function (<anonymous>)
+      at harness (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/final-hooks.test.mjs:10:19)
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/final-hooks.test.mjs:20:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)

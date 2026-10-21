@@ -1,0 +1,162 @@
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000001
+(1 row)
+
+                                                                                                                   migrate_workspace                                                                                                                    |                                                                                                                   migrate_workspace
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"counts": {"files": 0, "tasks": 0, "teams": 4, "events": 0, "notifs": 0, "activity": 0, "comments": 0, "projects": 0, "savedViews": 0}, "personalState": "snapshot_retained", "sourceRevision": 0, "unresolvedUsers": [], "personalStateOwner": null} | {"counts": {"files": 0, "tasks": 0, "teams": 1, "events": 0, "notifs": 0, "activity": 0, "comments": 0, "projects": 0, "savedViews": 0}, "personalState": "snapshot_retained", "sourceRevision": 0, "unresolvedUsers": [], "personalStateOwner": null}
+(1 row)
+
+ ?column?
+----------
+ t
+(1 row)
+
+ ?column?
+----------
+ t
+(1 row)
+
+ guard_reject
+--------------
+
+(1 row)
+
+ guard_assert
+--------------
+
+(1 row)
+
+ guard_assert
+--------------
+
+(1 row)
+
+ ?column?
+----------
+ t
+(1 row)
+
+ ?column?
+----------
+ t
+(1 row)
+
+ ?column?
+----------
+ t
+(1 row)
+
+ ?column?
+----------
+ t
+(1 row)
+
+ guard_reject
+--------------
+
+(1 row)
+
+ guard_reject
+--------------
+
+(1 row)
+
+ guard_reject
+--------------
+
+(1 row)
+
+ guard_assert
+--------------
+
+(1 row)
+
+ ?column?
+----------
+ t
+(1 row)
+
+ guard_reject
+--------------
+
+(1 row)
+
+ guard_reject
+--------------
+
+(1 row)
+
+ guard_assert
+--------------
+
+(1 row)
+
+ guard_assert
+--------------
+
+(1 row)
+
+ guard_assert
+--------------
+
+(1 row)
+
+ guard_assert
+--------------
+
+(1 row)
+
+ guard_assert
+--------------
+
+(1 row)
+
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000002
+(1 row)
+
+ guard_reject
+--------------
+
+(1 row)
+
+              set_config
+--------------------------------------
+ 00000000-0000-0000-0000-000000000003
+(1 row)
+
+ guard_reject
+--------------
+
+(1 row)
+
+                      set_config
+------------------------------------------------------
+ {"client_id":"10000000-0000-0000-0000-000000000008"}
+(1 row)
+
+ guard_assert
+--------------
+
+(1 row)
+
+ guard_reject
+--------------
+
+(1 row)
+
+ guard_reject
+--------------
+
+(1 row)
+
+               result
+------------------------------------
+ TEST008 SQL contract checks passed
+(1 row)
+
+Observed distinct winner/waiter backends and lock contention before release.
+TEST008 PostgreSQL 17: warm007, atomic guards, replay, tenant/guest/agent/ACL and two-session serialization passed.

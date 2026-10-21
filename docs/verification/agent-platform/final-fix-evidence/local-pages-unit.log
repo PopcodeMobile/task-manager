@@ -1,0 +1,19 @@
+✔ completed creation uses atomic create then complete; raw done creation is denied and replay creates one row (9.093834ms)
+✖ local task-event continuation advances beyond the first hundred records (2.871833ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 103.834625
+
+✖ failing tests:
+
+test at tests/local-panel-repository.test.mjs:508:1
+✖ local task-event continuation advances beyond the first hundred records (2.871833ms)
+  TypeError: Cannot set properties of undefined (setting 'events')
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/local-panel-repository.test.mjs:513:53)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)

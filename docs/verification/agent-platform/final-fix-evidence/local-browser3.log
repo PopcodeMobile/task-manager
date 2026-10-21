@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/browser/local-panel.spec.ts:2314:1 › final fix completed group inline and drawer creation remain atomic completed tasks (1.6s)
+
+  1 passed (2.5s)

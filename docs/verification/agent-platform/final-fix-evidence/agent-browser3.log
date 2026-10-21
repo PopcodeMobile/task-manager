@@ -1,0 +1,43 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 tests/browser/agent-panel.spec.ts:2031:1 › final fix discussion guard composes with core draft and uncertain send retry (5.7s)
+
+
+  1) tests/browser/agent-panel.spec.ts:2031:1 › final fix discussion guard composes with core draft and uncertain send retry
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByRole('alert').last()
+    Expected substring: "conexão"
+    Received string:    "Envie ou descarte esta resposta antes de sair da conversa. Um envio pendente precisa terminar."
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toContainText" getByRole('alert').last() with timeout 5000ms
+      - waiting for getByRole('alert').last()
+        14 × locator resolved to <p role="alert">Envie ou descarte esta resposta antes de sair da …</p>
+           - unexpected value "Envie ou descarte esta resposta antes de sair da conversa. Um envio pendente precisa terminar."
+
+
+      2042 |   f.writeOffline(true);
+      2043 |   await page.getByRole('button', { name: 'Comentar', exact: true }).click();
+    > 2044 |   await expect(page.getByRole('alert').last()).toContainText('conexão');
+           |                                                ^
+      2045 |   await expect(page.getByRole('textbox', { name: 'Comentário', exact: true })).toBeDisabled();
+      2046 |   await page.getByRole('button', { name: 'Fechar painel' }).click();
+      2047 |   await expect(page.getByRole('textbox', { name: 'Comentário', exact: true })).toHaveValue('Resposta preservada');
+        at /Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/browser/agent-panel.spec.ts:2044:48
+
+    Error Context: ../../../../../../tmp/task-manager-finalfix-agent3-20261021/agent-panel-final-fix-disc-b7350-ft-and-uncertain-send-retry/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../tmp/task-manager-finalfix-agent3-20261021/agent-panel-final-fix-disc-b7350-ft-and-uncertain-send-retry/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../../../tmp/task-manager-finalfix-agent3-20261021/agent-panel-final-fix-disc-b7350-ft-and-uncertain-send-retry/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/browser/agent-panel.spec.ts:2031:1 › final fix discussion guard composes with core draft and uncertain send retry

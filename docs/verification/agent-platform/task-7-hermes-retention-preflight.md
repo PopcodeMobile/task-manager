@@ -1,0 +1,53 @@
+# Main Hermes retention preflight
+
+Archive note: this Markdown view is formatter-normalized from the [byte-identical original](final-fix-evidence/task-7-hermes-retention-preflight.raw.txt); observations and conclusions are unchanged.
+
+2026-10-21. Narrow read-only operations preflight for the main deployment only. This does not repeat the existing durable-admission or isolated-runtime proofs.
+
+## Observed result
+
+SSH BatchMode authentication succeeded. Installed `/usr/local/lib/hermes-agent` HEAD is exactly `493208879a3248c6a4b844981d2c31c78ae00929`. `systemctl show hermes-gateway --property=ActiveState,SubState,MainPID,FragmentPath` returned active/running, MainPID 958026, and `/etc/systemd/system/hermes-gateway.service`.
+
+An allowlisted structural reader of `/root/.hermes/config.yaml` found no `sessions` section and no explicit values for any of the seven supported retention/maintenance keys below. The reader reported no duplicate-section/key, merge, document-marker or unsupported-section uncertainty. `/etc/hermes/config.yaml`, the source-defined default managed overlay location, does not exist.
+
+This proves the observed main-file/default resolution below. It does **not** prove the running process's effective configuration: its environment, alternative managed directory, worker snapshot, selected home/profile and in-process configuration were intentionally not inspected. The requested main home was supplied as scope, not independently established from process environment.
+
+| Supported config key                | Main file | Installed default | Main-file/default resolution                |
+| ----------------------------------- | --------- | ----------------- | ------------------------------------------- |
+| `sessions.auto_prune`               | absent    | false             | automatic session pruning disabled          |
+| `sessions.retention_days`           | absent    | 90                | dormant threshold while auto_prune is false |
+| `sessions.min_interval_hours`       | absent    | 24                | shared minimum maintenance interval         |
+| `sessions.auto_archive`             | absent    | false             | soft archive disabled                       |
+| `sessions.auto_archive_days`        | absent    | 3                 | dormant archive threshold                   |
+| `sessions.vacuum_after_prune`       | absent    | true              | vacuum permitted after an eligible prune    |
+| `sessions.min_vacuum_interval_days` | absent    | 30                | separate minimum vacuum interval            |
+
+`retention_days` is an inactive-session age threshold when pruning is enabled, not an expiry promise. Disabled automatic pruning supplies no automatic finite session-expiry horizon; it does not protect against manual deletion/pruning or other maintenance. Auto-archive only hides sessions, so its three-day default is not a deletion horizon. Maintenance cadence is a throttle, not a guaranteed extra retention allowance. No setting was changed.
+
+## Commit-specific source basis
+
+All remote paths below are under the verified installed source root:
+
+- `hermes_cli/config_defaults.py:2279-2308`: exact seven allowlisted defaults and supported semantics.
+- `hermes_cli/config.py:431-433`: main config path is the selected Hermes home plus config.yaml; `1487-1502` recursive default/user merge; `2325-2328` worker snapshot alternative; `2358-2373` default/user layering; `2393-2394` environment expansion and managed overlay.
+- `hermes_cli/managed_scope.py:31,45-58,107-109`: default `/etc/hermes` managed directory, environment-selectable alternate directory, and config.yaml overlay.
+- `gateway/run.py:4423-4440`: session maintenance reads these keys, gates pruning on auto_prune, and supplies retention/cadence/vacuum settings; `4536-4540` schedules the scoped maintenance chore.
+- `hermes_state_maintenance.py:252-263,270-273`: inactivity-based threshold; `478-529`: pruning throttle and invocation; negative retention is rejected and `auto_prune: false` is the documented disable switch.
+
+No installed Hermes module was imported or run to calculate configuration; that loader can create directories/backups, so only source and the narrow YAML block/key reader were used. The reader returned allowlisted boolean/numeric scalars or absence only. It emitted no raw config, unrelated key, secret, environment value or message.
+
+## Activation gate
+
+The retention part of live activation remains conditional. The observed main file supplies no auto-prune conflict, but the running process's effective policy has not been proven within this read-only scope. Do not describe effective runtime auto_prune=false as verified. Require operational confirmation that the main route's live sessions/admissions will remain retained through the full actual retry and intended replay period, and that manual/other deletion will not invalidate that period. Preserve the existing stable profile/home/route identity constraints from the prior report.
+
+The current Task Manager source changes the planning floor beyond the earlier backoff-only figure: `supabase/functions/_shared/webhook-delivery.ts:30-40` uses waits `[30,120,600,1800,7200,21600,86400]` and permits Retry-After to raise each wait to at most 86400 seconds; `:137` permits retry only before attempt eight. Seven maximum waits therefore total **604800 seconds (seven days)**, versus the base sum **117750 seconds (32h42m30s)**. This is only the programmed-delay component: add attempt duration, queue/lease/poll or outage latency, an explicitly chosen operational allowance and any later manual replay horizon. Queue/outage/manual replay delay is not bounded by that seven-day calculation. A fixed seven-day retention setting is therefore not a proven safety guarantee.
+
+Do not propose an arbitrary retention change. If the eventual effective pruning policy is shorter than the chosen complete delivery/replay horizon, activation must wait for an explicitly scoped retention decision or a separately proven durable receiver/replay strategy. Existing retired tombstones do not establish webhook replay safety after session deletion; that boundary remains as documented in the prior reconnaissance/runtime report.
+
+## Execution and limits
+
+Every remote call used `ssh -o BatchMode=yes -o ConnectTimeout=10 root@72.62.15.30 python3 -B -`, with bounded, supplied stdlib source/allowlist readers on stdin. Read-only subprocesses inside those readers were exactly `git -C /usr/local/lib/hermes-agent rev-parse HEAD` and the systemctl show command above. All calls exited zero; authentication did not fail and no interactive authentication was attempted.
+
+No remote writes, service restart, provider/model request, database/session/message read, environment read or credential extraction occurred. Lili and `/root/.hermes/profiles/lili` were not inspected. No active-runtime config loader, process-environment read or environment-file read was used. No worktree file, test, dependency, build or deployment was changed. Local delivery source was read only to assess the current Retry-After horizon; it is being edited independently, so this report describes the inspected source and requires reconciliation if that logic changes.
+
+The sole artifact from this preflight is `/tmp/task-manager-hermes-retention-preflight.md`. Stop condition reached: observed main-file/default retention controls, active-runtime limits and concrete conditional activation gate recorded.

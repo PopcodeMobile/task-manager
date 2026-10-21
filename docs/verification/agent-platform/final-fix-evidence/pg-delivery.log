@@ -1,0 +1,30 @@
+00000000-0000-0000-0000-000000000001
+{"counts": {"files": 0, "tasks": 1, "teams": 0, "events": 0, "notifs": 0, "activity": 0, "comments": 0, "projects": 1, "savedViews": 0}, "personalState": "snapshot_retained", "sourceRevision": 0, "unresolvedUsers": [], "personalStateOwner": null}
+
+t
+
+00000000-0000-0000-0000-000000000003
+t
+t
+
+
+
+
+t
+
+
+00000000-0000-0000-0000-000000000001
+t
+
+
+
+t
+t
+
+
+
+
+
+TEST009 bounded PostgreSQL assertions passed
+
+009 fresh PostgreSQL 17: authority, task context paging, execution transitions, one durable pgmq blocked event, minimal body, replay and graph cascades passed.

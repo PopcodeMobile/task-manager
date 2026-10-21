@@ -1,0 +1,41 @@
+
+Running 1 test using 1 worker
+
+  ✘  1 tests/browser/local-panel.spec.ts:2314:1 › final fix completed group inline and drawer creation remain atomic completed tasks (6.3s)
+
+
+  1) tests/browser/local-panel.spec.ts:2314:1 › final fix completed group inline and drawer creation remain atomic completed tasks
+
+    Error: expect(locator).toHaveValue(expected) failed
+
+    Locator: getByLabel('Status', { exact: true })
+    Expected: "done"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveValue" getByLabel('Status', { exact: true }) with timeout 5000ms
+      - waiting for getByLabel('Status', { exact: true })
+
+
+      2324 |   url.searchParams.set('status', 'done');
+      2325 |   await page.goto(url.href);
+    > 2326 |   await expect(page.getByLabel('Status', { exact: true })).toHaveValue('done');
+           |                                                            ^
+      2327 |   await page.getByLabel('Title', { exact: true }).fill('Created completed drawer');
+      2328 |   await page.getByRole('button', { name: 'Create task', exact: true }).click();
+      2329 |   await expect(page.getByRole('heading', { name: 'Task details', exact: true })).toBeVisible();
+        at /Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/browser/local-panel.spec.ts:2326:60
+
+    Error Context: ../../../../../../tmp/task-manager-finalfix-local2-20261021/local-panel-final-fix-comp-c0813-main-atomic-completed-tasks/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../../../../../tmp/task-manager-finalfix-local2-20261021/local-panel-final-fix-comp-c0813-main-atomic-completed-tasks/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../../../../../tmp/task-manager-finalfix-local2-20261021/local-panel-final-fix-comp-c0813-main-atomic-completed-tasks/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    tests/browser/local-panel.spec.ts:2314:1 › final fix completed group inline and drawer creation remain atomic completed tasks

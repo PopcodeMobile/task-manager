@@ -1,0 +1,28 @@
+✖ failed refresh of a complete history exposes retry and replaces rather than duplicates first page (34.198667ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 207.801333
+
+✖ failing tests:
+
+test at tests/final-hooks.test.mjs:258:1
+✖ failed refresh of a complete history exposes retry and replaces rather than duplicates first page (34.198667ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+  false !== true
+
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/final-hooks.test.mjs:271:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

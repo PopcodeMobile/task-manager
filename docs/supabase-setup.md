@@ -18,6 +18,7 @@ Apply the original `202610160001_workspaces.sql` and then the additive migration
 | `202610200006` | File metadata duplication                                                                    |
 | `202610200007` | Atomic task-graph copies                                                                     |
 | `202610200008` | Optional exact team-membership baselines                                                     |
+| `202610200009` | Task-context pages, structured execution and event high-water (source; runtime gate pending) |
 
 The dedicated hosted project has reviewed migrations through 008 and actual hosted API/MCP evidence recorded in [hosted preactivation proof](verification/agent-platform/hosted-preactivation-proof.md). This is not permission to target another project or proof that the final frontend is published. Production frontend origin, Auth Site URL/redirect allowlist, consent origin and CORS still require the actual deployment URL. Configure only that intended project; do not push local Auth defaults wholesale.
 
@@ -59,3 +60,9 @@ npm run test:e2e
 ```
 
 The SDK file accepts the dedicated local status JSON (`API_URL`, `ANON_KEY`, `SERVICE_ROLE_KEY`) or `url`, `key`, `serviceKey`. It refuses non-loopback hosts, creates unique fixtures and removes workspaces/accounts in `finally`; the service key is used only for setup/cleanup. Never commit this file. The local Supabase project uses API 61921/DB 61922; do not reset unrelated projects. Browser live suites use `TEST_SUPABASE_URL`, `TEST_SUPABASE_ANON_KEY`, `TEST_SUPABASE_SERVICE_ROLE_KEY` loaded privately. Default CI does not assert those optional live gates.
+
+## Final009 rollout boundary
+
+The [final-fix report](verification/agent-platform/final-fix-report.md) specifies the exact009 hash, contracts and root-owned live fixture/setup/cleanup map. Shared local and hosted runtime remains008 at this handoff.009 passed actual isolated PostgreSQL/pgmq and actual MCP SDK with injected Auth/PGlite; neither is a new live API/Auth acceptance. Root must first complete scoped review, freeze that hash and apply009 plus matched API/MCP code to the intended targets. The new frontend calls authorized `/api/v1/workspaces/{workspace_id}/event-cursor` before hydration and must not be published against008.
+
+`get_task` optionally returns a bounded context page for comments/subtasks/dependencies/files/attachments while preserving its default envelope and twelve MCP names. `renew_task_claim` optionally records running/blocked execution and bounded reason, separate from task workflow. Detailed pagination, quota cost, authority, expiry/revocation and retry semantics are in the report. The existing live SDK test config is local-only; final-contracts uses in-memory SDK/PGlite only. Do not repoint either isolated SQL harness at shared/hosted services.

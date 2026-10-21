@@ -1,0 +1,7 @@
+
+> gr8r-studio@1.0.0 format:check
+> prettier --check .
+
+Checking formatting...
+[warn] docs/verification/agent-platform/task-7-hermes-retention-preflight.md
+[warn] Code style issues found in the above file. Run Prettier with --write to fix.

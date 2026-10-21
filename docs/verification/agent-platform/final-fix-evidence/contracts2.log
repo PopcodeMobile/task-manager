@@ -1,0 +1,25 @@
+(node:67486) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✖ 009 MCP SDK context pages exact human instructions, task cursor binding and revocation (944.827ms)
+✔ 009 blocked execution preserves renewal, clears on running/intervention, fences stale claimant and receipts (719.582333ms)
+✔ 009 completed creation is atomic, replay safe, and deletion cascades calendar/notifications (657.936417ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2510.796916
+
+✖ failing tests:
+
+test at tests/final-contracts.test.mjs:28:1
+✖ 009 MCP SDK context pages exact human instructions, task cursor binding and revocation (944.827ms)
+  Error [PublicError]: unauthorized
+      at authenticate (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/supabase/functions/_shared/auth.ts:27:60)
+      at TestContext.<anonymous> (file:///Users/hdoria/projects/task-manager/.worktrees/agent-platform/tests/final-contracts.test.mjs:49:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    code: 'unauthorized'
+  }
