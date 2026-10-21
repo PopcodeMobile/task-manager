@@ -358,3 +358,24 @@ for (const name of ['authenticate_organization_agent_token', 'read_organization_
       assert.throws(() => audit(objects), /sensitive API bridge/);
     });
 }
+
+function projectTokenCatalog() {
+  return change(tokenCatalog(), 'execute_organization_agent_operation', o => ({
+    source: o.source.replace("'complete_task')", "'complete_task','create_project','update_project','archive_project')"),
+  }));
+}
+test('012 exact project-token extension is audited without broadening administrative authority', () => {
+  assert.ok(audit(projectTokenCatalog()).some(o => o.name === 'execute_organization_agent_operation'));
+});
+for (const operation of ['delete_project', 'restore_project', 'set_project_member', 'batch'])
+  test(`012 token extension still rejects extra ${operation}`, () => {
+    assert.throws(
+      () =>
+        audit(
+          change(projectTokenCatalog(), 'execute_organization_agent_operation', o => ({
+            source: o.source.replace("'archive_project')", "'archive_project','" + operation + "')"),
+          })),
+        ),
+      /token write allowlist/,
+    );
+  });

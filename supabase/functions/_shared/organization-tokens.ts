@@ -4,7 +4,18 @@ import { PublicError, publicError } from './errors.ts';
 export const organizationTokenFormat = /^krs_[0-9a-f]{32}_[A-Za-z0-9_-]{43}$/;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const reads = new Set(['list_workspaces', 'list_projects', 'list_tasks', 'get_task', 'list_task_activity']);
-const writes = new Set(['create_task', 'claim_task', 'renew_task_claim', 'release_task_claim', 'update_task', 'add_task_comment', 'complete_task']);
+const writes = new Set([
+  'create_task',
+  'claim_task',
+  'renew_task_claim',
+  'release_task_claim',
+  'update_task',
+  'add_task_comment',
+  'complete_task',
+  'create_project',
+  'update_project',
+  'archive_project',
+]);
 type Backend = { url: string; apiKey: string };
 
 /** Opaque secrets are RPC arguments, never PostgREST JWTs or public actor fields. */

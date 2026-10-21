@@ -89,6 +89,16 @@ test('009 MCP SDK context pages exact human instructions, task cursor binding an
       const args = JSON.parse(options.body);
       await db.query("select set_config('request.jwt.claim.sub',$1,false),set_config('request.jwt.claim.client_id',$2,false)", [member, cid]);
       try {
+        if (String(url).endsWith('/execute_operation')) {
+          const rows = await db.query('select public.execute_operation($1,$2,$3,$4,$5) result', [
+            args.p_workspace_id,
+            args.p_operation,
+            JSON.stringify(args.p_command),
+            args.p_idempotency_key,
+            args.p_expected_version,
+          ]);
+          return Response.json(rows.rows[0].result);
+        }
         return Response.json(await read(args.p_operation, args.p_query, args.p_workspace_id));
       } catch (error) {
         return Response.json({ code: error.code, message: error.message }, { status: 403 });
@@ -100,7 +110,60 @@ test('009 MCP SDK context pages exact human instructions, task cursor binding an
     const [a, b] = InMemoryTransport.createLinkedPair();
     await server.connect(a);
     await client.connect(b);
-    assert.equal((await client.listTools()).tools.length, 12);
+    assert.deepEqual(
+      (await client.listTools()).tools.map(t => t.name).sort(),
+      [
+        'list_workspaces',
+        'list_projects',
+        'list_tasks',
+        'get_task',
+        'list_task_activity',
+        'create_task',
+        'claim_task',
+        'renew_task_claim',
+        'release_task_claim',
+        'update_task',
+        'add_task_comment',
+        'complete_task',
+        'create_project',
+        'update_project',
+        'archive_project',
+      ].sort(),
+    );
+    const projectCreate = await client.callTool({
+      name: 'create_project',
+      arguments: {
+        workspace_id: ws,
+        idempotency_key: 'oauth-project-create',
+        input: { name: 'OAuth project' },
+      },
+    });
+    assert.equal(projectCreate.isError, undefined);
+    const project = projectCreate.structuredContent.data;
+    assert.equal(project.name, 'OAuth project');
+    assert.equal(project.version, 1);
+    const projectEdit = await client.callTool({
+      name: 'update_project',
+      arguments: {
+        workspace_id: ws,
+        idempotency_key: 'oauth-project-edit',
+        expected_version: 1,
+        input: { id: project.id, name: 'Renamed OAuth' },
+      },
+    });
+    assert.equal(projectEdit.structuredContent.data.name, 'Renamed OAuth');
+    assert.equal(projectEdit.structuredContent.data.version, 2);
+    const projectArchive = await client.callTool({
+      name: 'archive_project',
+      arguments: {
+        workspace_id: ws,
+        idempotency_key: 'oauth-project-archive',
+        expected_version: 2,
+        input: { id: project.id },
+      },
+    });
+    assert.equal(projectArchive.structuredContent.data.archived, true);
+    assert.equal(projectArchive.structuredContent.data.version, 3);
     const first = (await client.callTool({ name: 'get_task', arguments: { workspace_id: ws, id: 't1', context: 'comments', limit: 100 } })).structuredContent;
     assert.equal(first.context.items.length, 100);
     assert.ok(first.context.nextCursor);

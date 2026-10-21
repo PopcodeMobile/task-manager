@@ -7,7 +7,7 @@ Tokens permitem conectar agentes externos ao MCP/API do Kairos sem login interat
 1. Entre no Kairos e selecione a organização desejada.
 2. Abra **Configurações → Integrações → Tokens de agentes**. Integrações fica na seção da organização. O atalho em Ajuda e recursos e a busca no menu de comandos também continuam disponíveis.
 3. Informe um nome, como Hermes VPS.
-4. Selecione **Somente leitura** ou **Leitura e escrita**. Para criar tarefas, use leitura e escrita. O projeto de destino precisa existir.
+4. Selecione **Somente leitura** ou **Leitura e escrita**. Para criar projetos ou tarefas, use leitura e escrita. Você pode criar o projeto pelo próprio MCP antes de adicionar tarefas.
 5. Escolha 30, 90 ou 365 dias, ou **Sem expiração**. O padrão é 90 dias.
 6. Clique em **Gerar token**, copie e guarde o valor. Depois de fechar a exibição, o segredo não pode ser recuperado.
 
@@ -41,7 +41,7 @@ Exemplo de pedido ao agente:
 
 ## Limites e operações
 
-As cinco leituras são `list_workspaces`, `list_projects`, `list_tasks`, `get_task` e `list_task_activity`. Com escrita, as sete ações adicionais são `create_task`, `claim_task`, `renew_task_claim`, `release_task_claim`, `update_task`, `add_task_comment` e `complete_task`. As rotas REST equivalentes também aceitam o Bearer. Configurações, membros, projetos, logos, webhooks, preferências e administração de tokens não são liberados por essa credencial.
+As cinco leituras são `list_workspaces`, `list_projects`, `list_tasks`, `get_task` e `list_task_activity`. Com escrita, as dez ações adicionais são `create_project`, `update_project`, `archive_project`, `create_task`, `claim_task`, `renew_task_claim`, `release_task_claim`, `update_task`, `add_task_comment` e `complete_task`. As rotas REST equivalentes também aceitam o Bearer. Configurações, membros, exclusão de projetos, logos, webhooks, preferências e administração de tokens não são liberados por essa credencial. Consulte os [exemplos de projetos](mcp-projects.md).
 
 `list_workspaces` retorna somente a organização do token. Entidades usam `workspace_id`; escritas usam `idempotency_key`; atualizações/reservas exigem a versão atual e, quando aplicável, o `claimToken`. Repetir uma tentativa idêntica usa a mesma chave. A rotação preserva essa identidade, evitando tarefas duplicadas. Falta de permissão, expiração, substituição ou revogação impede novas chamadas, inclusive tentativas de recuperar recibos antigos.
 

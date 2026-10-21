@@ -113,7 +113,7 @@ Deno.test('token boundary rejects administration, cross organization and readonl
       await assertRejects(() => executeQuery(actor, operation, workspaceId), Error, 'forbidden');
     }
     await assertRejects(() => executeQuery(actor, 'list_tasks', crypto.randomUUID()), Error, 'forbidden');
-    for (const operation of ['create_workspace', 'create_project', 'batch', 'revoke_organization_agent_token']) {
+    for (const operation of ['create_workspace', 'delete_project', 'restore_project', 'batch', 'revoke_organization_agent_token']) {
       await assertRejects(() => executeCommand(actor, operation, { workspaceId, idempotencyKey: 'denied', input: {} }), Error, 'forbidden');
     }
     assertEquals(calls.length, 1);
@@ -125,7 +125,17 @@ Deno.test('token boundary rejects administration, cross organization and readonl
       'forbidden',
     );
     assertEquals(calls.length, 2);
-    for (const operation of ['claim_task', 'renew_task_claim', 'release_task_claim', 'update_task', 'add_task_comment', 'complete_task']) {
+    for (const operation of [
+      'claim_task',
+      'renew_task_claim',
+      'release_task_claim',
+      'update_task',
+      'add_task_comment',
+      'complete_task',
+      'create_project',
+      'update_project',
+      'archive_project',
+    ]) {
       await assertRejects(() => executeCommand(reader, operation, { workspaceId, idempotencyKey: 'denied', input: {} }), Error, 'forbidden');
     }
     assertEquals(calls.length, 2);
@@ -184,6 +194,7 @@ Deno.test('JWT user verification and original database bearer header survive tok
     const encode = (value: unknown) => btoa(JSON.stringify(value)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
     const jwt = (change: Record<string, unknown> = {}) => `${encode({ alg: 'HS256' })}.${encode({ ...claims, ...change })}.verified-signature`;
     let verifications = 0;
+    const projectOperations: string[] = [];
     globalThis.fetch = async (input, init) => {
       const req = new Request(input, init);
       assertEquals(req.headers.get('apikey'), 'public-test-key');
@@ -191,15 +202,27 @@ Deno.test('JWT user verification and original database bearer header survive tok
         verifications++;
         return Response.json({ id: userId });
       }
-      assertEquals(req.url, 'https://backend.example.test/rest/v1/rpc/read_operation');
       assertEquals(req.headers.get('authorization'), `Bearer ${jwt()}`);
       const body = await req.json();
       assertEquals(Object.hasOwn(body, 'p_token'), false);
+      if (req.url.endsWith('/execute_operation')) {
+        projectOperations.push(body.p_operation);
+        return Response.json({ data: { id: 'p1' }, eventId: 'project-event' });
+      }
+      assertEquals(req.url, 'https://backend.example.test/rest/v1/rpc/read_operation');
       return Response.json({ items: [], nextCursor: null });
     };
     const actor = await authenticate(request(jwt()));
     assertEquals(actor, { userId, clientId: 'oauth-client', connectionId: null });
     await executeQuery(actor, 'list_workspaces', null);
+    for (const operation of ['create_project', 'update_project', 'archive_project'])
+      await executeCommand(actor, operation, {
+        workspaceId,
+        idempotencyKey: 'oauth-project-' + operation,
+        expectedVersion: 1,
+        input: operation === 'create_project' ? { name: 'OAuth project' } : { id: 'p1' },
+      });
+    assertEquals(projectOperations, ['create_project', 'update_project', 'archive_project']);
     for (const change of [
       { sub: crypto.randomUUID() },
       { iss: 'https://other.example.test' },
@@ -240,6 +263,9 @@ Deno.test('real MCP SDK can initialize/list/read/create with opaque token and fr
           'update_task',
           'add_task_comment',
           'complete_task',
+          'create_project',
+          'update_project',
+          'archive_project',
         ].sort(),
       );
       const own = await client.callTool({ name: 'list_workspaces', arguments: {} });
@@ -279,6 +305,71 @@ Deno.test('MCP initialize and tools discovery revalidate after initial credentia
       assertEquals(response.status, 401);
       assertEquals(response.headers.get('Cache-Control'), 'no-store');
       assert(!JSON.stringify(await response.json()).includes(token));
+    }
+  }),
+);
+
+Deno.test('MCP project tools dispatch strict writes with CAS and deny read-only or cross-workspace authority', () =>
+  fixture(async (calls, state) => {
+    const client = new Client({ name: 'project-tools-test', version: '1.0.0' });
+    try {
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL('https://edge.example.test/functions/v1/mcp'), {
+          requestInit: { headers: { authorization: `Bearer ${token}` } },
+          fetch: (input, init) => handleMcpRequest(new Request(input, init)),
+        }),
+      );
+      const catalog = (await client.listTools()).tools;
+      const writeCount = () => calls.filter(c => c.name === 'execute_organization_agent_operation').length;
+      const invoke = (name: string, input: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+        client.callTool({
+          name,
+          arguments: { workspace_id: workspaceId, idempotency_key: 'projects-' + name, input, ...extra },
+        });
+      for (const [name, input, extra] of [
+        ['create_project', { name: 'Agent project', description: 'Details', status: 'active', attributes: { color: '#123456' } }, {}],
+        ['update_project', { id: 'p1', name: 'Renamed project', dueDate: null, archived: false }, { expected_version: 1 }],
+        ['archive_project', { id: 'p1' }, { expected_version: 2 }],
+      ] as const) {
+        const result = await invoke(name, input, extra);
+        assert(!result.isError);
+        const call = calls.filter(c => c.name === 'execute_organization_agent_operation').at(-1)!;
+        assertEquals(call.args.p_operation, name);
+        assertEquals(call.args.p_command, input);
+        assertEquals(call.args.p_expected_version, 'expected_version' in extra ? extra.expected_version : null);
+        assertEquals(call.args.p_workspace_id, workspaceId);
+      }
+      assertEquals(writeCount(), 3);
+      assertEquals(catalog.find(t => t.name === 'archive_project')?.annotations?.destructiveHint, true);
+      for (const [name, input, extra] of [
+        ['create_project', { name: ' ' }, {}],
+        ['create_project', { name: 'Project', role: 'owner' }, {}],
+        ['create_project', { name: 'Project', status: 'done' }, {}],
+        ['create_project', { name: 'Project', attributes: { authUserId: workspaceId } }, {}],
+        ['update_project', { id: 'p1', name: 'Needs version' }, {}],
+        ['archive_project', { id: 'p1' }, {}],
+      ] as const) {
+        const denied = await invoke(name, input, extra).then(
+          r => !!r.isError,
+          () => true,
+        );
+        assert(denied);
+      }
+      assertEquals(writeCount(), 3);
+      for (const name of ['create_project', 'update_project', 'archive_project']) {
+        const input = name === 'create_project' ? { name: 'No' } : { id: 'p1' };
+        const denied = await invoke(name, input, { expected_version: 1, workspace_id: crypto.randomUUID() });
+        assert(denied.isError);
+      }
+      assertEquals(writeCount(), 3);
+      state.capability = 'read';
+      for (const name of ['create_project', 'update_project', 'archive_project']) {
+        const result = await invoke(name, name === 'create_project' ? { name: 'No' } : { id: 'p1' }, { expected_version: 1 });
+        assert(result.isError);
+      }
+      assertEquals(writeCount(), 3);
+    } finally {
+      await client.close();
     }
   }),
 );

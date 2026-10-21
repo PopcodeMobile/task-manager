@@ -6,7 +6,32 @@ import { publicError } from '../_shared/errors.ts';
 const workspace = z.string().uuid();
 const id = z.string().min(1).max(128);
 const paging = { limit: z.number().int().min(1).max(100).optional(), cursor: z.string().max(2000).optional() };
+const projectName = z.string().trim().min(1).max(500);
+const projectDetails = {
+  key: z.string().trim().min(1).max(128).optional(),
+  description: z.string().max(100000).optional(),
+  status: z.enum(['planning', 'active', 'risk', 'hold', 'complete']).optional(),
+  teamId: id.nullable().optional(),
+  leadUserId: z.string().uuid().nullable().optional(),
+  dueDate: z.string().max(128).nullable().optional(),
+  startDate: z.string().max(128).nullable().optional(),
+  sortOrder: z.number().optional(),
+  attributes: z
+    .object({
+      icon: z.string().max(128).nullable().optional(),
+      color: z.string().max(128).nullable().optional(),
+      milestones: z
+        .array(z.object({ name: z.string().max(500), date: z.string().max(128) }).strict())
+        .max(100)
+        .optional(),
+    })
+    .strict()
+    .optional(),
+};
 const writes = {
+  create_project: z.object({ id: id.optional(), name: projectName, ...projectDetails }).strict(),
+  update_project: z.object({ id, name: projectName.optional(), ...projectDetails, archived: z.boolean().optional() }).strict(),
+  archive_project: z.object({ id }).strict(),
   create_task: z
     .object({
       id: id.optional(),
@@ -109,7 +134,7 @@ export function taskServer(actor: Actor): McpServer {
     ({ workspace_id, ...query }) => result(() => executeQuery(actor, 'list_task_activity', workspace_id, query)),
   );
   for (const [operation, input] of Object.entries(writes)) {
-    const cas = !['create_task', 'add_task_comment'].includes(operation);
+    const cas = !['create_task', 'add_task_comment', 'create_project'].includes(operation);
     server.registerTool(
       operation,
       {
@@ -128,7 +153,7 @@ export function taskServer(actor: Actor): McpServer {
             input,
           })
           .strict(),
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+        annotations: { readOnlyHint: false, destructiveHint: operation === 'archive_project', idempotentHint: true },
       },
       args =>
         result(() =>

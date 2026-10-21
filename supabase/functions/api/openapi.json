@@ -5502,7 +5502,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT or organization agent token",
-        "description": "Send Authorization: Bearer <SUPABASE_ACCESS_TOKEN> for human/OAuth access or Authorization: Bearer <ORGANIZATION_AGENT_TOKEN> for headless agents. Organization tokens are scoped to one organization and the existing 12 task tools. Store the issued secret in an environment variable; never put it in URLs or request data. The server validates it on every request, including MCP initialize and tools/list."
+        "description": "Send Authorization: Bearer <SUPABASE_ACCESS_TOKEN> for human/OAuth access or Authorization: Bearer <ORGANIZATION_AGENT_TOKEN> for headless agents. Organization tokens are scoped to one organization and 15 project and task tools (five reads and ten writes). Store the issued secret in an environment variable; never put it in URLs or request data. The server validates it on every request, including MCP initialize and tools/list."
       }
     },
     "schemas": {

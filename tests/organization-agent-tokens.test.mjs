@@ -5,10 +5,12 @@ import { PGlite } from '@electric-sql/pglite';
 const owner = '00000000-0000-0000-0000-000000000001',
   member = '00000000-0000-0000-0000-000000000003';
 const reject = (p, code) => assert.rejects(p, e => e.code === code);
-async function setup() {
+async function setup({ beforeProjectOperations = false } = {}) {
   const db = new PGlite();
   await db.exec(await readFile('supabase/tests/bootstrap.sql', 'utf8'));
-  const files = (await readdir('supabase/migrations')).filter(f => f.endsWith('.sql') && !f.includes('0004_webhook')).sort();
+  const files = (await readdir('supabase/migrations'))
+    .filter(f => f.endsWith('.sql') && !f.includes('0004_webhook') && !(beforeProjectOperations && f.includes('0012_agent_project')))
+    .sort();
   for (const f of files) {
     if (f.includes('0003_integration'))
       await db.exec(
@@ -322,6 +324,184 @@ test('issuance is no-store, invalid credentials never touch usage, and token rea
     );
     await h.as('');
     await reject(h.read(issued.token), 'PT429');
+  } finally {
+    await h.db.close();
+  }
+});
+
+test('organization write token manages project lifecycle with existing fields, CAS, receipts and agent attribution', async () => {
+  const h = await setup();
+  try {
+    await h.q('select public.execute_operation($1,\'create_team\',\'{"id":"team-projects","name":"Fixture team"}\',\'project-team\',null) result', [h.ws]);
+    const issued = await h.issue();
+    const input = {
+      key: 'AGT',
+      name: 'Agent project',
+      description: 'Created by an organization agent',
+      status: 'active',
+      teamId: 'team-projects',
+      leadUserId: member,
+      startDate: '2026-10-21',
+      dueDate: '2026-11-21',
+      sortOrder: 4,
+      attributes: { icon: 'box', color: '#123456', milestones: [{ name: 'First milestone', date: '2026-11-01' }] },
+    };
+    const created = await h.exec(issued.token, 'create_project', input, 'project-create');
+    assert.equal(typeof created.data.id, 'string');
+    assert.equal(created.data.version, 1);
+    assert.equal(created.data.name, input.name);
+    assert.equal(created.data.teamId, 'team-projects');
+    assert.equal(created.data.leadUserId, member);
+    assert.equal(created.data.legacyMetadata.icon, 'box');
+    assert.deepEqual(await h.exec(issued.token, 'create_project', input, 'project-create'), created);
+    const projectId = created.data.id;
+    const listed = (await h.read(issued.token, 'list_projects')).items.find(project => project.id === projectId);
+    assert.equal(listed.name, input.name);
+    const task = await h.exec(issued.token, 'create_task', { projectId, title: 'Task in the new project' });
+    assert.equal(task.data.projectId, projectId);
+    const edit = {
+      id: projectId,
+      key: 'EDIT',
+      name: 'Renamed project',
+      description: 'Edited',
+      status: 'hold',
+      teamId: null,
+      leadUserId: null,
+      startDate: null,
+      dueDate: null,
+      sortOrder: 9,
+      attributes: { color: '#654321' },
+    };
+    const updated = await h.exec(issued.token, 'update_project', edit, 'project-update', 1);
+    assert.equal(updated.data.version, 2);
+    assert.equal(updated.data.name, 'Renamed project');
+    assert.equal(updated.data.status, 'hold');
+    assert.equal(updated.data.teamId, null);
+    assert.equal(updated.data.leadUserId, null);
+    assert.equal(updated.data.startDate, null);
+    assert.equal(updated.data.dueDate, null);
+    assert.equal(updated.data.sortOrder, 9);
+    assert.equal(updated.data.legacyMetadata.icon, 'box');
+    assert.equal(updated.data.legacyMetadata.color, '#654321');
+    assert.deepEqual(await h.exec(issued.token, 'update_project', edit, 'project-update', 1), updated);
+    await reject(h.exec(issued.token, 'update_project', { ...edit, name: 'Changed receipt' }, 'project-update', 1), 'PT409');
+    await reject(h.exec(issued.token, 'update_project', edit, 'project-stale', 1), 'PT409');
+    await reject(h.exec(issued.token, 'archive_project', { id: projectId }, 'archive-no-version'), 'PT409');
+    const archived = await h.exec(issued.token, 'archive_project', { id: projectId }, 'project-archive', 2);
+    assert.equal(archived.data.archived, true);
+    assert.equal(archived.data.version, 3);
+    assert.deepEqual(await h.exec(issued.token, 'archive_project', { id: projectId }, 'project-archive', 2), archived);
+    assert.equal((await h.read(issued.token, 'list_projects')).items.find(project => project.id === projectId).archived, true);
+    const unhidden = await h.exec(issued.token, 'update_project', { id: projectId, archived: false }, 'project-existing-archived-field', 3);
+    assert.equal(unhidden.data.archived, false);
+    assert.equal(unhidden.data.version, 4);
+    const rotated = await h.rotate(issued.connection.id);
+    assert.deepEqual(await h.exec(rotated.token, 'create_project', input, 'project-create'), created);
+    await h.db.exec('reset role');
+    const events = (
+      await h.db.query(
+        "select actor_user_id,actor_kind,actor_principal_id,actor_agent_id,actor_connection_id from public.domain_events where workspace_id=$1 and actor_connection_id=$2 and operation in ('create_project','update_project','archive_project')",
+        [h.ws, issued.connection.id],
+      )
+    ).rows;
+    assert.equal(events.length, 4);
+    assert.ok(
+      events.every(
+        event =>
+          event.actor_user_id === null &&
+          event.actor_kind === 'organization_token' &&
+          event.actor_principal_id === issued.connection.id &&
+          event.actor_agent_id === issued.connection.agentId &&
+          event.actor_connection_id === issued.connection.id,
+      ),
+    );
+    await h.as();
+    await h.revoke(issued.connection.id);
+    await reject(h.exec(rotated.token, 'create_project', input, 'project-create'), 'PT401');
+    await reject(h.exec(rotated.token, 'update_project', edit, 'project-update', 1), 'PT401');
+    await reject(h.exec(rotated.token, 'archive_project', { id: projectId }, 'project-archive', 2), 'PT401');
+  } finally {
+    await h.db.close();
+  }
+});
+
+test('project token extension preserves validation, organization and capability fences and remaining administration denial', async () => {
+  const h = await setup();
+  try {
+    const write = await h.issue();
+    const read = await h.issue('read');
+    for (const [operation, input, version] of [
+      ['create_project', { name: 'Project' }, null],
+      ['update_project', { id: 'p1', name: 'Rename' }, 1],
+      ['archive_project', { id: 'p1' }, 1],
+    ]) {
+      await reject(h.exec(read.token, operation, input, crypto.randomUUID(), version), 'PT403');
+      await reject(h.exec(write.token, operation, input, crypto.randomUUID(), version, h.other), 'PT403');
+    }
+    for (const [operation, input] of [
+      ['delete_project', { id: 'p1' }],
+      ['restore_project', { id: 'p1' }],
+      ['batch', { commands: [{ operation: 'create_project', input: { name: 'Nested' } }] }],
+      ['set_project_member', { id: 'p1', userId: member }],
+      ['remove_project_member', { id: 'p1', userId: member }],
+      ['create_team', { name: 'Denied' }],
+      ['set_team_member', { id: 'team-projects', userId: member }],
+      ['update_workspace', { name: 'Denied' }],
+      ['create_workspace', { name: 'Denied', slug: 'denied' }],
+    ])
+      await reject(h.exec(write.token, operation, input, crypto.randomUUID(), 1), 'PT403');
+    for (const [operation, input] of [
+      ['create_project', { name: 'Invalid status', status: 'todo' }],
+      ['create_project', { name: 'Unknown', dangerous: true }],
+      ['create_project', { name: 'Unknown attributes', attributes: { permission: 'owner' } }],
+      ['update_project', { id: 'p1', unexpected: true }],
+      ['archive_project', { id: 'p1', name: 'Unexpected' }],
+    ])
+      await reject(h.exec(write.token, operation, input, crypto.randomUUID(), 1), 'PT422');
+    await h.db.exec('reset role');
+    await h.db.query("update public.organization_agent_credentials set expires_at=clock_timestamp()-interval '1 second' where connection_id=$1", [
+      write.connection.id,
+    ]);
+    await h.as('');
+    await reject(h.exec(write.token, 'create_project', { name: 'Expired' }), 'PT401');
+    await reject(h.exec(write.token, 'update_project', { id: 'p1', name: 'Expired' }, 'expired-update', 1), 'PT401');
+    await reject(h.exec(write.token, 'archive_project', { id: 'p1' }, 'expired-archive', 1), 'PT401');
+  } finally {
+    await h.db.close();
+  }
+});
+
+test('additive project migration preserves the exact credential boundary and ACL and upgrades already issued write tokens', async () => {
+  const h = await setup({ beforeProjectOperations: true });
+  try {
+    const issued = await h.issue();
+    await reject(h.exec(issued.token, 'create_project', { name: 'Not yet allowed' }), 'PT403');
+    const catalog = async () =>
+      (
+        await h.db.query(
+          "select prosrc,proacl::text acl,prosecdef,proconfig from pg_proc where oid='public.execute_organization_agent_operation(text,uuid,text,jsonb,text,bigint)'::regprocedure",
+        )
+      ).rows[0];
+    const before = await catalog();
+    await h.db.exec('reset role');
+    await h.db.exec(await readFile('supabase/migrations/202610210012_agent_project_operations.sql', 'utf8'));
+    const after = await catalog();
+    assert.equal(
+      after.prosrc,
+      before.prosrc.replace("'add_task_comment','complete_task')", "'add_task_comment','complete_task','create_project','update_project','archive_project')"),
+    );
+    assert.equal(after.acl, before.acl);
+    assert.equal(after.prosecdef, before.prosecdef);
+    assert.deepEqual(after.proconfig, before.proconfig);
+    await h.db.exec('set role anon');
+    const result = await h.exec(issued.token, 'create_project', { name: 'Already issued token' }, 'existing-token-project');
+    assert.equal(result.data.version, 1);
+    const read = await h.read(issued.token, 'list_projects');
+    assert.equal(
+      read.items.some(project => project.id === result.data.id),
+      true,
+    );
+    await reject(h.exec(issued.token, 'delete_project', { id: result.data.id }, 'still-no-delete', 1), 'PT403');
   } finally {
     await h.db.close();
   }

@@ -32,7 +32,7 @@ At `/`, sign in when cloud is configured or select **Continue on this device** f
 - `src/components/ui/`: shadcn/Radix primitives; native labels, focus behavior and semantic token classes.
 - `src/domain/`: typed operation contracts. `src/workspace/normalized.ts` sends human JWT RPCs with CAS/idempotency; `local-panel-repository.ts` exposes the same panel contract over device persistence.
 - `src/styles/tokens.css`, `src/core/design-tokens.js`: public token definitions and tooling inventory. Shared calendar, seed, local mutations and locale modules remain live; the old HTML renderer, global store, delegated actions and cloud snapshot writer are retired.
-- `supabase/functions/`, `supabase/migrations/`: shared authorization/operations, API, MCP and webhook worker; additive normalized migrations through `202610210011`.
+- `supabase/functions/`, `supabase/migrations/`: shared authorization/operations, API, MCP and webhook worker; additive normalized migrations through `202610210012`.
 - `tests/fixtures/legacy-workspace-*`: historical compatibility fixtures only. They are outside the frontend import closure and are not the current React lifecycle proof.
 
 Use React escaping for literal user content and DOMPurify only for explicitly supported rich content. Keep operations scoped to workspace, use authoritative versions, preserve drafts on failures and follow every cursor. Project privacy, task attachment byte uploads and actual invitations require separate contracts.
@@ -41,10 +41,12 @@ Appearance supports custom HEX accents, saved per identity on this device with r
 
 The [design-system guide](docs/design-system.md) describes token policy. `check:tokens` audits authored CSS plus JS/TS/JSX/TSX styles and static `cn`/`cva` utility sources; semantic aliases must resolve to declared foundation variables. Dynamic geometry and validated domain colors remain runtime data. No component directory is exempt.
 
-Organization owners/admins can issue single-organization agent tokens in **Help & resources → Integrations**. Tokens support read or read/write access, a default expiry of 90 days (30/90/365 or explicit no expiry), one-time secret display, rotation and revocation. They authenticate the existing 12 MCP tools and equivalent REST task routes without a browser login on the agent machine. See [token setup](docs/organization-agent-tokens.md). OAuth user connections remain available.
+Organization owners/admins can issue single-organization agent tokens in **Settings → Integrations**. Tokens support read or read/write access, a default expiry of 90 days (30/90/365 or explicit no expiry), one-time secret display, rotation and revocation. They authenticate 15 MCP project/task tools and their equivalent REST command routes without a browser login on the agent machine. See [token setup](docs/organization-agent-tokens.md). OAuth user connections remain available.
 
 ## Deploy and status
 
 `vercel.json` builds Vite, serves `dist/` and rewrites SPA routes to `/index.html`. Only public Supabase URL/publishable keys belong in frontend build variables. Private provisioning/worker/consumer secrets stay outside Git and frontend bundles.
 
 The panel is published on [Vercel](https://task-manager-chi-eight-19.vercel.app), with production Auth URLs/CORS configured. The dedicated hosted backend has separately recorded API/MCP proof. Real Hermes acceptance, two actual Claude-user connections and the remaining Task7 retention/recovery checks are still activation gates; the webhook scheduler stays off. Local cloud-mode browser proof uses real local Auth/DB; it is not hosted frontend proof. See [verification](docs/verification.md), [architecture](docs/superpowers/specs/2026-10-20-agent-platform-design.md) and [Hermes setup](docs/hermes-integration.md).
+
+Gerenciamento de projetos pelo MCP: [criar, editar/renomear e arquivar](docs/mcp-projects.md), com tokens de escrita por organização ou OAuth.

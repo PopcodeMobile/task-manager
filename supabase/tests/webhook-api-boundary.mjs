@@ -210,7 +210,7 @@ export function auditWebhookApiSurface({ sql, exposedSchemas, extraSearchPath })
       if (object.name === 'execute_organization_agent_operation') {
         assert.match(
           source,
-          /p_operation not in \('create_task','claim_task','renew_task_claim','release_task_claim','update_task','add_task_comment','complete_task'\)/,
+          /p_operation not in \('create_task','claim_task','renew_task_claim','release_task_claim','update_task','add_task_comment','complete_task'(?:,'create_project','update_project','archive_project')?\)/,
           'token write allowlist must remain narrow',
         );
         assert.match(source, /a->>'capability'<>'write'/, 'read credentials cannot execute writes');
