@@ -41,6 +41,9 @@ export function TaskDrawer({
   readOnly,
   projectId,
   initialDueDate,
+  initialAssignee,
+  initialStatus,
+  prefs = {},
   revision,
   admin,
   refresh,
@@ -63,6 +66,9 @@ export function TaskDrawer({
   readOnly: boolean;
   projectId?: string;
   initialDueDate?: string;
+  initialAssignee?: string;
+  initialStatus?: string;
+  prefs?: Record<string, unknown>;
   revision: number;
   admin: boolean;
   refresh: () => Promise<void>;
@@ -77,20 +83,23 @@ export function TaskDrawer({
   const [title, setTitle] = useState(initial?.title ?? ''),
     [description, setDescription] = useState(initial?.description ?? ''),
     [project, setProject] = useState(initial?.projectId ?? (projectId || projects[0]?.id || '')),
-    [status, setStatus] = useState<TaskStatus>(initial?.status ?? 'todo'),
+    [status, setStatus] = useState<TaskStatus>(
+      initial?.status ?? (['backlog', 'todo', 'progress', 'review', 'done'].includes(initialStatus ?? '') ? (initialStatus as TaskStatus) : 'todo'),
+    ),
     [priority, setPriority] = useState<TaskPriority>(initial?.priority ?? 'none'),
     [due, setDue] = useState(initial?.dueDate ?? initialDueDate ?? ''),
     [start, setStart] = useState(initial?.startDate ?? ''),
     [recurrence, setRecurrence] = useState<Recurrence | ''>(initial?.recurrence ?? ''),
     [estimate, setEstimate] = useState(String(initial?.legacyMetadata.estimate ?? '')),
-    [assignee, setAssignee] = useState(initial?.assigneeUserId ?? ''),
+    [assignee, setAssignee] = useState(initial?.assigneeUserId ?? initialAssignee ?? ''),
     [agent, setAgent] = useState(initial?.executorAgentId ?? ''),
     [deleteConfirm, setDeleteConfirm] = useState(false),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
     [confirm, setConfirm] = useState(false),
     [conflict, setConflict] = useState(false),
-    [subDirty, setSubDirty] = useState(false);
+    [subDirty, setSubDirty] = useState(false),
+    [full, setFull] = useState(prefs.openTasks === 'full');
   const current = task === 'new' ? null : task,
     active = !!current?.reservation?.active && Date.parse(current.reservation.expiresAt) > Date.now();
   const version = current?.version;
@@ -240,12 +249,15 @@ export function TaskDrawer({
         if (!open) close();
       }}
     >
-      <SheetContent closeLabel={t('Fechar painel', 'Close panel')}>
+      <SheetContent className={full ? 'task-full' : undefined} closeLabel={t('Fechar painel', 'Close panel')}>
         <div className="drawer-eyebrow">{current?.key ?? t('Nova tarefa', 'New task')}</div>
         <SheetTitle>{current ? t('Detalhes da tarefa', 'Task details') : t('Nova tarefa', 'New task')}</SheetTitle>
         <SheetDescription>
           {t('Organize a tarefa, acompanhe o agente e registre decisões.', 'Organize the task, supervise its agent and record decisions.')}
         </SheetDescription>
+        <Button variant="ghost" aria-pressed={full} onClick={() => setFull(value => !value)}>
+          {full ? t('Minimizar tarefa', 'Minimize task') : t('Maximizar tarefa', 'Maximize task')}
+        </Button>
         <form
           onSubmit={e => {
             e.preventDefault();
@@ -354,9 +366,51 @@ export function TaskDrawer({
           </Button>
         </form>
         {error && (
-          <p role="alert" className="error-message">
-            {error}
-          </p>
+          <div>
+            <p role="alert" className="error-message">
+              {error}
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const blob = new Blob(
+                  [
+                    JSON.stringify(
+                      {
+                        workspaceId: repo.workspaceId,
+                        exportedAt: new Date().toISOString(),
+                        task: {
+                          id: current?.id ?? newTaskId,
+                          version: editVersion,
+                          title,
+                          description,
+                          projectId: project,
+                          status,
+                          priority,
+                          assigneeUserId: assignee || null,
+                          dueDate: due || null,
+                          startDate: start || null,
+                          recurrence: recurrence || null,
+                          estimate,
+                        },
+                      },
+                      null,
+                      2,
+                    ),
+                  ],
+                  { type: 'application/json' },
+                );
+                const url = URL.createObjectURL(blob),
+                  link = document.createElement('a');
+                link.href = url;
+                link.download = 'task-draft.json';
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              }}
+            >
+              {t('Exportar rascunho da tarefa', 'Export task draft')}
+            </Button>
+          </div>
         )}
         {conflict && (
           <Button
@@ -495,7 +549,15 @@ export function TaskDrawer({
                 variant="destructive"
                 disabled={busy || readOnly || active}
                 onClick={() => {
-                  if (requireSaved()) setDeleteConfirm(true);
+                  if (requireSaved()) {
+                    if (prefs.confirmDel === false && !incoming.length && !sharedFiles.length && !details.loading && !details.error)
+                      void action(async () => {
+                        await execute('delete_task', { id: current.id }, version);
+                        registerDraft(null);
+                        close();
+                      });
+                    else setDeleteConfirm(true);
+                  }
                 }}
               >
                 {t('Excluir tarefa', 'Delete task')}

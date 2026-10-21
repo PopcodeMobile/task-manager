@@ -63,7 +63,7 @@ export const localWorkspaceDTO = row => ({
   name: row.name,
   slug: row.url ?? '',
   color: row.c,
-  version: 1,
+  version: row.version ?? 1,
   storageVersion: 1,
   role: /** @type {const} */ ('owner'),
 });

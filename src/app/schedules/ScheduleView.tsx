@@ -1,3 +1,4 @@
+import { weekStartsOn, preferredDate } from '../panel/panel-model';
 import { useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { addD, diffD, iso, parse } from '../../core/calendar.js';
@@ -83,14 +84,8 @@ export function ScheduleView(props: ScheduleViewProps) {
   const scope = useMemo(() => crypto.randomUUID(), [repo, projectId, mode]),
     signal = repo.controller.signal;
   const locale = t('pt-BR', 'en'),
-    first = Number(prefs.weekStart) === 0 ? 0 : 1;
-  const dateLabel = (date: string) => {
-    const day = parse(date)!;
-    if (prefs.dateFmt === 'yyyy-MM-dd') return date;
-    if (prefs.dateFmt === 'd/M') return `${day.getDate()}/${day.getMonth() + 1}/${day.getFullYear()}`;
-    if (prefs.dateFmt === 'M/d') return `${day.getMonth() + 1}/${day.getDate()}/${day.getFullYear()}`;
-    return day.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+    first = weekStartsOn(prefs.weekStart);
+  const dateLabel = (date: string) => preferredDate(date, prefs, locale);
   const projects = props.projects.filter(p => !p.archived && (!projectId || p.id === projectId));
   const tasks = props.tasks
     .filter(task => !task.archived && projects.some(p => p.id === task.projectId))

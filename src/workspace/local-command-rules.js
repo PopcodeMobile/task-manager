@@ -4,6 +4,16 @@ const taskFields = 'title description status priority assigneeUserId recurrence 
 const projectFields = 'key name description status teamId leadUserId dueDate startDate sortOrder attributes';
 const rule = (fields, required = '') => ({ fields: fields.split(' '), required: required.split(' ').filter(Boolean) });
 export const localCommandRules = {
+  create_team: rule('id name description attributes', 'name'),
+  update_team: rule('id name description attributes', 'id'),
+  delete_team: rule('id', 'id'),
+  set_team_member: rule('id userId', 'id userId'),
+  remove_team_member: rule('id userId', 'id userId'),
+  update_workspace: rule('name slug color'),
+  local_update_profile: rule('name title avatar color'),
+  local_workspace_member: rule('action userId email role', 'action'),
+  local_demo_setting: rule('section key value', 'section key value'),
+  local_reset_demo: rule('confirmWorkspaceId', 'confirmWorkspaceId'),
   create_task: rule(`id projectId ${taskFields}`, 'projectId title'),
   update_task: rule(`id ${taskFields}`, 'id'),
   move_task: rule('id projectId sortOrder', 'id projectId'),

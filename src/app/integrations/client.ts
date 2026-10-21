@@ -2,6 +2,13 @@ import { createClient, type SupabaseClient, type OAuthAuthorizationDetails, type
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 export const supabase: SupabaseClient | null = url && key ? createClient(url, key, { auth: { flowType: 'pkce', detectSessionInUrl: false } }) : null;
+/** A password check must not replace the panel session or broadcast a sign-in. */
+export function passwordVerifier() {
+  if (!url || !key) throw new Error('cloud_unconfigured');
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: `gr8r.password-check.${crypto.randomUUID()}` },
+  }).auth;
+}
 export type WorkspaceChoice = { id: string; name: string; role: string; storageVersion: number };
 export type GrantChoice = { workspaceId: string; capability: 'read' | 'write' };
 export type Connection = {

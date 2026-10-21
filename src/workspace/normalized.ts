@@ -1,7 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Command, CommandResult, Page, Workspace, UserPreferences } from '../domain/contracts';
 export type Agent = { id: string; name: string; authUserId: string | null; clientId: string | null };
-export type Member = { user_id: string; name: string; email: string; role: string };
+export type Member = {
+  user_id: string;
+  name: string;
+  email: string;
+  role: string;
+  title?: string;
+  color?: string;
+  avatar?: string;
+  status?: string;
+  timezone?: string;
+  teamId?: string | null;
+};
 export type DomainEvent = {
   id: string;
   operation: string;

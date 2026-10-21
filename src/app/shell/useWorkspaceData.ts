@@ -14,6 +14,8 @@ import type {
   Team,
   Comment,
   ActivityEntry,
+  Notification,
+  CommentReaction,
 } from '../../domain/contracts';
 import { eventCursor, type Agent, type DomainEvent, type Member } from '../../workspace/normalized';
 import type { WorkspaceRepository } from '../../workspace/repository';
@@ -33,6 +35,9 @@ export type Snapshot = {
   actorId: string;
   actorTeamId: string | null;
   teams: Team[];
+  teamMembers: { teamId: string; userId: string }[];
+  notifications: Notification[];
+  reactions: CommentReaction[];
   views: SavedView[];
   projectMembers: { projectId: string; userId: string }[];
   comments: Comment[];
@@ -55,6 +60,9 @@ export const emptySnapshot: Snapshot = {
   actorId: '',
   actorTeamId: null,
   teams: [],
+  teamMembers: [],
+  notifications: [],
+  reactions: [],
   views: [],
   projectMembers: [],
   comments: [],
@@ -86,6 +94,7 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
     idempotency = useRef(new Map<string, string>());
   const refresh = useCallback(
     async (initial = false, operations: string[] = []) => {
+      if (operations.includes('local_reset_demo')) initial = true;
       const serial = ++refreshSerial.current;
       try {
         // Capture the event boundary BEFORE reading mutable rows. Later commits remain visible to polling.
@@ -104,6 +113,9 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
           attachments,
           calendarEvents,
           teams,
+          teamMembers,
+          notifications,
+          reactions,
           views,
           projectMembers,
           comments,
@@ -113,10 +125,10 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
           repo.list<Task>('list_tasks', {}, true),
           repo.list<Project>('list_projects', {}, true),
           repo.list<Agent>('list_agents', {}, true),
-          initial || operations.includes('local_project_sharing')
+          initial || operations.some(op => /team|local_|workspace/.test(op))
             ? repo.rpc<Member[]>('list_workspace_members', { p_workspace_id: repo.workspaceId })
             : Promise.resolve(null),
-          initial ? repo.preferences() : Promise.resolve(null),
+          initial || operations.includes('set_preferences') ? repo.preferences() : Promise.resolve(null),
           initial || operations.some(op => /label$|duplicate_task|complete_task|delete_project|delete_task/.test(op))
             ? repo.list<Label>('list_labels', {}, true)
             : Promise.resolve(null),
@@ -138,7 +150,16 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
           initial || operations.some(op => /calendar_event$|delete_project/.test(op))
             ? repo.list<CalendarEvent>('list_calendar_events', {}, true)
             : Promise.resolve(null),
-          initial ? repo.list<Team>('list_teams', {}, true) : Promise.resolve(null),
+          initial || operations.some(op => /team|local_/.test(op)) ? repo.list<Team>('list_teams', {}, true) : Promise.resolve(null),
+          initial || operations.some(op => /team|local_/.test(op))
+            ? repo.list<{ teamId: string; userId: string }>('list_team_members', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /notification|local_reset/.test(op))
+            ? repo.list<Notification>('list_notifications', {}, true)
+            : Promise.resolve(null),
+          initial || operations.some(op => /reaction|comment|delete_task|local_reset/.test(op))
+            ? repo.list<CommentReaction>('list_reactions', {}, true)
+            : Promise.resolve(null),
           initial || operations.some(op => /_view$|delete_project/.test(op)) ? repo.list<SavedView>('list_views', {}, true) : Promise.resolve(null),
           initial || operations.some(op => /_project$|project_member|local_project_sharing/.test(op))
             ? repo.list<{ projectId: string; userId: string }>('list_project_members', {}, true)
@@ -146,8 +167,8 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
           initial || operations.some(op => /comment$|delete_task|delete_project/.test(op))
             ? repo.list<Comment>('list_comments', {}, true)
             : Promise.resolve(null),
-          initial ? repo.list<ActivityEntry>('list_activity', {}, true) : Promise.resolve(null),
-          initial
+          initial || operations.length > 0 ? repo.list<ActivityEntry>('list_activity', {}, true) : Promise.resolve(null),
+          initial || operations.some(op => /team|local_/.test(op))
             ? repo.mode === 'local'
               ? repo.rpc<{ currentMemberId: string; teamId?: string | null }>('get_local_actor')
               : Promise.resolve({ currentMemberId: repo.userId, teamId: null })
@@ -157,8 +178,11 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
         setSnapshot(old => ({
           tasks,
           actorId: actorId?.currentMemberId ?? old.actorId,
-          actorTeamId: actorId?.teamId ?? old.actorTeamId,
+          actorTeamId: actorId ? (actorId.teamId ?? null) : old.actorTeamId,
           teams: teams ?? old.teams,
+          teamMembers: teamMembers ?? old.teamMembers,
+          notifications: notifications ?? old.notifications,
+          reactions: reactions ?? old.reactions,
           views: views ?? old.views,
           projectMembers: projectMembers ?? old.projectMembers,
           comments: comments ?? old.comments,
@@ -284,6 +308,13 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
     else await execute('set_preferences', { preferences: { [field]: next[field] } });
     if (!repo.controller.signal.aborted) setSnapshot(old => ({ ...old, preferences: next }));
   }
+  async function markNotifications(ids: string[], read: boolean) {
+    const existing = await repo.preferences();
+    const notificationReadStates = { ...existing.notificationReadStates, ...Object.fromEntries(ids.map(id => [id, read])) };
+    if (repo.mode === 'local' && repo.savePersonal) await repo.savePersonal({ preferences: { notificationReadStates } });
+    else await execute('set_preferences', { preferences: { notificationReadStates } });
+    if (!repo.controller.signal.aborted) setSnapshot(old => ({ ...old, preferences: { ...old.preferences, notificationReadStates } }));
+  }
   async function addCopiedFavorites(ids: string[]) {
     const current = await repo.preferences();
     const next = { ...current, favoriteTaskIds: [...new Set([...current.favoriteTaskIds, ...ids])] };
@@ -291,7 +322,21 @@ export function useWorkspaceData(repo: WorkspaceRepository, currentId: string | 
     else await execute('set_preferences', { preferences: { favoriteTaskIds: next.favoriteTaskIds } });
     if (!repo.controller.signal.aborted) setSnapshot(old => ({ ...old, preferences: next }));
   }
-  return { addCopiedFavorites, snapshot, snapshotScope, loading, error, setError, revision, search, setSearch, refresh, execute, toggleFavorite };
+  return {
+    markNotifications,
+    addCopiedFavorites,
+    snapshot,
+    snapshotScope,
+    loading,
+    error,
+    setError,
+    revision,
+    search,
+    setSearch,
+    refresh,
+    execute,
+    toggleFavorite,
+  };
 }
 
 export function useTaskDetails(repo: WorkspaceRepository, taskId: string | undefined, revision: number, t: Translate, graph: TaskGraph) {

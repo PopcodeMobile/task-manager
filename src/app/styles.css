@@ -1,3 +1,4 @@
+@import './panel/panel.css';
 @import 'tailwindcss';
 @import '../styles/tokens.css';
 @import './shell/workspace.css';

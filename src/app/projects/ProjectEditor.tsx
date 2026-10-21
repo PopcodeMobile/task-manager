@@ -127,7 +127,7 @@ export function ProjectEditor({
       registerDraft(null);
       if (edit.kind !== 'edit') opener.current = null;
       close();
-      if (edit.kind !== 'edit') openProject(draft.id, draft.template === 'blank' ? 'overview' : 'board');
+      if (edit.kind !== 'edit') openProject(draft.id, draft.template === 'blank' ? 'overview' : undefined);
     } catch (err) {
       if (!repo.controller.signal.aborted) {
         setError(projectError(err, t));

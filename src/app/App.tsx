@@ -34,6 +34,7 @@ function AppearanceApp({ identityKey, local }: { identityKey: string; local: boo
   const [locale, setLocale] = useState(initial.lang),
     [theme, setTheme] = useState(initial.theme),
     [density, setDensity] = useState(initial.density),
+    [extras, setExtras] = useState<Record<string, unknown>>(initial),
     [appearanceError, setAppearanceError] = useState<unknown>(null),
     [logoutError, setLogoutError] = useState(false);
   const [systemDark, setSystemDark] = useState(() => matchMedia('(prefers-color-scheme: dark)').matches);
@@ -43,13 +44,32 @@ function AppearanceApp({ identityKey, local }: { identityKey: string; local: boo
     media.addEventListener('change', changed);
     return () => media.removeEventListener('change', changed);
   }, []);
+  useEffect(() => {
+    const update = () => {
+      try {
+        const value = loadAppearance(localStorage, identityKey);
+        setLocale(value.lang);
+        setTheme(value.theme);
+        setDensity(value.density);
+        setExtras(value);
+      } catch (e) {
+        setAppearanceError(e);
+      }
+    };
+    addEventListener('gr8r:appearance', update);
+    return () => removeEventListener('gr8r:appearance', update);
+  }, [identityKey]);
   const dark = theme === 'dark' || (theme === 'system' && systemDark);
   const t = useCallback((pt: string, en: string) => supervisionCatalogs[locale]?.[en] ?? (locale === 'en' ? en : pt), [locale]);
   useEffect(() => {
     document.documentElement.lang = locale;
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
     document.documentElement.dataset.density = density;
-  }, [locale, dark, density]);
+    document.documentElement.dataset.accent = String(extras.accent ?? 'indigo');
+    document.documentElement.dataset.side = String(extras.side ?? 'comfortable');
+    if (extras.motion === 'reduce') document.documentElement.dataset.motion = 'reduce';
+    else delete document.documentElement.dataset.motion;
+  }, [locale, dark, density, extras]);
   const appearance = (patch: { lang?: string; theme?: string; density?: string }) => {
     try {
       saveAppearance(localStorage, identityKey, patch);
@@ -57,6 +77,7 @@ function AppearanceApp({ identityKey, local }: { identityKey: string; local: boo
       if (patch.theme) setTheme(patch.theme);
       if (patch.density) setDensity(patch.density);
       setAppearanceError(null);
+      dispatchEvent(new Event('gr8r:appearance'));
     } catch (err) {
       setAppearanceError(err);
     }

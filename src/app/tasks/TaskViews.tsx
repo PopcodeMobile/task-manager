@@ -48,6 +48,7 @@ export type TaskViewsProps = {
   view: (href: string) => void;
   t: Translate;
   canCreate: boolean;
+  creationContext?: Partial<Pick<Task, 'assigneeUserId' | 'dueDate' | 'status'>>;
   repo: WorkspaceRepository;
   execute: Execute;
   projectId?: string;
@@ -613,7 +614,7 @@ export function TaskViews(props: TaskViewsProps) {
                           setBusy(true);
                           setError('');
                           try {
-                            await execute('create_task', input);
+                            await execute('create_task', { ...input, ...props.creationContext });
                             return true;
                           } catch (err) {
                             if (!repo.controller.signal.aborted) setError(errorMessage(err, t));

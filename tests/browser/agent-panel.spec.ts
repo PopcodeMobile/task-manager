@@ -1662,3 +1662,164 @@ test('actual cloud projects compose templates members saved views full graph cop
   }
   expect(cleanup).toEqual([]);
 });
+
+test('actual cloud remaining teams workspace notifications and unavailable settings use real contracts', async ({ page }) => {
+  test.skip(!process.env.TEST_SUPABASE_URL || !process.env.TEST_SUPABASE_SERVICE_ROLE_KEY, 'Requires dedicated local Supabase');
+  test.setTimeout(90000);
+  const { createClient } = await import('@supabase/supabase-js');
+  const base = process.env.TEST_SUPABASE_URL!,
+    key = process.env.TEST_SUPABASE_ANON_KEY!,
+    options = { auth: { persistSession: false, autoRefreshToken: false } };
+  const service = createClient(base, process.env.TEST_SUPABASE_SERVICE_ROLE_KEY!, options),
+    human = createClient(base, key, options),
+    setupActor = createClient(base, key, options),
+    suffix = crypto.randomUUID(),
+    password = `Remaining-${crypto.randomUUID()}!`,
+    addresses = [`remaining-${suffix}@example.test`, `remaining-setup-${suffix}@example.test`],
+    users: string[] = [],
+    cleanup: string[] = [],
+    counts: Record<string, number> = {};
+  let ws = '';
+  page.on('response', response => {
+    if (response.url().includes('/rest/v1/rpc/')) {
+      const k = response.url().split('/').pop() + ':' + response.status();
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+  });
+  try {
+    for (const [index, email] of addresses.entries()) {
+      const made = await service.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { name: index ? 'Remaining teammate' : 'Remaining owner' },
+      });
+      expect(made.error).toBeNull();
+      users.push(made.data.user!.id);
+    }
+    expect((await human.auth.signInWithPassword({ email: addresses[0], password })).error).toBeNull();
+    expect((await setupActor.auth.signInWithPassword({ email: addresses[1], password })).error).toBeNull();
+    const made = await human.rpc('create_workspace_v2', { p_name: 'Remaining actual', p_slug: `remaining-${suffix}`, p_idempotency_key: suffix });
+    expect(made.error).toBeNull();
+    ws = made.data.data.id;
+    expect((await service.from('workspace_memberships').insert({ workspace_id: ws, user_id: users[1], role: 'member' })).error).toBeNull();
+    const command = async (operation: string, input: Record<string, unknown>, version?: number) => {
+      const result = await setupActor.rpc('execute_operation', {
+        p_workspace_id: ws,
+        p_operation: operation,
+        p_command: input,
+        p_expected_version: version ?? null,
+        p_idempotency_key: crypto.randomUUID(),
+      });
+      expect(result.error?.message ?? '').toBe('');
+      return result.data.data;
+    };
+    const read = async (operation: string) => {
+      const result = await setupActor.rpc('read_operation', { p_workspace_id: ws, p_operation: operation, p_query: {} });
+      expect(result.error).toBeNull();
+      return result.data;
+    };
+    const project = await command('create_project', { id: 'remaining-project', name: 'Remaining project' });
+    const task = await command('create_task', { id: 'remaining-task', projectId: project.id, title: 'Remaining Home <literal>', assigneeUserId: users[0] });
+    const first = await command('create_team', { id: 'remaining-old-team', name: 'Old team' });
+    await command('set_team_member', { id: first.id, userId: users[1] }, first.version);
+    expect(
+      (
+        await service.from('notifications').insert({
+          workspace_id: ws,
+          id: 'remaining-notification',
+          task_id: task.id,
+          notification_type: 'comment',
+          legacy_metadata: { text: 'Remaining notification', snippet: 'Literal cloud', at: new Date().toISOString() },
+        })
+      ).error,
+    ).toBeNull();
+    await page.goto(`/app/w/${ws}/teams`);
+    await page.getByLabel('E-mail').fill(addresses[0]);
+    await page.getByLabel('Senha', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await page.getByLabel('Idioma', { exact: true }).selectOption('en');
+    await expect(page.getByRole('button', { name: 'Create team', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Create team', exact: true }).click();
+    await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Cloud <team>');
+    await page.getByRole('dialog').getByLabel('Remaining teammate', { exact: true }).check();
+    await page.getByRole('button', { name: 'Save team', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Remaining teammate', exact: true })).toBeVisible();
+    const teams = (await read('list_teams')).items,
+      newTeam = teams.find((team: { name: string }) => team.name === 'Cloud <team>');
+    expect(newTeam).toBeTruthy();
+    expect((await read('list_team_members')).items.filter((r: { userId: string }) => r.userId === users[1]).map((r: { teamId: string }) => r.teamId)).toEqual([
+      newTeam.id,
+    ]);
+    await page.goto(`/app/w/${ws}/notifications`);
+    await expect(page.getByRole('button', { name: /Remaining notification/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Mark all as read', exact: true }).click();
+    await page.getByLabel(/Unread only/).check();
+    await expect(page.getByText('No notifications.', { exact: true })).toBeVisible();
+    await page.reload();
+    await page.getByLabel(/Unread only/).check();
+    await expect(page.getByText('No notifications.', { exact: true })).toBeVisible();
+    await page.goto(`/app/w/${ws}/settings?sec=workspace`);
+    await page.getByLabel('Workspace name', { exact: true }).fill('Remaining renamed');
+    await page.getByRole('button', { name: 'Save workspace', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel('Workspace name', { exact: true })).toHaveValue('Remaining renamed');
+    for (const sec of ['profile', 'permissions', 'notif-email', 'sessions', '2fa', 'plan', 'payment', 'invoices']) {
+      await page
+        .getByRole('navigation', { name: 'Settings sections' })
+        .getByRole('button', {
+          name: (
+            {
+              profile: 'Profile',
+              permissions: 'Permissions',
+              'notif-email': 'Email notifications',
+              sessions: 'Sessions',
+              '2fa': 'Two-factor authentication',
+              plan: 'Plan',
+              payment: 'Payment',
+              invoices: 'Invoices',
+            } as Record<string, string>
+          )[sec],
+          exact: true,
+        })
+        .click();
+      await expect(page.locator('.settings-content')).toContainText(sec === 'profile' ? 'read-only' : 'unavailable');
+    }
+    await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: 'Password', exact: true }).click();
+    await page.getByLabel('Current password', { exact: true }).fill('wrong-password');
+    await page.getByLabel('New password', { exact: true }).fill('Valid-password-123!');
+    await page.getByLabel('Confirm new password', { exact: true }).fill('Valid-password-123!');
+    await page.getByRole('button', { name: 'Update password', exact: true }).click();
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toHaveCount(0);
+    const originalSession = await page.evaluate(
+      () => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(key => key.endsWith('-auth-token'))!)!).access_token.split('.')[1],
+    );
+    await page.getByLabel('Current password', { exact: true }).fill(password);
+    await page.getByRole('button', { name: 'Update password', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
+    const afterSession = await page.evaluate(
+      () => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(key => key.endsWith('-auth-token'))!)!).access_token.split('.')[1],
+    );
+    expect(JSON.parse(Buffer.from(afterSession, 'base64url').toString()).session_id).toBe(
+      JSON.parse(Buffer.from(originalSession, 'base64url').toString()).session_id,
+    );
+    const check = createClient(base, key, options);
+    expect((await check.auth.signInWithPassword({ email: addresses[0], password: 'Valid-password-123!' })).error).toBeNull();
+    await check.auth.signOut({ scope: 'local' });
+    await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Overview', exact: true }).click();
+    await expect.poll(() => page.locator('#work-content').evaluate(node => node.scrollTop)).toBe(0);
+    await page.screenshot({ path: '/tmp/task6c-cloud-overview-en.png', fullPage: true });
+    expect(Object.keys(counts).filter(k => k.endsWith(':429'))).toEqual([]);
+    test.info().annotations.push({ type: 'remaining-actual-cloud-counts', description: JSON.stringify(counts) });
+  } finally {
+    if (ws && (await service.from('workspaces').delete().eq('id', ws)).error) cleanup.push('workspace');
+    for (const id of users) if ((await service.auth.admin.deleteUser(id)).error) cleanup.push('user');
+    await human.auth.signOut();
+    await setupActor.auth.signOut();
+  }
+  expect(cleanup).toEqual([]);
+});

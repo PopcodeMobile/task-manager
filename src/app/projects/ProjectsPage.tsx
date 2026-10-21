@@ -72,6 +72,7 @@ export function ProjectsPage({
   copyFavorites,
   extraTaskMenuActions,
   refresh,
+  initialCreate = false,
 }: {
   snapshot: Snapshot;
   repo: WorkspaceRepository;
@@ -93,8 +94,9 @@ export function ProjectsPage({
   copyFavorites: (ids: string[]) => Promise<void>;
   extraTaskMenuActions: ExtraTaskMenuAction[];
   refresh: () => Promise<unknown>;
+  initialCreate?: boolean;
 }) {
-  const [edit, setEdit] = useState<ProjectEdit | null>(null),
+  const [edit, setEdit] = useState<ProjectEdit | null>(initialCreate && !readOnly ? { kind: 'new', opener: null } : null),
     [share, setShare] = useState<{ project: Project; opener: HTMLElement | null } | null>(null),
     [viewEdit, setViewEdit] = useState<ViewEdit | null>(null),
     [confirmation, setConfirmation] = useState<{ operation: string; entity: Project | SavedView; opener: HTMLElement | null } | null>(null),

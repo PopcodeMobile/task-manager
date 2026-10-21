@@ -1,0 +1,203 @@
+.panel-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  min-width: 0;
+}
+.panel-page h2 {
+  font-size: var(--fs-subtitle);
+  margin: var(--s-4) 0 0;
+}
+.panel-page h3 {
+  font-size: var(--fs);
+}
+.panel-page p {
+  margin: var(--s-2) 0;
+}
+.panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: var(--s-4);
+}
+.panel-card {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  padding: var(--s-4);
+  text-align: left;
+  color: var(--text);
+}
+.panel-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.panel-row > :first-child {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.panel-row > input[type='checkbox'] {
+  flex: none;
+  width: var(--s-4);
+  height: var(--s-4);
+}
+.panel-row .inline-link {
+  text-align: left;
+}
+.panel-row time {
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+.panel-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--s-4);
+}
+.panel-metrics strong {
+  display: block;
+  font-size: var(--fs-display);
+}
+.panel-metrics span {
+  display: block;
+  margin-top: var(--s-2);
+  color: var(--text-3);
+}
+.panel-toolbar {
+  display: flex;
+  gap: var(--s-3);
+  align-items: end;
+  flex-wrap: wrap;
+}
+.panel-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.panel-check {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: var(--s-2) 0;
+}
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+.setting-row select {
+  max-width: 55%;
+}
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(160px, 210px) minmax(0, 1fr);
+  gap: var(--s-6);
+}
+.settings-layout > nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  align-items: stretch;
+}
+.settings-layout > nav button {
+  justify-content: flex-start;
+  white-space: normal;
+  text-align: left;
+}
+.settings-content {
+  max-width: 900px;
+}
+.inbox-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-4);
+}
+.inbox-layout.has-selection {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.inbox-preview {
+  border-left: 1px solid var(--border);
+  padding-left: var(--s-4);
+}
+.token-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+}
+.token-swatches span {
+  display: block;
+  width: var(--s-10);
+  height: var(--s-10);
+  border: 1px solid var(--border);
+}
+.ui-sheet.task-full {
+  left: 5vw;
+  right: 5vw;
+  width: 90vw;
+  max-width: none;
+  top: 5vh;
+  bottom: 5vh;
+  height: 90vh;
+  border-radius: var(--r);
+}
+.work-shell.sidebar-collapsed .work-sidebar nav,
+.work-shell.sidebar-collapsed .work-sidebar-bottom {
+  display: none;
+}
+.work-shell.sidebar-collapsed {
+  grid-template-columns: 90px minmax(0, 1fr);
+}
+[data-motion='reduce'] .work-shell *,
+[data-motion='reduce'] .ui-sheet,
+[data-motion='reduce'] .ui-overlay {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-shell *,
+  .ui-sheet,
+  .ui-overlay {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media (max-width: 700px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+  .settings-layout > nav {
+    flex-direction: row;
+    overflow: auto;
+    max-width: 100%;
+  }
+  .settings-layout > nav button {
+    flex-shrink: 0;
+  }
+  .inbox-layout.has-selection {
+    grid-template-columns: 1fr;
+  }
+  .inbox-layout.has-selection .inbox-list {
+    display: none;
+  }
+  .inbox-preview {
+    border: 0;
+    padding: 0;
+  }
+  .ui-sheet.task-full {
+    inset: 0;
+    height: 100dvh;
+    width: 100vw;
+    border-radius: 0;
+  }
+  .work-shell.sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+}

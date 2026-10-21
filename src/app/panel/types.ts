@@ -1,0 +1,26 @@
+import type { Workspace } from '../../domain/contracts';
+import type { WorkspaceRepository } from '../../workspace/repository';
+import type { Snapshot } from '../shell/useWorkspaceData';
+import type { Translate } from '../auth/ConsentPage';
+import type { Execute } from '../projects/ProjectsPage';
+export type PanelProps = {
+  snapshot: Snapshot;
+  repo: WorkspaceRepository;
+  workspace: Workspace;
+  t: Translate;
+  execute: Execute;
+  route: string;
+  params: URLSearchParams;
+  go: (route: string, params?: Record<string, string>) => void;
+  openTask: (id: string) => void;
+  createTask: (assignee?: string, due?: string, status?: string) => void;
+  openProject: (id: string, tab?: string) => void;
+  readOnly: boolean;
+  admin: boolean;
+  prefs: Record<string, unknown>;
+  savePrefs: (patch: Record<string, unknown>) => Promise<void>;
+  markNotifications: (ids: string[], read: boolean) => Promise<void>;
+  toggleFavorite: (id: string, kind?: 'task' | 'project') => Promise<void>;
+  refresh: () => Promise<unknown>;
+  workspaceChanged: () => void;
+};

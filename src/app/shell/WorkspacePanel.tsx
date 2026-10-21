@@ -1,5 +1,34 @@
+import DOMPurify from 'dompurify';
+import { CommandPalette, type PaletteItem } from '../panel/CommandPalette';
+import { RemainingRoutes, remainingRoutes } from '../panel/RemainingRoutes';
+import { defaultProjectTab, visiblePanelSnapshot } from '../panel/panel-model';
+import { loadAppearance, saveAppearance } from '../../workspace/device-preferences.js';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Activity, CalendarDays, ChartGantt, Files, Bot, CheckCheck, ChevronRight, FolderKanban, ListTodo, Plug, Plus, RefreshCw, Star } from 'lucide-react';
+import {
+  Home,
+  Inbox,
+  Users,
+  Settings,
+  Search,
+  Archive,
+  Bell,
+  LayoutDashboard,
+  Menu,
+  Palette,
+  Activity,
+  CalendarDays,
+  ChartGantt,
+  Files,
+  Bot,
+  CheckCheck,
+  ChevronRight,
+  FolderKanban,
+  ListTodo,
+  Plug,
+  Plus,
+  RefreshCw,
+  Star,
+} from 'lucide-react';
 import type { Workspace } from '../../domain/contracts';
 import type { RepositoryFactory } from '../../workspace/repository';
 import { useWorkspaceData, emptySnapshot } from './useWorkspaceData';
@@ -16,7 +45,6 @@ import { TaskList } from '../tasks/TaskList';
 import { TaskDrawer, type DraftGuard } from '../tasks/TaskDrawer';
 import { ProjectsPage } from '../projects/ProjectsPage';
 import { AgentsPage } from '../agents/AgentsPage';
-import { ActivityPage } from '../activity/ActivityPage';
 import { IntegrationsPanel } from '../agents/IntegrationsPanel';
 import { useNavigation } from './navigation';
 import { errorMessage } from './messages';
@@ -50,7 +78,7 @@ export function WorkspacePanel({
   };
   const segments = url.pathname.split('/'),
     workspaceId = segments[3] ?? '',
-    route = segments[4] ?? 'tasks';
+    route = segments[4] || 'home';
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]),
     [discovery, setDiscovery] = useState(true),
     [discoveryError, setDiscoveryError] = useState(''),
@@ -78,7 +106,7 @@ export function WorkspacePanel({
               const personal = await discoveryRepo.personal?.();
               if (alive)
                 navigate(
-                  `${discoveryRepo.mode === 'local' ? '/app-local' : '/app'}/w/${rows.find(w => w.id === personal?.activeWorkspace)?.id ?? rows[0].id}/tasks`,
+                  `${discoveryRepo.mode === 'local' ? '/app-local' : '/app'}/w/${rows.find(w => w.id === personal?.activeWorkspace)?.id ?? rows[0].id}/home`,
                   true,
                 );
             })().catch(err => {
@@ -101,23 +129,73 @@ export function WorkspacePanel({
   const creationAttempt = useRef<{ name: string; key: string; slug: string } | null>(null);
   const current = workspaces.find(w => w.id === workspaceId);
   const repo = useMemo(() => repositoryFactory(workspaceId || null), [repositoryFactory, workspaceId]);
-  const { snapshot, snapshotScope, loading, error, setError, revision, refresh, execute, toggleFavorite, addCopiedFavorites } = useWorkspaceData(
-    repo,
-    current?.id,
-    workspaceId,
-    t,
-  );
+  const { markNotifications, snapshot, snapshotScope, loading, error, setError, revision, refresh, execute, toggleFavorite, addCopiedFavorites } =
+    useWorkspaceData(repo, current?.id, workspaceId, t);
   useEffect(() => {
     if (current && repo.savePersonal) void repo.savePersonal({ activeWorkspace: current.id }).catch(err => setError(errorMessage(err, t)));
   }, [repo, current?.id, t]);
   const base = `${routeRoot}/w/${workspaceId}`;
+  const [prefs, setPrefs] = useState<Record<string, unknown>>({}),
+    [collapsed, setCollapsed] = useState(false),
+    [palette, setPalette] = useState(false),
+    [paletteMode, setPaletteMode] = useState<'command' | 'search'>('command');
+  const paletteOpener = useRef<HTMLElement | null>(null),
+    gPending = useRef(0);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const personal = await repo.personal?.();
+      if (alive) {
+        setPrefs(loadAppearance(localStorage, repo.userId));
+        setCollapsed(personal?.collapsed ?? !!JSON.parse(localStorage.getItem(`gr8r.preferences.${repo.userId}`) ?? '{}').collapsed);
+      }
+    })().catch(err => {
+      if (alive) setError(errorMessage(err, t));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [repo]);
+  useEffect(() => {
+    const update = () => setPrefs(loadAppearance(localStorage, repo.userId));
+    addEventListener('gr8r:appearance', update);
+    return () => removeEventListener('gr8r:appearance', update);
+  }, [repo]);
+  async function savePrefs(patch: Record<string, unknown>) {
+    saveAppearance(localStorage, repo.userId, patch);
+    setPrefs(previous => ({ ...previous, ...patch }));
+    dispatchEvent(new Event('gr8r:appearance'));
+  }
+  const go = (route: string, params: Record<string, string> = {}) =>
+    navigate(`${base}/${route}${Object.keys(params).length ? '?' + new URLSearchParams(params) : ''}`);
+  const openProject = (id: string, tab = defaultProjectTab(prefs)) => go('project', { project: id, tab });
+  useEffect(() => {
+    const open = () => {
+      paletteOpener.current = document.activeElement as HTMLElement;
+      setPaletteMode('command');
+      setPalette(true);
+    };
+    const key = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        open();
+      }
+    };
+    addEventListener('keydown', key);
+    document.addEventListener('gr8r:palette', open);
+    return () => {
+      removeEventListener('keydown', key);
+      document.removeEventListener('gr8r:palette', open);
+    };
+  }, []);
+
   const taskHref = (params: Record<string, string>) => {
     const q = new URLSearchParams(url.search);
     for (const [key, value] of Object.entries(params)) {
       if (value) q.set(key, value);
       else q.delete(key);
     }
-    return `${base}/${['calendar', 'timeline', 'files', 'project'].includes(route) ? route : 'tasks'}${q.size ? '?' + q.toString() : ''}`;
+    return `${base}/${route}${q.size ? '?' + q.toString() : ''}`;
   };
   const openTask = (id: string) => navigate(taskHref({ task: id, due: '', file: '' }));
   const shown = snapshotScope === workspaceId ? snapshot : emptySnapshot;
@@ -127,7 +205,25 @@ export function WorkspacePanel({
     selected = shown.tasks.find(task => task.id === taskId),
     readOnly = current?.role === 'guest',
     admin = current?.role === 'owner' || current?.role === 'admin';
+  const pageLocation = [workspaceId, route, projectId, url.searchParams.get('tab'), url.searchParams.get('id'), url.searchParams.get('sec')].join(':');
+  useEffect(() => {
+    const content = document.getElementById('work-content');
+    if (content) content.scrollTop = 0;
+  }, [pageLocation]);
   const nav = [
+    { id: 'home', label: t('Início', 'Home'), icon: Home },
+    { id: 'inbox', label: t('Caixa de entrada', 'Inbox'), icon: Inbox },
+    { id: 'mytasks', label: t('Minhas tarefas', 'My tasks'), icon: CheckCheck },
+    { id: 'favorites', label: t('Favoritos', 'Favorites'), icon: Star },
+    { id: 'notifications', label: t('Notificações', 'Notifications'), icon: Bell },
+    { id: 'search', label: t('Busca', 'Search'), icon: Search },
+    { id: 'overview', label: t('Visão geral', 'Overview'), icon: LayoutDashboard },
+    { id: 'members', label: t('Membros', 'Members'), icon: Users },
+    { id: 'teams', label: t('Equipes', 'Teams'), icon: Users },
+    { id: 'archive', label: t('Arquivo', 'Archive'), icon: Archive },
+    { id: 'settings', label: t('Configurações', 'Settings'), icon: Settings },
+    { id: 'system', label: t('Sistema visual', 'Design system'), icon: Palette },
+    { id: 'states', label: t('Estados', 'States'), icon: LayoutDashboard },
     { id: 'tasks', label: t('Tarefas', 'Tasks'), icon: ListTodo },
     { id: 'calendar', label: t('Calendário', 'Calendar'), icon: CalendarDays },
     { id: 'timeline', label: t('Cronograma', 'Timeline'), icon: ChartGantt },
@@ -137,11 +233,29 @@ export function WorkspacePanel({
     { id: 'activity', label: t('Atividade', 'Activity'), icon: Activity },
     { id: 'integrations', label: t('Integrações', 'Integrations'), icon: Plug },
   ];
-  const activeNav = route === 'project' ? { label: filterProject?.name ?? t('Projeto', 'Project') } : nav.find(item => item.id === route);
+  const activeNav =
+    route === 'project'
+      ? { label: filterProject?.name ?? t('Projeto', 'Project') }
+      : route === 'member'
+        ? { label: shown.members.find(m => m.user_id === url.searchParams.get('id'))?.name ?? t('Membro', 'Member') }
+        : route === 'team'
+          ? { label: shown.teams.find(team => team.id === url.searchParams.get('id'))?.name ?? t('Equipe', 'Team') }
+          : nav.find(item => item.id === route);
   useEffect(() => {
     document.title = `${activeNav?.label ?? 'Gr8r Studio'} | Gr8r Studio`;
   }, [activeNav?.label]);
-  const taskList = shown.tasks.filter(task => !task.archived && (!projectId || task.projectId === projectId)),
+  const taskList = shown.tasks.filter(
+      task =>
+        !task.archived &&
+        (!projectId || task.projectId === projectId) &&
+        (url.searchParams.get('filter') === 'done'
+          ? task.status === 'done'
+          : url.searchParams.get('filter') === 'open'
+            ? task.status !== 'done'
+            : url.searchParams.get('filter') === 'overdue'
+              ? task.status !== 'done' && !!task.dueDate && task.dueDate < new Date().toISOString().slice(0, 10)
+              : true),
+    ),
     projects = shown.projects
       .filter(
         p =>
@@ -171,15 +285,75 @@ export function WorkspacePanel({
       },
     },
   ];
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      const mod = event.metaKey || event.ctrlKey;
+      if (mod && event.shiftKey && event.key.toLowerCase() === 'l') {
+        event.preventDefault();
+        void savePrefs({ theme: document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark' }).catch(err => setError(errorMessage(err, t)));
+        return;
+      }
+      if (
+        mod ||
+        event.altKey ||
+        (event.target as HTMLElement)?.closest('input,textarea,select,[contenteditable=true]') ||
+        document.querySelector('[role=dialog],[role=alertdialog]')
+      )
+        return;
+      const k = event.key.toLowerCase();
+      if (gPending.current && Date.now() - gPending.current < 1200) {
+        gPending.current = 0;
+        const destination = (
+          { h: 'home', t: 'mytasks', p: 'projects', i: 'inbox', c: 'calendar', s: 'settings', n: 'notifications', a: 'activity', m: 'members' } as Record<
+            string,
+            string
+          >
+        )[k];
+        if (destination) {
+          event.preventDefault();
+          go(destination);
+        }
+        return;
+      }
+      if (k === 'g') {
+        gPending.current = Date.now();
+        return;
+      }
+      if (k === '/') {
+        event.preventDefault();
+        paletteOpener.current = document.activeElement as HTMLElement;
+        setPaletteMode('search');
+        setPalette(true);
+      }
+      if (k === 'n' && !readOnly && projects.length) {
+        event.preventDefault();
+        openTask('new');
+      }
+      if (k === 'p' && !readOnly) {
+        event.preventDefault();
+        go('projects', { create: 'true' });
+      }
+      if (k === '?') {
+        event.preventDefault();
+        go('settings', { sec: 'shortcuts' });
+      }
+      if (k === '[') {
+        event.preventDefault();
+        document.querySelector<HTMLButtonElement>('[data-sidebar-toggle]')?.click();
+      }
+    };
+    addEventListener('keydown', key);
+    return () => removeEventListener('keydown', key);
+  });
   return (
-    <div className="work-shell">
+    <div className={'work-shell' + (collapsed ? ' sidebar-collapsed' : '')}>
       <a className="work-skip" href="#work-content">
         {t('Ir para conteúdo', 'Skip to content')}
       </a>
       <aside className="work-sidebar">
         <div className="work-brand">
           {workspaces.length ? (
-            <WorkspacePicker items={workspaces} value={workspaceId} onChange={id => navigate(`${routeRoot}/w/${id}/tasks`)} t={t} />
+            <WorkspacePicker items={workspaces} value={workspaceId} onChange={id => navigate(`${routeRoot}/w/${id}/home`)} t={t} />
           ) : (
             <span className="brand">Gr8r Studio</span>
           )}
@@ -193,6 +367,39 @@ export function WorkspacePanel({
             }}
           >
             <Plus size={16} />
+          </Button>
+        </div>
+        <div className="button-row">
+          <Button
+            variant="ghost"
+            data-sidebar-toggle
+            aria-label={t('Alternar barra lateral', 'Toggle sidebar')}
+            aria-expanded={!collapsed}
+            onClick={() => {
+              const next = !collapsed;
+              void (async () => {
+                if (repo.savePersonal) await repo.savePersonal({ collapsed: next });
+                else {
+                  const key = `gr8r.preferences.${repo.userId}`;
+                  const value = JSON.parse(localStorage.getItem(key) ?? '{}');
+                  localStorage.setItem(key, JSON.stringify({ ...value, collapsed: next }));
+                }
+                setCollapsed(next);
+              })().catch(err => setError(errorMessage(err, t)));
+            }}
+          >
+            <Menu size={16} />
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              paletteOpener.current = document.activeElement as HTMLElement;
+              setPaletteMode('command');
+              setPalette(true);
+            }}
+            aria-label={t('Abrir comandos', 'Open commands')}
+          >
+            <Search size={16} />
           </Button>
         </div>
         <nav aria-label={t('Navegação principal', 'Main navigation')}>
@@ -217,7 +424,7 @@ export function WorkspacePanel({
             <a
               key={p.id}
               className="project-nav"
-              href={`${base}/project?project=${encodeURIComponent(p.id)}&tab=overview`}
+              href={`${base}/project?project=${encodeURIComponent(p.id)}&tab=${defaultProjectTab(prefs)}`}
               onClick={e => {
                 e.preventDefault();
                 navigate(e.currentTarget.href);
@@ -231,7 +438,9 @@ export function WorkspacePanel({
         <div className="work-sidebar-bottom">
           <span>
             <Star size={15} />
-            {t('Favoritos', 'Favorites')}{' '}
+            <button className="inline-link" onClick={() => go('favorites')}>
+              {t('Favoritos', 'Favorites')}
+            </button>{' '}
             <small data-testid="favorite-count">{shown.preferences.favoriteProjectIds.length + shown.preferences.favoriteTaskIds.length}</small>
           </span>
           <Button
@@ -246,11 +455,13 @@ export function WorkspacePanel({
           </Button>
           <span className="account-name">
             <span className="account-avatar">
-              {String(identity.name || identity.email || '?')
+              {String((repo.mode === 'local' ? shown.members.find(m => m.user_id === shown.actorId)?.name : identity.name) || identity.email || '?')
                 .slice(0, 2)
                 .toUpperCase()}
             </span>
-            {identity.name || identity.email}
+            <button className="inline-link" onClick={() => go('settings', { sec: 'profile' })}>
+              {(repo.mode === 'local' ? shown.members.find(m => m.user_id === shown.actorId)?.name : identity.name) || identity.email}
+            </button>
           </span>
         </div>
       </aside>
@@ -334,7 +545,8 @@ export function WorkspacePanel({
                   snapshot={shown}
                   repo={repo}
                   projectId={route === 'project' ? projectId : undefined}
-                  tab={url.searchParams.get('tab') || 'overview'}
+                  tab={url.searchParams.get('tab') || defaultProjectTab(prefs)}
+                  initialCreate={url.searchParams.get('create') === 'true'}
                   back={() => navigate(`${base}/projects`)}
                   href={taskHref}
                   navigate={navigate}
@@ -349,7 +561,7 @@ export function WorkspacePanel({
                   extraTaskMenuActions={taskMenuActions}
                   execute={execute}
                   t={t}
-                  openProject={(id, tab = 'overview') => navigate(`${base}/project?project=${encodeURIComponent(id)}&tab=${encodeURIComponent(tab)}`)}
+                  openProject={openProject}
                   readOnly={readOnly}
                 />
               ) : (
@@ -371,7 +583,7 @@ export function WorkspacePanel({
                                   ? t('Alterações de pessoas e agentes, no mesmo histórico.', 'Updates from people and agents in one history.')
                                   : route === 'integrations'
                                     ? t('Acesso dos aplicativos e entrega de eventos.', 'App access and event delivery.')
-                                    : t('Esta rota será concluída na próxima etapa da migração.', 'This route will be completed in the next migration stage.')}
+                                    : t('Seu espaço de trabalho.', 'Your workspace.')}
                     </p>
                   </div>
                   <div className="button-row">
@@ -433,7 +645,7 @@ export function WorkspacePanel({
                   readOnly={!!readOnly}
                   openTask={openTask}
                   createTask={day => navigate(taskHref({ task: 'new', due: day || '' }))}
-                  openProject={id => navigate(`${base}/project?project=${encodeURIComponent(id)}&tab=overview`)}
+                  openProject={openProject}
                 />
               ) : route === 'files' ? (
                 <FilesView
@@ -460,8 +672,6 @@ export function WorkspacePanel({
                 ) : (
                   <AgentsPage agents={shown.agents} tasks={shown.tasks} openTask={openTask} t={t} />
                 )
-              ) : route === 'activity' ? (
-                <ActivityPage events={shown.events} members={shown.members} agents={shown.agents} tasks={shown.tasks} openTask={openTask} t={t} />
               ) : route === 'integrations' ? (
                 repo.mode === 'local' ? (
                   <p role="status" className="configuration-note">
@@ -470,42 +680,154 @@ export function WorkspacePanel({
                 ) : (
                   <IntegrationsPanel repo={repo} t={t} admin={admin} />
                 )
-              ) : null}
-              {taskId && !loading && ['tasks', 'calendar', 'timeline', 'files', 'project'].includes(route) && (selected || taskId === 'new') && (
-                <TaskDrawer
-                  key={`${workspaceId}:${taskId}`}
-                  graph={shown}
-                  task={selected ?? 'new'}
-                  tasks={shown.tasks}
-                  projects={projects}
-                  agents={shown.agents}
-                  members={shown.members}
+              ) : remainingRoutes.includes(route) ? (
+                <RemainingRoutes
+                  key={`${workspaceId}:${route}:${route === 'settings' ? (url.searchParams.get('sec') ?? 'workspace') : ''}`}
+                  route={route}
+                  params={url.searchParams}
+                  snapshot={visiblePanelSnapshot(shown, repo.mode === 'local')}
                   repo={repo}
-                  execute={execute}
+                  workspace={current}
                   t={t}
-                  close={() => navigate(taskHref({ task: '', due: '' }))}
-                  created={openTask}
+                  execute={execute}
+                  go={go}
+                  openTask={openTask}
+                  createTask={(assignee, due, status) => navigate(taskHref({ task: 'new', assignee: assignee ?? '', due: due ?? '', status: status ?? '' }))}
+                  openProject={openProject}
                   readOnly={readOnly}
-                  projectId={projectId}
-                  initialDueDate={url.searchParams.get('due') || undefined}
-                  revision={revision}
                   admin={admin}
-                  refresh={async () => {
-                    await refresh(true);
+                  prefs={prefs}
+                  savePrefs={savePrefs}
+                  markNotifications={markNotifications}
+                  toggleFavorite={toggleFavorite}
+                  refresh={() => refresh(true)}
+                  workspaceChanged={() => {
+                    void repo
+                      .workspaces(true)
+                      .then(rows => {
+                        if (!repo.controller.signal.aborted) setWorkspaces(rows);
+                      })
+                      .catch(err => setError(errorMessage(err, t)));
                   }}
-                  registerDraft={registerDraft}
-                  favorite={shown.preferences.favoriteTaskIds.includes(taskId)}
-                  toggleFavorite={() => toggleFavorite(taskId)}
-                  copyLink={() => (selected ? navigator.clipboard.writeText(taskLink(selected, repo.mode === 'local', location.origin)) : Promise.resolve())}
                 />
-              )}{' '}
-              {taskId && !loading && ['tasks', 'calendar', 'timeline', 'files', 'project'].includes(route) && !selected && taskId !== 'new' && (
-                <p role="status">{t('Tarefa não encontrada nesta organização.', 'Task not found in this workspace.')}</p>
+              ) : (
+                <div className="work-empty">
+                  <h2>{t('Página não encontrada', 'Page not found')}</h2>
+                  <div className="button-row">
+                    <Button variant="outline" onClick={() => history.back()}>
+                      {t('Voltar', 'Go back')}
+                    </Button>
+                    <Button onClick={() => go('home')}>{t('Ir para início', 'Go to Home')}</Button>
+                  </div>
+                </div>
               )}
+              {taskId &&
+                !loading &&
+                (nav.some(item => item.id === route) || ['project', 'member', 'team'].includes(route)) &&
+                (selected || taskId === 'new') && (
+                  <TaskDrawer
+                    key={`${workspaceId}:${taskId}`}
+                    graph={shown}
+                    task={selected ?? 'new'}
+                    tasks={shown.tasks}
+                    projects={projects}
+                    agents={shown.agents}
+                    members={shown.members}
+                    repo={repo}
+                    execute={execute}
+                    t={t}
+                    close={() => navigate(taskHref({ task: '', due: '', assignee: '', status: '' }))}
+                    created={openTask}
+                    readOnly={readOnly}
+                    projectId={projectId}
+                    initialDueDate={url.searchParams.get('due') || undefined}
+                    initialAssignee={url.searchParams.get('assignee') || undefined}
+                    initialStatus={url.searchParams.get('status') || undefined}
+                    prefs={prefs}
+                    revision={revision}
+                    admin={admin}
+                    refresh={async () => {
+                      await refresh(true);
+                    }}
+                    registerDraft={registerDraft}
+                    favorite={shown.preferences.favoriteTaskIds.includes(taskId)}
+                    toggleFavorite={() => toggleFavorite(taskId)}
+                    copyLink={() => (selected ? navigator.clipboard.writeText(taskLink(selected, repo.mode === 'local', location.origin)) : Promise.resolve())}
+                  />
+                )}{' '}
+              {taskId &&
+                !loading &&
+                (nav.some(item => item.id === route) || ['project', 'member', 'team'].includes(route)) &&
+                !selected &&
+                taskId !== 'new' && <p role="status">{t('Tarefa não encontrada nesta organização.', 'Task not found in this workspace.')}</p>}
             </>
           )}
         </main>
       </div>
+      <CommandPalette
+        open={palette}
+        onOpenChange={setPalette}
+        opener={paletteOpener.current}
+        initialMode={paletteMode}
+        t={t}
+        items={
+          [
+            ...nav.map(item => ({ id: item.id, label: item.label, kind: 'command' as const, run: () => go(item.id) })),
+            ...workspaces.map(workspace => ({
+              id: workspace.id,
+              label: t('Mudar para ', 'Switch to ') + workspace.name,
+              kind: 'command' as const,
+              run: () => navigate(`${routeRoot}/w/${workspace.id}/home`),
+            })),
+            ...(!readOnly && projects.length
+              ? [
+                  { id: 'create-task', label: t('Criar tarefa', 'Create task'), kind: 'command' as const, run: () => openTask('new') },
+                  {
+                    id: 'create-project',
+                    label: t('Criar projeto', 'Create project'),
+                    kind: 'command' as const,
+                    run: () => go('projects', { create: 'true' }),
+                  },
+                ]
+              : []),
+            {
+              id: 'theme',
+              label: t('Alternar tema', 'Toggle theme'),
+              kind: 'command',
+              run: () => {
+                void savePrefs({ theme: document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark' }).catch(err => setError(errorMessage(err, t)));
+              },
+            },
+            ...visiblePanelSnapshot(shown, repo.mode === 'local').projects.map(project => ({
+              id: project.id,
+              label: project.name,
+              kind: 'project' as const,
+              run: () => openProject(project.id),
+            })),
+            ...visiblePanelSnapshot(shown, repo.mode === 'local')
+              .tasks.filter(task => !task.archived)
+              .map(task => ({ id: task.id, label: task.title, kind: 'task' as const, run: () => openTask(task.id) })),
+            ...shown.members.map(member => ({
+              id: member.user_id,
+              label: member.name,
+              kind: 'person' as const,
+              run: () => go('member', { id: member.user_id }),
+            })),
+            ...visiblePanelSnapshot(shown, repo.mode === 'local').files.map(file => ({
+              id: file.id,
+              label: file.name,
+              kind: 'file' as const,
+              run: () => go('files', { file: file.id }),
+            })),
+            ...visiblePanelSnapshot(shown, repo.mode === 'local').comments.map(comment => ({
+              id: comment.id,
+              label: DOMPurify.sanitize(comment.body, { ALLOWED_TAGS: [] }),
+              kind: 'comment' as const,
+              run: () => openTask(comment.taskId),
+            })),
+          ] as PaletteItem[]
+        }
+      />
       <Sheet
         open={createWorkspace}
         onOpenChange={open => {
@@ -545,7 +867,7 @@ export function WorkspacePanel({
                 setWorkspaces(rows => [...rows.filter(row => row.id !== result.data.id), result.data]);
                 creationAttempt.current = null;
                 setCreateWorkspace(false);
-                navigate(`${routeRoot}/w/${result.data.id}/tasks`);
+                navigate(`${routeRoot}/w/${result.data.id}/home`);
               } catch (err) {
                 setDiscoveryError(errorMessage(err, t));
               } finally {
