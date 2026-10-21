@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { addD, diffD, iso, parse } from '../../core/calendar.js';
-import type { CalendarEvent, Project, Task, BatchCommand } from '../../domain/contracts';
+import type { CalendarEvent, Project, Task, BatchCommand, Json } from '../../domain/contracts';
 import type { WorkspaceRepository } from '../../workspace/repository';
 import type { Member } from '../../workspace/normalized';
 import type { TaskGraph } from '../shell/useWorkspaceData';
@@ -20,6 +20,7 @@ export type ScheduleViewProps = {
   extraTaskMenuActions?: ExtraTaskMenuAction[];
   projectId?: string;
   viewKey?: string;
+  initialFilters?: Json[];
   repo: WorkspaceRepository;
   tasks: Task[];
   projects: Project[];
@@ -61,9 +62,9 @@ export function ScheduleView(props: ScheduleViewProps) {
   } = useSurfaceView(
     repo,
     props.viewKey ?? `${projectId ? `project:${projectId}:` : ''}${mode}`,
-    readView,
+    value => readView({ filters: props.initialFilters ?? [], ...value }),
     t,
-    projectId || (mode === 'calendar' ? 'cal' : 'tl'),
+    props.initialFilters ? undefined : projectId || (mode === 'calendar' ? 'cal' : 'tl'),
   );
   const [busy, setBusy] = useState(false),
     [event, setEvent] = useState<CalendarEvent | null>(null),

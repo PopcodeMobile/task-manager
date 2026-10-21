@@ -7,7 +7,7 @@ import type { Execute } from './ProjectsPage';
 import type { ExtraTaskMenuAction } from '../tasks/TaskContextMenu';
 import { Button } from '../../components/ui/button';
 import { TaskList, statuses, statusLabel } from '../tasks/TaskList';
-import { prepareTaskAction, readTaskView, applyTaskView, saveTaskView, type TaskView } from '../tasks/task-view-model';
+import { prepareTaskAction, readTaskView, saveTaskView, type TaskView } from '../tasks/task-view-model';
 import { ScheduleView } from '../schedules/ScheduleView';
 import { FilesView } from '../files/FilesView';
 import { ActivityPage } from '../activity/ActivityPage';
@@ -286,7 +286,8 @@ export function ProjectDetail({
               projectId={project.id}
               viewKey={saved ? key : `p:${project.id}:${mode}`}
               repo={repo}
-              tasks={saved ? applyTaskView(snapshot.tasks, readTaskView({ filters: saved.filters }), snapshot.projects, snapshot.members) : snapshot.tasks}
+              tasks={snapshot.tasks}
+              initialFilters={saved?.filters}
               projects={snapshot.projects}
               members={snapshot.members}
               graph={snapshot}

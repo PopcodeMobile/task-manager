@@ -1620,3 +1620,91 @@ test('project collection table has aligned labeled cells and persists layout', a
   await page.reload();
   await expect(page.getByRole('table', { name: 'Project collection' })).toBeVisible();
 });
+
+async function copyRecoveryFixture(page: import('@playwright/test').Page) {
+  await prepare(page);
+  await page.goto('/app-local/w/w1/projects');
+  await expect(page.getByRole('button', { name: 'New project', exact: true })).toBeEnabled();
+  await projectLocalCommand(page, 'create_project', { id: 'recovery-project', name: 'Recovery source', key: 'REC', status: 'planning' });
+  await projectLocalCommand(page, 'create_task', { id: 'recovery-task', projectId: 'recovery-project', title: 'Recovery task' });
+  await projectLocalCommand(page, 'create_task', { id: 'remaining-task', projectId: 'recovery-project', title: 'Remaining task' });
+  await page.goto('/app-local/w/w1/project?project=recovery-project&tab=overview');
+  await page.locator('.project-heading .project-options summary').click();
+  await page.getByRole('button', { name: 'Duplicate project', exact: true }).click();
+  await page.getByLabel('Name', { exact: true }).fill('Recovery destination');
+  await page.getByRole('textbox', { name: 'Description', exact: true }).fill('Keep this draft');
+}
+for (const change of ['update', 'delete'] as const) {
+  test(`project copy replans after definitive source task ${change} with retained draft`, async ({ page }) => {
+    await copyRecoveryFixture(page);
+    await projectLocalCommand(page, `${change}_task`, { id: 'recovery-task', ...(change === 'update' ? { title: 'External task update' } : {}) }, 1);
+    const before = await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.projects.length);
+    await page.getByRole('button', { name: 'Save project', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.projects.length)).toBe(before);
+    await expect(page.getByRole('button', { name: 'Review current source tasks and keep draft', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Review current source tasks and keep draft', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save project', exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Name', { exact: true })).toHaveValue('Recovery destination');
+    await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveValue('Keep this draft');
+    await page.getByRole('button', { name: 'Save project', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Recovery destination', exact: true })).toBeVisible();
+    const id = new URL(page.url()).searchParams.get('project');
+    const rows = await page.evaluate(
+      id => JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.tasks.filter((task: { project: string }) => task.project === id),
+      id,
+    );
+    expect(rows.map((row: { title: string }) => row.title).sort()).toEqual(
+      change === 'update' ? ['External task update', 'Remaining task'] : ['Remaining task'],
+    );
+    await page.reload();
+    await expect(page.getByText('Keep this draft', { exact: true })).toBeVisible();
+  });
+  test(`project committed copy recovers favorites after source project ${change}`, async ({ page }) => {
+    await copyRecoveryFixture(page);
+    await page.evaluate(() => {
+      const key = 'gr8r.preferences.local',
+        personal = JSON.parse(localStorage.getItem(key)!);
+      personal.preferences ??= {};
+      personal.preferences.w1 ??= { favoriteProjectIds: [], notificationReadStates: {} };
+      personal.preferences.w1.favoriteTaskIds = ['recovery-task'];
+      localStorage.setItem(key, JSON.stringify(personal));
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === 'gr8r.preferences.local' && JSON.parse(value).preferences.w1.favoriteTaskIds.length > 1) {
+          Storage.prototype.setItem = original;
+          throw Error('Simulated personal failure');
+        }
+        return original.call(this, key, value);
+      };
+    });
+    await page.getByRole('button', { name: 'Save project', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
+    await expect(page.getByLabel('Name', { exact: true })).toBeDisabled();
+    const destination = await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data.projects.find((p: { name: string }) => p.name === 'Recovery destination').id,
+    );
+    await projectLocalCommand(page, `${change}_project`, { id: 'recovery-project', ...(change === 'update' ? { name: 'Source changed' } : {}) }, 1);
+    // Let the real parent snapshot refresh observe deletion/update while the committed sheet remains mounted.
+    await page.getByRole('button', { name: 'Check current version', exact: true }).click();
+    if (change === 'delete') await expect(page.locator('main h1')).toHaveText('Project not found');
+    else await expect(page.locator('.project-heading h1')).toHaveText('Source changed');
+    await expect(page.getByRole('dialog')).toContainText('The project was created');
+    await expect(page.getByRole('button', { name: 'Use current version and keep draft', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save project', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Save project', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Recovery destination', exact: true })).toBeVisible();
+    expect(new URL(page.url()).searchParams.get('project')).toBe(destination);
+    const proof = await page.evaluate(() => ({
+      data: JSON.parse(localStorage.getItem('gr8r.workspaces.v1')!).records.w1.data,
+      prefs: JSON.parse(localStorage.getItem('gr8r.preferences.local')!).preferences.w1,
+    }));
+    expect(proof.data.projects.filter((p: { name: string }) => p.name === 'Recovery destination')).toHaveLength(1);
+    expect(proof.prefs.favoriteTaskIds).toContain(
+      proof.data.tasks.find((task: { project: string; title: string }) => task.project === destination && task.title === 'Recovery task').id,
+    );
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Recovery destination', exact: true })).toBeVisible();
+  });
+}

@@ -67,21 +67,22 @@ export function ProjectEditor({
     attempt = useRef<{ signature: string; commands: BatchCommand[]; result?: BatchResult } | undefined>(undefined);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [discard, setDiscard] = useState(false);
+    [discard, setDiscard] = useState(false),
+    [copyConflict, setCopyConflict] = useState(false);
   const committed = !!attempt.current?.result;
   const dirty = JSON.stringify(draft) !== initial.current;
   const live = source ? snapshot.projects.find(p => p.id === source.id) : undefined;
-  const conflict = !!source && (!live || live.version !== base?.version);
+  const conflict = !committed && !!source && (!live || live.version !== base?.version);
   useEffect(() => {
     registerDraft({
-      dirty: dirty || busy || committed,
+      dirty: dirty || busy || committed || copyConflict,
       flush: async () => {
         setError(t('Salve ou descarte o rascunho do projeto antes de sair.', 'Save or discard the project draft before leaving.'));
         return false;
       },
     });
     return () => registerDraft(null);
-  }, [dirty, busy, committed, registerDraft, t]);
+  }, [dirty, busy, committed, copyConflict, registerDraft, t]);
   const patch = (next: Partial<ProjectDraft>) => setDraft(old => ({ ...old, ...next }));
   function dismiss() {
     if (busy || committed) return;
@@ -93,12 +94,12 @@ export function ProjectEditor({
     close();
   }
   async function save() {
-    if (busy || conflict) return;
+    if (busy || conflict || copyConflict) return;
     setBusy(true);
     setError('');
     try {
       const signature = JSON.stringify([draft, base?.version]);
-      if (attempt.current?.signature !== signature)
+      if (!attempt.current?.result && attempt.current?.signature !== signature)
         attempt.current = {
           signature,
           commands:
@@ -128,7 +129,13 @@ export function ProjectEditor({
       close();
       if (edit.kind !== 'edit') openProject(draft.id, draft.template === 'blank' ? 'overview' : 'board');
     } catch (err) {
-      if (!repo.controller.signal.aborted) setError(projectError(err, t));
+      if (!repo.controller.signal.aborted) {
+        setError(projectError(err, t));
+        const code = err instanceof Error && 'code' in err ? String(err.code) : '';
+        // A definitive atomic rejection can be replanned. An ambiguous transport failure
+        // retains the exact commands, and therefore the existing idempotency key.
+        if (edit.kind === 'copy' && !attempt.current?.result && ['version_conflict', 'not_found'].includes(code)) setCopyConflict(true);
+      }
     } finally {
       setBusy(false);
     }
@@ -261,6 +268,7 @@ export function ProjectEditor({
                     type="button"
                     variant="outline"
                     onClick={() => {
+                      if (attempt.current?.result) return;
                       setBase(live);
                       attempt.current = undefined;
                     }}
@@ -269,6 +277,39 @@ export function ProjectEditor({
                   </Button>
                 </>
               )}
+            </div>
+          )}
+          {copyConflict && !committed && (
+            <div role="status">
+              <p>
+                {t(
+                  'As tarefas de origem mudaram ou foram removidas. Revise a origem antes de tentar novamente.',
+                  'Source tasks changed or were removed. Review the source before retrying.',
+                )}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  void (async () => {
+                    setBusy(true);
+                    try {
+                      if ((await refresh()) && !repo.controller.signal.aborted && !attempt.current?.result) {
+                        attempt.current = undefined;
+                        setCopyConflict(false);
+                        setError('');
+                      }
+                    } catch (err) {
+                      if (!repo.controller.signal.aborted) setError(projectError(err, t));
+                    } finally {
+                      setBusy(false);
+                    }
+                  })()
+                }
+              >
+                {t('Revisar tarefas atuais e manter rascunho', 'Review current source tasks and keep draft')}
+              </Button>
             </div>
           )}
           {error && (
@@ -298,7 +339,7 @@ export function ProjectEditor({
               </Button>
             </div>
           )}
-          <Button type="submit" disabled={busy || conflict || !draft.name.trim()}>
+          <Button type="submit" disabled={busy || conflict || copyConflict || !draft.name.trim()}>
             {t('Salvar projeto', 'Save project')}
           </Button>
         </form>

@@ -1475,6 +1475,8 @@ test('actual cloud projects compose templates members saved views full graph cop
       title: 'Source task',
       description: '<b>Cloud rich</b><img src=x onerror=alert(1)>',
       priority: 'high',
+      startDate: new Date().toLocaleDateString('en-CA'),
+      dueDate: new Date().toLocaleDateString('en-CA'),
       attributes: { estimate: '4h' },
     });
     await command('create_subtask', { taskId: task.id, title: 'Completed subtask', done: true, attributes: { note: '<literal> detail' } }, task.version);
@@ -1483,6 +1485,9 @@ test('actual cloud projects compose templates members saved views full graph cop
     const file = await command('create_file', { id: 'project-file', projectId: source.id, name: 'Source file', fileType: 'pdf' });
     task = (await read('get_task', { id: task.id })).data;
     await command('set_task_attachment', { id: task.id, fileId: file.id, sortOrder: 7 }, task.version);
+    task = (await read('get_task', { id: task.id })).data;
+    const canonicalLabel = await command('create_label', { id: 'schedule-label', name: 'Schedule label' });
+    await command('set_task_label', { id: task.id, labelId: canonicalLabel.id }, task.version);
     task = (await read('get_task', { id: task.id })).data;
     await command('complete_task', { id: task.id }, task.version);
     expect(
@@ -1512,21 +1517,60 @@ test('actual cloud projects compose templates members saved views full graph cop
           .eq('task_id', task.id)
       ).error,
     ).toBeNull();
-    await command('create_view', { id: 'imported-calendar', projectId: source.id, name: 'Imported calendar', viewType: 'calendar', filters: [] });
+    for (const mode of ['calendar', 'timeline'])
+      for (const op of ['is', 'not'])
+        await command('create_view', {
+          id: `imported-${mode}-${op}`,
+          projectId: source.id,
+          name: `${mode} ${op} label`,
+          viewType: mode,
+          filters: [{ f: 'labels', op, v: [canonicalLabel.id] }],
+        });
+    expect((await read('get_task', { id: task.id })).data.legacyMetadata.labels).toBeUndefined();
+    expect((await read('list_task_labels', { taskId: task.id })).items.some((link: { labelId: string }) => link.labelId === canonicalLabel.id)).toBe(true);
     await page.goto(`/app/w/${ws}/projects`);
     await page.getByLabel('E-mail').fill(addresses[0]);
     await page.getByLabel('Senha', { exact: true }).fill(password);
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Projetos', exact: true })).toBeVisible();
     await page.getByLabel('Idioma', { exact: true }).selectOption('en');
-    let loseCreate = true;
-    const createKeys: string[] = [];
+    await page.evaluate(
+      ({ userId, ws, sourceId }) => {
+        const key = `gr8r.preferences.${userId}`,
+          personal = JSON.parse(localStorage.getItem(key) || '{}');
+        personal.views ??= {};
+        personal.views[ws] ??= {};
+        personal.views[ws][sourceId] = { filters: [{ f: 'priority', op: 'is', v: ['low'] }] };
+        localStorage.setItem(key, JSON.stringify(personal));
+      },
+      { userId: users[0], ws, sourceId: source.id },
+    );
+    await page.goto(`/app/w/${ws}/project?project=${source.id}&tab=v%3Aimported-calendar-is`);
+    for (const mode of ['calendar', 'timeline'])
+      for (const op of ['is', 'not']) {
+        await page.getByRole('link', { name: `${mode} ${op} label`, exact: true }).click();
+        const scheduled =
+          mode === 'calendar' ? page.locator('.schedule-task').filter({ hasText: 'Source task' }) : page.locator(`[data-schedule-bar="${task.id}"]`);
+        await expect(page.locator('.schedule-view')).toBeVisible();
+        await expect(scheduled).toHaveCount(op === 'is' ? 1 : 0);
+      }
+    await page.reload();
+    await expect(page.locator('.project-tabs [aria-current]')).toHaveText('timeline not label');
+    await expect(page.locator('.schedule-view')).toBeVisible();
+    await expect(page.locator(`[data-schedule-bar="${task.id}"]`)).toHaveCount(0);
+    await page.getByRole('link', { name: 'Projects', exact: true }).click();
+    let loseCreate = true,
+      loseCopy = true;
+    const createKeys: string[] = [],
+      copyKeys: string[] = [];
     await page.route('**/rest/v1/rpc/execute_operation', async route => {
       const body = route.request().postDataJSON();
       if (body.p_operation === 'batch' && body.p_command.commands.some((c: { operation: string }) => c.operation === 'create_project')) {
-        createKeys.push(body.p_idempotency_key);
-        if (loseCreate) {
-          loseCreate = false;
+        const copying = body.p_command.commands.some((c: { operation: string }) => c.operation === 'duplicate_task_graph');
+        (copying ? copyKeys : createKeys).push(body.p_idempotency_key);
+        if (copying ? loseCopy : loseCreate) {
+          if (copying) loseCopy = false;
+          else loseCreate = false;
           const response = await route.fetch();
           expect(response.ok()).toBe(true);
           return route.abort('failed');
@@ -1569,7 +1613,15 @@ test('actual cloud projects compose templates members saved views full graph cop
     await page.locator('.project-heading .project-options summary').click();
     await page.getByRole('button', { name: 'Duplicate project', exact: true }).click();
     await page.getByRole('button', { name: 'Save project', exact: true }).click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
+    const latestSourceTask = (await read('get_task', { id: task.id })).data;
+    await command('update_task', { id: task.id, description: 'Source changed after ambiguous response' }, latestSourceTask.version);
+    await page.getByRole('button', { name: 'Check current version', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Review current source tasks and keep draft', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Save project', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Source <literal> copy', exact: true })).toBeVisible();
+    expect(copyKeys).toHaveLength(2);
+    expect(copyKeys[0]).toBe(copyKeys[1]);
     const copied = new URL(page.url()).searchParams.get('project')!;
     await page.reload();
     const cloned = (await read('list_tasks', { projectId: copied })).items;
