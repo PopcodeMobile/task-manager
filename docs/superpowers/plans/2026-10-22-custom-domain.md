@@ -10,4 +10,4 @@ Acceptance: domain attached to the dedicated task-manager Vercel project in Delt
 
 ## Current handoff
 
-Vercel domain attached successfully; correct provider-specific CNAME supplied to user. Both authoritative GoDaddy nameservers have no CNAME; browser requireslogin. Auth/CORS planned only, no premature cutover. Current Resend/OAuthsettings preserved in privatebeforestate. See [pending activation receipt](../../verification/agent-platform/custom-domain-2026-10-22.md). Continue from DNS verification after user action.
+Activated on 2026-10-22. DNS, Vercel verification, HTTPS, static parity, sparse Auth update and CORS are proven; see the [activation receipt](../../verification/agent-platform/custom-domain-2026-10-22.md). Pending only a controlled real email link and Claude OAuth consent on the new host.
