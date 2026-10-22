@@ -1629,6 +1629,43 @@
 .panel-modal .invitation-options {
   gap: var(--s-3);
 }
+.panel-modal.invite-editor form > [role='status'],
+.panel-modal.invite-editor form > [role='alert'] {
+  margin: var(--s-3) var(--s-4);
+  font-size: var(--fs-sm);
+}
+.panel-modal .invitation-list {
+  margin: var(--s-3) var(--s-4);
+  padding: 0;
+  list-style: none;
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--r);
+}
+.panel-modal .invitation-list li {
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.panel-modal .invitation-list li + li {
+  border-top: var(--stroke) solid var(--divider);
+}
+.invitation-banner {
+  margin-bottom: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border: var(--stroke) solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.invitation-banner .row {
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  align-items: center;
+}
+.invitation-banner p {
+  margin: 0;
+  min-width: 12rem;
+}
 @media (max-width: 900px) {
   .work-shell .inbox-page .has-selection .inbox-sidebar {
     display: none;

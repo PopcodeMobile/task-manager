@@ -4,7 +4,7 @@ begin;
 create table public.workspace_invitations (
  id uuid primary key default gen_random_uuid(),
  workspace_id uuid not null references public.workspaces(id) on delete cascade,
- email text not null check(email=lower(btrim(email)) and length(email)<=254 and email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'),
+ email text not null check(email=lower(btrim(email)) and length(email)<=254 and email ~ '^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$'),
  role text not null check(role in ('admin','member','guest')),
  invited_by uuid references auth.users(id) on delete set null,
  created_at timestamptz not null default clock_timestamp(),
@@ -42,7 +42,8 @@ create function public.invitation_metadata(i public.workspace_invitations) retur
   'status',case when i.revoked_at is not null then 'revoked' when i.accepted_at is not null then 'accepted' when i.expires_at<=clock_timestamp() then 'expired' else 'pending' end)
 $$;
 create function public.invitation_person_name(p_user_id uuid) returns text language sql stable security definer set search_path='' as $$
- select coalesce(nullif(btrim(u.raw_user_meta_data->>'name'),''),split_part(u.email,'@',1)) from auth.users u where u.id=p_user_id
+ -- Never fall back to the email: invitees are not members yet.
+ select coalesce((select nullif(btrim(u.raw_user_meta_data->>'name'),'') from auth.users u where u.id=p_user_id),'Um administrador')
 $$;
 revoke all on function public.invitation_human(),public.invitation_manager(uuid),public.invitation_metadata(public.workspace_invitations),public.invitation_person_name(uuid) from public,anon,authenticated;
 
@@ -51,14 +52,18 @@ language plpgsql security definer set search_path='' as $$
 declare actor_role text; uid uuid; addr text:=lower(btrim(coalesce(p_email,''))); i public.workspace_invitations;
 begin
  actor_role:=public.invitation_manager(p_workspace_id); uid:=auth.uid();
- if p_role is null or p_role not in ('admin','member','guest') or length(addr)>254 or addr !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then
+ if p_role is null or p_role not in ('admin','member','guest') or length(addr)>254 or addr !~ '^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$' then
   raise exception 'validation_error' using errcode='PT422'; end if;
  if p_role='admin' and actor_role<>'owner' then raise exception 'forbidden' using errcode='PT403'; end if;
  if exists(select 1 from public.workspace_memberships m join auth.users u on u.id=m.user_id where m.workspace_id=p_workspace_id and lower(u.email)=addr) then
   raise exception 'validation_error' using errcode='PT422'; end if;
  -- Serialize per workspace so the send window and pending caps cannot be raced.
- perform 1 from public.workspaces where id=p_workspace_id for update;
- if (select count(*) from public.workspace_invitations where workspace_id=p_workspace_id and last_sent_at>clock_timestamp()-interval '24 hours')>=50 then
+ perform 1 from public.workspaces where id=p_workspace_id for no key update;
+ -- Each send is an email from our domain: cap per workspace and per inviter, and throttle resends.
+ if (select count(*) from public.workspace_invitations where workspace_id=p_workspace_id and last_sent_at>clock_timestamp()-interval '24 hours')>=50
+   or (select count(*) from public.workspace_invitations where invited_by=uid and last_sent_at>clock_timestamp()-interval '24 hours')>=50
+   or exists(select 1 from public.workspace_invitations where workspace_id=p_workspace_id and email=addr and accepted_at is null and revoked_at is null
+     and (last_sent_at>clock_timestamp()-interval '10 minutes' or send_count>=5)) then
   raise exception 'rate_limited' using errcode='PT429'; end if;
  update public.workspace_invitations set role=p_role,invited_by=uid,expires_at=clock_timestamp()+interval '7 days',last_sent_at=clock_timestamp(),send_count=send_count+1
   where workspace_id=p_workspace_id and email=addr and accepted_at is null and revoked_at is null returning * into i;

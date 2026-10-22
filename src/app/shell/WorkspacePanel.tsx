@@ -62,6 +62,8 @@ import { AgentsPage } from '../agents/AgentsPage';
 import { IntegrationsPanel } from '../agents/IntegrationsPanel';
 import { useNavigation } from './navigation';
 import { errorMessage } from './messages';
+import { PendingInvitations } from '../panel/PendingInvitations';
+import { listReceivedInvitations } from '../panel/invitations';
 export function WorkspacePanel({
   identity,
   repositoryFactory,
@@ -122,7 +124,11 @@ export function WorkspacePanel({
       .then(rows => {
         if (alive) {
           setWorkspaces(rows);
-          if (!rows.length) setCreateWorkspace(true);
+          if (!rows.length)
+            // An invited newcomer must see the invitation, not a prompt to create an empty workspace.
+            void listReceivedInvitations(discoveryRepo)
+              .catch(() => [])
+              .then(invites => alive && !invites.length && setCreateWorkspace(true));
           else if (!workspaceId) {
             void (async () => {
               const personal = await discoveryRepo.personal?.();
@@ -783,6 +789,18 @@ export function WorkspacePanel({
           <span>{readOnly ? t('Somente leitura', 'Read only') : t('Alterações por versão', 'Versioned changes')}</span>
         </div>
         <main className="work-content" id="work-content" tabIndex={-1}>
+          {!discovery && (
+            <PendingInvitations
+              repo={discoveryRepo}
+              t={t}
+              accepted={async id => {
+                const rows = await discoveryRepo.workspaces(true);
+                setWorkspaces(rows);
+                setCreateWorkspace(false);
+                navigate(`${routeRoot}/w/${id}/home`);
+              }}
+            />
+          )}
           {discovery ? (
             <p role="status">{t('Carregando organizações...', 'Loading workspaces...')}</p>
           ) : discoveryError ? (

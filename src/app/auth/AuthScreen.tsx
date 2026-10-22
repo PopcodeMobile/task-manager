@@ -188,6 +188,14 @@ export function AuthScreen({ t }: { t: Translate }) {
           )}
         </p>
       )}
+      {new URLSearchParams(location.search).has('invite') && !recovery && (
+        <p className="hint">
+          {t(
+            'Você recebeu um convite. Entre ou crie sua conta com o e-mail que recebeu o convite para aceitá-lo.',
+            'You received an invitation. Sign in or sign up with the invited email to accept it.',
+          )}
+        </p>
+      )}
       {authError && (
         <p role="alert" className="error-message">
           {t('O link de acesso expirou ou não é válido. Solicite um novo link.', 'The access link expired or is invalid. Request a new link.')}

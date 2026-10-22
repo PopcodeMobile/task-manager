@@ -67,7 +67,7 @@ export async function sendInvitationEmail(invitation: Invitation): Promise<boole
       body: JSON.stringify({
         from: Deno.env.get('INVITE_FROM') ?? 'Kairos <send@deltaacademy.com.br>',
         to: [invitation.email],
-        subject: `${inviter} convidou você para ${workspace} no Kairos`,
+        subject: 'Você recebeu um convite para o Kairos',
         html,
         text,
       }),

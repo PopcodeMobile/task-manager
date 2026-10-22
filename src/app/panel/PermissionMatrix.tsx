@@ -8,7 +8,7 @@ export function PermissionMatrix({ t, repo }: Pick<PanelProps, 't' | 'repo'>) {
     [t('Comentar nas tarefas', 'Comment on tasks'), [true, true, true, false]],
     [t('Criar e editar tarefas', 'Create and edit tasks'), [true, true, true, false]],
     [t('Criar projetos', 'Create projects'), [true, true, true, false]],
-    [t('Convidar membros', 'Invite members'), local ? [true, true, true, false] : null],
+    [t('Convidar membros', 'Invite members'), local ? [true, true, true, false] : [true, true, false, false]],
     [t('Gerenciar papéis', 'Manage roles'), local ? [true, true, true, false] : null],
     [t('Configurações do espaço', 'Workspace settings'), [true, true, false, false]],
     [t('Gerenciar tokens de agentes', 'Manage agent tokens'), local ? null : [true, true, false, false]],

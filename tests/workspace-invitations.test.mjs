@@ -63,7 +63,7 @@ test('owner invites, the verified invitee accepts and becomes a listed member', 
     assert.equal(created.role, 'member');
     assert.equal(created.status, 'pending');
     assert.equal(created.workspaceName, 'Delta');
-    assert.equal(created.inviterName, 'owner');
+    assert.equal(created.inviterName, 'Um administrador');
     assert.ok(new Date(created.expiresAt) - Date.now() > 6.9 * 864e5);
     assert.equal((await h.list()).items.length, 1);
     await h.as(invitee);
@@ -109,17 +109,24 @@ test('role matrix: owner grants admin, admin cannot, member and guest cannot inv
 test('invalid email, existing member and resend renew without duplicates', async () => {
   const h = await setup();
   try {
-    for (const bad of ['', 'nope', 'a@b', 'a b@example.test', `${'x'.repeat(250)}@example.test`]) await reject(h.invite(bad), 'PT422');
+    for (const bad of ['', 'nope', 'a@b', 'a b@example.test', 'x<v@evil.test>@example.test', 'a,b@example.test', `${'x'.repeat(250)}@example.test`])
+      await reject(h.invite(bad), 'PT422');
     await reject(h.invite('Admin@example.test'), 'PT422');
     const first = await h.invite('new@example.test', 'guest');
     await h.db.exec('reset role');
-    await h.db.query("update public.workspace_invitations set expires_at=now()+interval '1 day'");
+    await reject(h.invite('new@example.test', 'member'), 'PT429');
+    await h.db.exec('reset role');
+    await h.db.query("update public.workspace_invitations set expires_at=now()+interval '1 day',last_sent_at=now()-interval '11 minutes'");
     await h.as();
     const again = await h.invite('new@example.test', 'member');
     assert.equal(again.id, first.id);
     assert.equal(again.role, 'member');
     assert.ok(new Date(again.expiresAt) - Date.now() > 6.9 * 864e5);
     assert.equal((await h.list()).items.length, 1);
+    await h.db.exec('reset role');
+    await h.db.query("update public.workspace_invitations set last_sent_at=now()-interval '11 minutes',send_count=5");
+    await h.as();
+    await reject(h.invite('new@example.test', 'member'), 'PT429');
   } finally {
     await h.db.close();
   }

@@ -43,6 +43,7 @@ import type { PanelProps } from './types';
 import { PersonAvatar, MiniTasks, ProjectMark, ProjectState, ProgressBar } from './PanelVisual';
 import { radioKeys } from './choice-navigation';
 import { PermissionMatrix } from './PermissionMatrix';
+import { CloudInvitations } from './CloudInvitations';
 import { ContextHistory } from '../activity/ContextHistory';
 const teamIcons = {
   users: Users,
@@ -972,9 +973,9 @@ export function PeoplePages(p: PanelProps & { embedded?: boolean }) {
           <SheetDescription>
             {p.repo.mode === 'local'
               ? t('Demonstração neste dispositivo. Nenhum email será enviado.', 'Demonstration on this device. No email will be sent.')
-              : t('Convites e gerenciamento de acesso não estão disponíveis neste painel.', 'Invitations and access management are unavailable in this panel.')}
+              : t('A pessoa recebe um e-mail com o link de acesso.', 'The person receives an email with the access link.')}
           </SheetDescription>
-          {
+          {p.repo.mode === 'local' ? (
             <form
               onSubmit={e => {
                 e.preventDefault();
@@ -987,41 +988,21 @@ export function PeoplePages(p: PanelProps & { embedded?: boolean }) {
             >
               <label className="form-field">
                 Email
-                <Input disabled={p.repo.mode !== 'local'} type="email" required value={email} onChange={e => setEmail(e.target.value)} />
+                <Input type="email" required value={email} onChange={e => setEmail(e.target.value)} />
               </label>
-              <div className="row invitation-options">
-                <label className="field grow">
-                  {t('Papel', 'Role')}
-                  <select className="select" disabled>
-                    <option>{t('Membro', 'Member')}</option>
-                  </select>
-                </label>
-                <label className="field grow">
-                  {t('Equipe', 'Team')}
-                  <select className="select" disabled>
-                    <option>{t('Indisponível neste painel', 'Unavailable in this panel')}</option>
-                  </select>
-                </label>
-              </div>
-              <p className="hint">
-                {t(
-                  'Um email por convite. Papéis e equipes adicionais não são configurados neste formulário.',
-                  'One email per invitation. Additional role and team settings are unavailable in this form.',
-                )}
-              </p>
+              <p className="hint">{t('Um email por convite.', 'One email per invitation.')}</p>
               {error && !edit && <p role="alert">{error}</p>}
               <div className="modal-f">
-                <Button type="button" variant="ghost" disabled>
-                  {t('Copiar link do convite', 'Copy invite link')}
-                </Button>
                 <span className="sp" />
                 <Button type="button" variant="outline" onClick={() => setInvite(false)}>
                   {t('Cancelar', 'Cancel')}
                 </Button>
-                <Button disabled={busy || p.repo.mode !== 'local'}>{t('Criar convite local', 'Create local invitation')}</Button>
+                <Button disabled={busy}>{t('Criar convite local', 'Create local invitation')}</Button>
               </div>
             </form>
-          }
+          ) : (
+            invite && <CloudInvitations p={p} close={() => setInvite(false)} />
+          )}
         </SheetContent>
       </Sheet>
       <AlertDialog
