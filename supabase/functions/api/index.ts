@@ -1,5 +1,6 @@
 import { authenticate } from '../_shared/auth.ts';
 import { errorResponse, PublicError } from '../_shared/errors.ts';
+import { createInvitation } from '../_shared/invitations.ts';
 import { executeCommand, executeQuery } from '../_shared/operations.ts';
 import { object, uuid } from '../_shared/validation.ts';
 const collections: Record<string, string> = {
@@ -116,6 +117,9 @@ export async function handleRequest(request: Request): Promise<Response> {
       throw new PublicError('validation_error');
     }
     if (!object(body.input)) throw new PublicError('validation_error');
+    if (path[3] === 'invitations' && path.length === 4 && request.method === 'POST' && workspaceId) {
+      return Response.json({ ...(await createInvitation(actor, workspaceId, body.input)), requestId }, { status: 201, headers });
+    }
     let operation: string;
     const input = { ...body.input };
     if (path.length === 2 && request.method === 'POST') operation = 'create_workspace';

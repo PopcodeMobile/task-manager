@@ -3,7 +3,7 @@ import { actorCredential } from './auth.ts';
 import { PublicError, publicError } from './errors.ts';
 import { uuid, validateCommand, validateQuery } from './validation.ts';
 import { authorizeOrganizationOperation, organizationTokenRpc } from './organization-tokens.ts';
-async function rpc(actor: Actor, name: string, parameters: Record<string, unknown>): Promise<unknown> {
+export async function rpc(actor: Actor, name: string, parameters: Record<string, unknown>): Promise<unknown> {
   const credential = actorCredential(actor);
   if (actor.kind === 'organization_token') {
     return await organizationTokenRpc(credential, name, { ...parameters, p_token: credential.token });

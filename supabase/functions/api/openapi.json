@@ -5482,6 +5482,92 @@
           }
         }
       }
+    },
+    "/v1/workspaces/{workspaceId}/invitations": {
+      "post": {
+        "operationId": "create_workspace_invitation",
+        "description": "Human owners invite admin/member/guest; admins invite member/guest. Organization tokens and OAuth clients are forbidden. Acceptance requires the invitee's confirmed Auth email. Email delivery failure does not roll back the invitation and is reported as emailSent=false.",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["input"],
+                "properties": {
+                  "input": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["email", "role"],
+                    "properties": {
+                      "email": {
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 254
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": ["admin", "member", "guest"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pending invitation (created or renewed for 7 days)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "emailSent", "requestId"],
+                  "properties": {
+                    "data": {
+                      "type": "object"
+                    },
+                    "emailSent": {
+                      "type": "boolean"
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "422": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "429": {
+            "$ref": "#/components/responses/PublicError"
+          },
+          "503": {
+            "$ref": "#/components/responses/PublicError"
+          }
+        }
+      }
     }
   },
   "components": {
