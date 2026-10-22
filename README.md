@@ -50,3 +50,5 @@ Organization owners/admins can issue single-organization agent tokens in **Setti
 The panel is published on [Vercel](https://task-manager-chi-eight-19.vercel.app), with production Auth URLs/CORS configured. The dedicated hosted backend has separately recorded API/MCP proof. Real Hermes acceptance, two actual Claude-user connections and the remaining Task7 retention/recovery checks are still activation gates; the webhook scheduler stays off. Local cloud-mode browser proof uses real local Auth/DB; it is not hosted frontend proof. See [verification](docs/verification.md), [architecture](docs/superpowers/specs/2026-10-20-agent-platform-design.md) and [Hermes setup](docs/hermes-integration.md).
 
 Gerenciamento de projetos pelo MCP: [criar, editar/renomear e arquivar](docs/mcp-projects.md), com tokens de escrita por organização ou OAuth.
+
+Auth email delivery: [Resend SMTP setup and rotation](docs/resend-email.md), sender **Kairos <send@deltaacademy.com.br>**.
