@@ -22,23 +22,13 @@ import {
 } from 'lucide-react';
 import type { Project, Task } from '../../domain/contracts';
 import type { Member } from '../../workspace/normalized';
-import { ProjectStatus, ProjectProgress, projectTone } from '../projects/ProjectVisual';
+import { ProjectStatus, ProjectProgress, projectTone, memberTone } from '../projects/ProjectVisual';
 import type { Translate } from '../auth/ConsentPage';
 import type { PanelProps } from './types';
 import { TaskStatusIcon, TaskPriorityIcon } from '../tasks/TaskVisual';
 import { iso, diffD } from '../../core/calendar.js';
 import { preferredDate } from './panel-model';
 import { errorMessage } from '../shell/messages';
-const colors: Record<string, string> = {
-  indigo: 'var(--accent-indigo)',
-  blue: 'var(--blue)',
-  violet: 'var(--violet)',
-  teal: 'var(--teal)',
-  rose: 'var(--rose)',
-  amber: 'var(--amber)',
-  green: 'var(--green)',
-  slate: 'var(--gray)',
-};
 export const projectColor = (project?: Project) => (project ? projectTone(project) : 'var(--accent)');
 export function ProjectMark({ project }: { project: Project }) {
   const Icon =
@@ -70,12 +60,7 @@ export function ProjectMark({ project }: { project: Project }) {
 }
 export function PersonAvatar({ member, size = 'sm' }: { member?: Member; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
   return (
-    <span
-      className={'av ' + size + (!member ? ' empty' : '')}
-      title={member?.name}
-      aria-hidden="true"
-      style={{ '--c': colors[String(member?.color)] ?? member?.color ?? 'var(--gray)' } as CSSProperties}
-    >
+    <span className={'av ' + size + (!member ? ' empty' : '')} title={member?.name} aria-hidden="true" style={{ '--c': memberTone(member) } as CSSProperties}>
       {member ? (
         member.name
           .split(' ')

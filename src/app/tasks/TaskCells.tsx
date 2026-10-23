@@ -1,9 +1,9 @@
 import { iso, addD } from '../../core/calendar.js';
 import { Pencil, Calendar, ChevronRight, ListChecks, MessageSquare, Repeat2 } from 'lucide-react';
-import { MemberAvatar, projectTone } from '../projects/ProjectVisual';
+import { MemberAvatar, memberTone, projectTone, taskKeyTone } from '../projects/ProjectVisual';
 import { TaskFieldControl, taskDateLabel } from './TaskFieldPopover';
 import { TaskStatusIcon, TaskPriorityIcon, labelVisual } from './TaskVisual';
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import type { Task, Project, Json, Label, TaskLabel, TaskDependency, Subtask, Comment } from '../../domain/contracts';
 import type { Agent, Member } from '../../workspace/normalized';
 import type { Translate } from '../auth/ConsentPage';
@@ -65,7 +65,9 @@ export function TaskCell({
     ) : (
       <div className="task-title-cell">
         <Button className="task-title" aria-label={task.title} variant="ghost" onClick={() => open(task.id)}>
-          <small aria-hidden="true">{task.key}</small>
+          <small aria-hidden="true" className="task-key" style={{ '--c': taskKeyTone(task, projects) } as CSSProperties}>
+            {task.key}
+          </small>
           <span>{task.title}</span>
         </Button>
         {!!graph?.subtasks.some(s => s.taskId === task.id) && (
@@ -169,7 +171,7 @@ export function TaskCell({
           ]}
         >
           <MemberAvatar member={members.find(member => member.user_id === task.assigneeUserId)} />
-          <span className="trunc">
+          <span className="trunc" style={{ '--c': memberTone(members.find(member => member.user_id === task.assigneeUserId)) } as CSSProperties}>
             {members.find(member => member.user_id === task.assigneeUserId)?.name ?? (task.assigneeUserId || t('Sem responsável', 'Unassigned'))}
           </span>
         </TaskFieldControl>

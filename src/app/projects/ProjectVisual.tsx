@@ -10,6 +10,10 @@ export const projectTone = (project: Project) => {
   const color = String(project.legacyMetadata.color ?? 'blue');
   return (PCOLORS as Record<string, string>)[color] ?? 'var(--accent)';
 };
+export const taskKeyTone = (task: { projectId?: string | null }, projects: Project[]) => {
+  const project = projects.find(item => item.id === task.projectId);
+  return project ? projectTone(project) : 'var(--accent)';
+};
 export function ProjectStatus({ status, t }: { status: Project['status']; t: Translate }) {
   const tone = { planning: 'gray', active: 'blue', risk: 'red', hold: 'amber', complete: 'green' }[status];
   return (
@@ -19,11 +23,29 @@ export function ProjectStatus({ status, t }: { status: Project['status']; t: Tra
     </span>
   );
 }
+const MEMBER_TONES: Record<string, string> = {
+  indigo: 'var(--accent-indigo)',
+  blue: 'var(--blue)',
+  violet: 'var(--violet)',
+  teal: 'var(--teal)',
+  rose: 'var(--rose)',
+  amber: 'var(--amber)',
+  green: 'var(--green)',
+};
+// Cloud members carry no profile color, so derive a stable tone from the user id.
+export const memberTone = (member?: Pick<Member, 'user_id' | 'color'>) => {
+  if (!member) return 'var(--gray)';
+  if (member.color) return member.color === 'slate' ? 'var(--gray)' : (MEMBER_TONES[member.color] ?? member.color);
+  const tones = Object.values(MEMBER_TONES);
+  let hash = 0;
+  for (const char of member.user_id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return tones[hash % tones.length];
+};
 export function MemberAvatar({ member, size = 'sm' }: { member?: Member; size?: 'sm' | 'md' }) {
   return (
     <span
       className={`av ${size}${member ? '' : ' empty'}`}
-      style={{ '--c': member?.color ?? 'var(--gray)' } as CSSProperties}
+      style={{ '--c': memberTone(member) } as CSSProperties}
       aria-label={member?.name}
       title={member?.name}
     >

@@ -58,7 +58,7 @@ import {
   type Column,
   defaultTaskColumnWidths,
 } from './task-view-model';
-import { ProjectProgress, projectTone } from '../projects/ProjectVisual';
+import { ProjectProgress, projectTone, taskKeyTone } from '../projects/ProjectVisual';
 import { TaskStatusIcon, labelVisual } from './TaskVisual';
 import { statusLabel, priorityLabel } from './TaskList';
 export type TaskViewsProps = {
@@ -728,7 +728,9 @@ export function TaskViews(props: TaskViewsProps) {
                                   />
                                 </span>
                               )}
-                              <span className="key">{task.key}</span>
+                              <span className="key task-key" style={{ '--c': taskKeyTone(task, projects) } as React.CSSProperties}>
+                                {task.key}
+                              </span>
                               <span className="board-priority">{cell(task, 'priority')}</span>
                               {task.dueDate && <span className="board-due">{cell(task, 'due')}</span>}
                               {task.recurrence && (

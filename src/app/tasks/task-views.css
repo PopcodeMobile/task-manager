@@ -2951,3 +2951,15 @@ tr:hover .table-row-actions,
     min-height: 0;
   }
 }
+
+/* Task keys carry their project tone and assignee names their member tone. */
+:is(.task-title-cell .task-title small, .kcard .key).task-key {
+  padding: calc(var(--space-unit) * 0.25) calc(var(--space-unit) * 1.25);
+  border-radius: var(--r-2xs);
+  background: color-mix(in srgb, var(--c) 13%, transparent);
+  color: color-mix(in srgb, var(--c) 72%, var(--text));
+  font-weight: var(--fw-medium);
+}
+.task-assignee-cell .task-field-trigger > .trunc {
+  color: color-mix(in srgb, var(--c) 62%, var(--text));
+}
