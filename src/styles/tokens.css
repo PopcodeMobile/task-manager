@@ -328,6 +328,15 @@
   --acc-l: var(--accent-graphite-light);
   --acc-d: var(--accent-graphite-dark);
 }
+/* Green and amber reuse the semantic status hues shown by their swatches. */
+:root[data-accent='green'] {
+  --acc-l: #25754b;
+  --acc-d: #5cba86;
+}
+:root[data-accent='amber'] {
+  --acc-l: #8f5e0e;
+  --acc-d: #d8a443;
+}
 
 :root[data-side='compact'] {
   --side-row: 26px;

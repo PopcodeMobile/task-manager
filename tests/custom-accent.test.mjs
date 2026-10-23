@@ -116,3 +116,12 @@ test('applying each theme leaves the saved base intact and another identity uses
   assert.equal(root.dataset.accent, 'indigo');
   assert.equal(root.properties.size, 0);
 });
+test('every non-default settings swatch has a theme rule for both modes', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const css = await readFile(new URL('../src/styles/tokens.css', import.meta.url), 'utf8');
+  for (const palette of ['blue', 'violet', 'teal', 'rose', 'graphite', 'green', 'amber']) {
+    const rule = css.match(new RegExp(`:root\\[data-accent='${palette}'\\]\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    assert.match(rule, /--acc-l:/, `${palette} light accent`);
+    assert.match(rule, /--acc-d:/, `${palette} dark accent`);
+  }
+});
