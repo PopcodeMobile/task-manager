@@ -35,6 +35,8 @@ Depois, use o `data.id` retornado como `projectId` ao criar tarefas. Para renome
 
 Para obter a versão atual, use `list_projects` e siga `nextCursor` se houver outra página. Se receber `version_conflict`, leia novamente o projeto e decida a alteração com base no estado atual. Uma nova tentativa com argumentos diferentes precisa de outra chave. Repetir uma chamada idêntica com a mesma chave retorna o resultado original sem duplicar o projeto ou evento.
 
+Etiquetas e responsável de tarefa têm comandos próprios, descritos em [tokens de agentes](organization-agent-tokens.md): `create_label`, `set_task_label`, `remove_task_label`, as leituras `list_labels`, `list_task_labels` e `list_members`, e o campo `assigneeUserId` de `create_task` e `update_task`.
+
 Os três comandos não liberam exclusão de projetos, alteração de membros, criação de organizações ou administração de tokens. A organização autorizada continua fixa. Expiração, rotação e revogação continuam sendo verificadas antes de executar ou devolver um recibo anterior.
 
 Exemplo de pedido ao agente: “Crie o projeto Marketing Delta no Kairos. Depois crie nele as tarefas Planejar calendário e Revisar campanha. Confirme os identificadores criados.”

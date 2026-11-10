@@ -3,13 +3,21 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 const owner = '00000000-0000-0000-0000-000000000001',
-  member = '00000000-0000-0000-0000-000000000003';
+  member = '00000000-0000-0000-0000-000000000003',
+  outsider = '00000000-0000-0000-0000-000000000009';
 const reject = (p, code) => assert.rejects(p, e => e.code === code);
-async function setup({ beforeProjectOperations = false } = {}) {
+async function setup({ beforeProjectOperations = false, beforeLabelOperations = false } = {}) {
   const db = new PGlite();
   await db.exec(await readFile('supabase/tests/bootstrap.sql', 'utf8'));
   const files = (await readdir('supabase/migrations'))
-    .filter(f => f.endsWith('.sql') && !f.includes('0004_webhook') && !(beforeProjectOperations && f.includes('0012_agent_project')))
+    .filter(
+      f =>
+        f.endsWith('.sql') &&
+        !f.includes('0004_webhook') &&
+        !(beforeProjectOperations && f.includes('0012_agent_project')) &&
+        // The label migration replaces both entrypoints, so it stays out of the project boundary fixture too.
+        !((beforeProjectOperations || beforeLabelOperations) && f.includes('0014_agent_label')),
+    )
     .sort();
   for (const f of files) {
     if (f.includes('0003_integration'))
@@ -502,6 +510,113 @@ test('additive project migration preserves the exact credential boundary and ACL
       true,
     );
     await reject(h.exec(issued.token, 'delete_project', { id: result.data.id }, 'still-no-delete', 1), 'PT403');
+  } finally {
+    await h.db.close();
+  }
+});
+
+test('organization write token reads labels and members, creates a label, labels a claimed task and sets the assignee', async () => {
+  const h = await setup();
+  try {
+    const issued = await h.issue();
+    const readOnly = await h.issue('read');
+    assert.deepEqual((await h.read(issued.token, 'list_labels')).items, []);
+    const members = (await h.read(issued.token, 'list_members')).items;
+    assert.deepEqual(members.map(entry => entry.userId).sort(), [owner, member].sort());
+    assert.deepEqual([...new Set(members.flatMap(entry => Object.keys(entry)))].sort(), ['role', 'userId', 'workspaceId']);
+    const label = await h.exec(issued.token, 'create_label', { name: 'cockpit' }, 'label-create');
+    assert.equal(label.data.name, 'cockpit');
+    assert.deepEqual(await h.exec(issued.token, 'create_label', { name: 'cockpit' }, 'label-create'), label);
+    assert.equal((await h.read(readOnly.token, 'list_labels')).items.length, 1);
+    const task = (await h.exec(issued.token, 'create_task', { projectId: 'p1', title: 'Labelled' })).data;
+    // Task label writes keep the existing live-claim requirement for agent actors.
+    await reject(h.exec(issued.token, 'set_task_label', { id: task.id, labelId: label.data.id }, 'label-no-claim', 1), 'PT409');
+    const claim = await h.exec(issued.token, 'claim_task', { id: task.id }, 'label-claim', 1);
+    const claimToken = claim.data.claimToken;
+    const attached = await h.exec(issued.token, 'set_task_label', { id: task.id, labelId: label.data.id, claimToken }, 'label-attach', 2);
+    assert.equal(attached.data.version, 3);
+    assert.deepEqual(
+      (await h.read(issued.token, 'list_task_labels', { taskId: task.id })).items.map(link => [link.taskId, link.labelId]),
+      [[task.id, label.data.id]],
+    );
+    const assigned = await h.exec(issued.token, 'update_task', { id: task.id, assigneeUserId: member, claimToken }, 'label-assign', 3);
+    assert.equal(assigned.data.assigneeUserId, member);
+    const cleared = await h.exec(issued.token, 'update_task', { id: task.id, assigneeUserId: null, claimToken }, 'label-unassign', 4);
+    assert.equal(cleared.data.assigneeUserId, null);
+    const removed = await h.exec(issued.token, 'remove_task_label', { id: task.id, labelId: label.data.id, claimToken }, 'label-remove', 5);
+    assert.equal(removed.data.version, 6);
+    assert.deepEqual((await h.read(issued.token, 'list_task_labels', { taskId: task.id })).items, []);
+    await reject(h.exec(issued.token, 'update_task', { id: task.id, assigneeUserId: outsider, claimToken }, 'label-outsider', 6), 'PT422');
+    // Minimum privilege: no label renaming or deletion, membership writes or wider reads.
+    for (const [operation, input] of [
+      ['update_label', { id: label.data.id, name: 'Renamed' }],
+      ['delete_label', { id: label.data.id }],
+      ['set_project_member', { id: 'p1', userId: member }],
+      ['remove_project_member', { id: 'p1', userId: member }],
+    ])
+      await reject(h.exec(issued.token, operation, input, crypto.randomUUID(), 1), 'PT403');
+    for (const operation of ['list_teams', 'list_agents', 'list_team_members', 'list_project_members', 'get_workspace'])
+      await reject(h.read(issued.token, operation), 'PT403');
+    for (const [operation, input] of [
+      ['create_label', { name: 'Denied' }],
+      ['set_task_label', { id: task.id, labelId: label.data.id, claimToken }],
+      ['remove_task_label', { id: task.id, labelId: label.data.id, claimToken }],
+    ])
+      await reject(h.exec(readOnly.token, operation, input, crypto.randomUUID(), 6), 'PT403');
+    for (const operation of ['list_labels', 'list_task_labels', 'list_members']) await reject(h.read(issued.token, operation, {}, h.other), 'PT403');
+    await reject(h.exec(issued.token, 'create_label', { name: 'Cross' }, crypto.randomUUID(), null, h.other), 'PT403');
+    await reject(h.exec(issued.token, 'create_label', { name: 'Unknown', color: '#123456' }, crypto.randomUUID()), 'PT422');
+  } finally {
+    await h.db.close();
+  }
+});
+
+test('additive label migration preserves the exact credential boundary and ACL and upgrades already issued write tokens', async () => {
+  const h = await setup({ beforeLabelOperations: true });
+  try {
+    const issued = await h.issue();
+    await reject(h.exec(issued.token, 'create_label', { name: 'Not yet allowed' }), 'PT403');
+    await reject(h.read(issued.token, 'list_labels'), 'PT403');
+    await reject(h.read(issued.token, 'list_members'), 'PT403');
+    const entrypoints = {
+      write: 'public.execute_organization_agent_operation(text,uuid,text,jsonb,text,bigint)',
+      read: 'public.read_organization_agent_operation(text,uuid,text,jsonb)',
+    };
+    const catalog = async () =>
+      Object.fromEntries(
+        await Promise.all(
+          Object.entries(entrypoints).map(async ([key, signature]) => [
+            key,
+            (await h.db.query('select prosrc,proacl::text acl,prosecdef,proconfig from pg_proc where oid=$1::regprocedure', [signature])).rows[0],
+          ]),
+        ),
+      );
+    const before = await catalog();
+    await h.db.exec('reset role');
+    await h.db.exec(await readFile('supabase/migrations/202611100014_agent_label_operations.sql', 'utf8'));
+    const after = await catalog();
+    assert.equal(
+      after.write.prosrc,
+      before.write.prosrc.replace(
+        "'create_project','update_project','archive_project')",
+        "'create_project','update_project','archive_project','create_label','set_task_label','remove_task_label')",
+      ),
+    );
+    assert.equal(
+      after.read.prosrc,
+      before.read.prosrc.replace("'get_task','list_task_activity')", "'get_task','list_task_activity','list_labels','list_task_labels','list_members')"),
+    );
+    for (const key of ['write', 'read']) {
+      assert.equal(after[key].acl, before[key].acl);
+      assert.equal(after[key].prosecdef, before[key].prosecdef);
+      assert.deepEqual(after[key].proconfig, before[key].proconfig);
+    }
+    await h.db.exec('set role anon');
+    const label = await h.exec(issued.token, 'create_label', { name: 'Already issued token' }, 'existing-token-label');
+    assert.equal(label.data.name, 'Already issued token');
+    assert.equal((await h.read(issued.token, 'list_labels')).items.length, 1);
+    assert.equal((await h.read(issued.token, 'list_members')).items.length, 2);
+    await reject(h.exec(issued.token, 'delete_label', { id: label.data.id }, 'still-no-delete', 1), 'PT403');
   } finally {
     await h.db.close();
   }

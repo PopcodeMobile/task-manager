@@ -109,7 +109,7 @@ Deno.test('every token query and command uses narrow entrypoint and revalidates 
 Deno.test('token boundary rejects administration, cross organization and readonly writes before dispatch', () =>
   fixture(async (calls, state) => {
     const actor = await authenticate(request());
-    for (const operation of ['get_workspace', 'list_members', 'list_agents', 'get_preferences', 'run_sql']) {
+    for (const operation of ['get_workspace', 'list_teams', 'list_agents', 'get_preferences', 'run_sql']) {
       await assertRejects(() => executeQuery(actor, operation, workspaceId), Error, 'forbidden');
     }
     await assertRejects(() => executeQuery(actor, 'list_tasks', crypto.randomUUID()), Error, 'forbidden');
@@ -135,6 +135,9 @@ Deno.test('token boundary rejects administration, cross organization and readonl
       'create_project',
       'update_project',
       'archive_project',
+      'create_label',
+      'set_task_label',
+      'remove_task_label',
     ]) {
       await assertRejects(() => executeCommand(reader, operation, { workspaceId, idempotencyKey: 'denied', input: {} }), Error, 'forbidden');
     }
@@ -158,7 +161,15 @@ Deno.test('REST token reads/writes are allowed while equivalent administration r
     const write = await send(`/${workspaceId}/tasks`, { idempotencyKey: 'rest', input: { projectId: 'p1', title: 'REST token task' } });
     assertEquals(write.status, 201);
     await write.body?.cancel();
-    for (const response of [await send(`/${workspaceId}/members`), await send('', { idempotencyKey: 'no', input: { name: 'No' } })]) {
+    for (const collection of ['labels', 'task-labels', 'members']) {
+      const allowed = await send(`/${workspaceId}/${collection}`);
+      assertEquals(allowed.status, 200);
+      await allowed.body?.cancel();
+    }
+    const labelWrite = await send(`/${workspaceId}/commands/create_label`, { idempotencyKey: 'rest-label', input: { name: 'cockpit' } });
+    assertEquals(labelWrite.status, 201);
+    await labelWrite.body?.cancel();
+    for (const response of [await send(`/${workspaceId}/agents`), await send('', { idempotencyKey: 'no', input: { name: 'No' } })]) {
       assertEquals(response.status, 403);
       const text = await response.text();
       assert(!text.includes(token));
@@ -266,6 +277,12 @@ Deno.test('real MCP SDK can initialize/list/read/create with opaque token and fr
           'create_project',
           'update_project',
           'archive_project',
+          'list_labels',
+          'list_task_labels',
+          'list_members',
+          'create_label',
+          'set_task_label',
+          'remove_task_label',
         ].sort(),
       );
       const own = await client.callTool({ name: 'list_workspaces', arguments: {} });
@@ -368,6 +385,85 @@ Deno.test('MCP project tools dispatch strict writes with CAS and deny read-only 
         assert(result.isError);
       }
       assertEquals(writeCount(), 3);
+    } finally {
+      await client.close();
+    }
+  }),
+);
+
+Deno.test('MCP label and member tools dispatch strict reads and claim-bound writes, and deny read-only or cross-workspace authority', () =>
+  fixture(async (calls, state) => {
+    const client = new Client({ name: 'label-tools-test', version: '1.0.0' });
+    const claimToken = '00000000-0000-4000-8000-00000000000a';
+    try {
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL('https://edge.example.test/functions/v1/mcp'), {
+          requestInit: { headers: { authorization: `Bearer ${token}` } },
+          fetch: (input, init) => handleMcpRequest(new Request(input, init)),
+        }),
+      );
+      const reads = () => calls.filter(call => call.name === 'read_organization_agent_operation');
+      for (const [name, args] of [
+        ['list_labels', {}],
+        ['list_members', {}],
+        ['list_task_labels', { taskId: 'task-1' }],
+      ] as const) {
+        const result = await client.callTool({ name, arguments: { workspace_id: workspaceId, ...args } });
+        assert(!result.isError);
+        const call = reads().at(-1)!;
+        assertEquals(call.args.p_operation, name);
+        assertEquals(call.args.p_query, args);
+        assertEquals(call.args.p_workspace_id, workspaceId);
+      }
+      const writeCount = () => calls.filter(call => call.name === 'execute_organization_agent_operation').length;
+      const invoke = (name: string, input: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+        client.callTool({ name, arguments: { workspace_id: workspaceId, idempotency_key: 'labels-' + name, input, ...extra } });
+      for (const [name, input, extra] of [
+        ['create_label', { name: 'cockpit' }, {}],
+        ['set_task_label', { id: 'task-1', labelId: 'label-1', claimToken }, { expected_version: 2 }],
+        ['remove_task_label', { id: 'task-1', labelId: 'label-1', claimToken }, { expected_version: 3 }],
+        ['update_task', { id: 'task-1', assigneeUserId: identity.principalId, claimToken }, { expected_version: 4 }],
+        ['create_task', { projectId: 'p1', title: 'Assigned', assigneeUserId: identity.principalId }, {}],
+      ] as const) {
+        const result = await invoke(name, input, extra);
+        assert(!result.isError);
+        const call = calls.filter(c => c.name === 'execute_organization_agent_operation').at(-1)!;
+        assertEquals(call.args.p_operation, name);
+        assertEquals(call.args.p_command, input);
+        assertEquals(call.args.p_expected_version, 'expected_version' in extra ? extra.expected_version : null);
+      }
+      assertEquals(writeCount(), 5);
+      for (const [name, input, extra] of [
+        ['create_label', { name: ' ' }, {}],
+        ['create_label', { name: 'cockpit', color: '#123456' }, {}],
+        ['set_task_label', { id: 'task-1', labelId: 'label-1' }, { expected_version: 2 }],
+        ['set_task_label', { id: 'task-1', labelId: 'label-1', claimToken: 'not-a-uuid' }, { expected_version: 2 }],
+        ['set_task_label', { id: 'task-1', labelId: 'label-1', claimToken }, {}],
+        ['remove_task_label', { id: 'task-1', labelId: 'label-1', claimToken }, {}],
+        ['update_task', { id: 'task-1', assigneeUserId: 'not-a-uuid', claimToken }, { expected_version: 4 }],
+        ['create_task', { projectId: 'p1', title: 'Bad', assigneeUserId: 'not-a-uuid' }, {}],
+      ] as const) {
+        const denied = await invoke(name, input, extra).then(
+          r => !!r.isError,
+          () => true,
+        );
+        assert(denied);
+      }
+      assertEquals(writeCount(), 5);
+      for (const name of ['list_labels', 'list_task_labels', 'list_members']) {
+        const cross = await client.callTool({ name, arguments: { workspace_id: crypto.randomUUID() } });
+        assertEquals(cross.isError, true);
+      }
+      state.capability = 'read';
+      for (const [name, input, extra] of [
+        ['create_label', { name: 'No' }, {}],
+        ['set_task_label', { id: 'task-1', labelId: 'label-1', claimToken }, { expected_version: 2 }],
+        ['remove_task_label', { id: 'task-1', labelId: 'label-1', claimToken }, { expected_version: 2 }],
+      ] as const) {
+        const result = await invoke(name, input, extra);
+        assert(result.isError);
+      }
+      assertEquals(writeCount(), 5);
     } finally {
       await client.close();
     }

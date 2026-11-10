@@ -7,6 +7,8 @@ const workspace = z.string().uuid();
 const id = z.string().min(1).max(128);
 const paging = { limit: z.number().int().min(1).max(100).optional(), cursor: z.string().max(2000).optional() };
 const projectName = z.string().trim().min(1).max(500);
+const labelName = z.string().trim().min(1).max(500);
+const assigneeUserId = z.string().uuid().nullable().optional();
 const projectDetails = {
   key: z.string().trim().min(1).max(128).optional(),
   description: z.string().max(100000).optional(),
@@ -39,6 +41,7 @@ const writes = {
       title: z.string().min(1).max(10000),
       description: z.string().max(100000).optional(),
       priority: z.enum(['none', 'low', 'medium', 'high', 'urgent']).optional(),
+      assigneeUserId,
       dueDate: z.string().optional(),
     })
     .strict(),
@@ -49,6 +52,7 @@ const writes = {
       description: z.string().max(100000).optional(),
       status: z.enum(['backlog', 'todo', 'progress', 'review']).optional(),
       priority: z.enum(['none', 'low', 'medium', 'high', 'urgent']).optional(),
+      assigneeUserId,
       dueDate: z.string().nullable().optional(),
       claimToken: z.string().uuid(),
     })
@@ -65,6 +69,9 @@ const writes = {
   release_task_claim: z.object({ id, claimToken: z.string().uuid() }).strict(),
   add_task_comment: z.object({ taskId: id, body: z.string().min(1).max(100000) }).strict(),
   complete_task: z.object({ id, claimToken: z.string().uuid() }).strict(),
+  create_label: z.object({ id: id.optional(), name: labelName }).strict(),
+  set_task_label: z.object({ id, labelId: id, claimToken: z.string().uuid() }).strict(),
+  remove_task_label: z.object({ id, labelId: id, claimToken: z.string().uuid() }).strict(),
 };
 /** Every tool closes over a server-authenticated actor. No actor or executor is accepted as input. */
 export function taskServer(actor: Actor): McpServer {
@@ -124,6 +131,28 @@ export function taskServer(actor: Actor): McpServer {
     },
     ({ workspace_id, ...query }) => result(() => executeQuery(actor, 'get_task', workspace_id, query)),
   );
+  for (const operation of ['list_labels', 'list_members'] as const) {
+    server.registerTool(
+      operation,
+      {
+        description: `${operation.replaceAll('_', ' ')} in an explicitly granted workspace. Use nextCursor for another page.${
+          operation === 'list_members' ? ' Members expose only workspaceId, userId and role; use userId as assigneeUserId.' : ''
+        }`,
+        inputSchema: z.object({ workspace_id: workspace, ...paging }).strict(),
+        annotations: { readOnlyHint: true },
+      },
+      ({ workspace_id, ...query }) => result(() => executeQuery(actor, operation, workspace_id, query)),
+    );
+  }
+  server.registerTool(
+    'list_task_labels',
+    {
+      description: 'Read label links of the workspace, or of one task with taskId. Use nextCursor for another page.',
+      inputSchema: z.object({ workspace_id: workspace, taskId: id.optional(), ...paging }).strict(),
+      annotations: { readOnlyHint: true },
+    },
+    ({ workspace_id, ...query }) => result(() => executeQuery(actor, 'list_task_labels', workspace_id, query)),
+  );
   server.registerTool(
     'list_task_activity',
     {
@@ -134,14 +163,14 @@ export function taskServer(actor: Actor): McpServer {
     ({ workspace_id, ...query }) => result(() => executeQuery(actor, 'list_task_activity', workspace_id, query)),
   );
   for (const [operation, input] of Object.entries(writes)) {
-    const cas = !['create_task', 'add_task_comment', 'create_project'].includes(operation);
+    const cas = !['create_task', 'add_task_comment', 'create_project', 'create_label'].includes(operation);
     server.registerTool(
       operation,
       {
         description: `${operation.replaceAll('_', ' ')}. Supply a unique idempotency_key; reuse it only for an identical retry.${
           cas ? ' expected_version is required. Refresh after version_conflict.' : ''
         }${
-          ['update_task', 'renew_task_claim', 'release_task_claim', 'complete_task'].includes(operation)
+          ['update_task', 'renew_task_claim', 'release_task_claim', 'complete_task', 'set_task_label', 'remove_task_label'].includes(operation)
             ? ' Supply the live claimToken returned by claim_task.'
             : ''
         }`,

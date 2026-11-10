@@ -3,7 +3,7 @@ import { PublicError, publicError } from './errors.ts';
 
 export const organizationTokenFormat = /^krs_[0-9a-f]{32}_[A-Za-z0-9_-]{43}$/;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const reads = new Set(['list_workspaces', 'list_projects', 'list_tasks', 'get_task', 'list_task_activity']);
+const reads = new Set(['list_workspaces', 'list_projects', 'list_tasks', 'get_task', 'list_task_activity', 'list_labels', 'list_task_labels', 'list_members']);
 const writes = new Set([
   'create_task',
   'claim_task',
@@ -15,6 +15,9 @@ const writes = new Set([
   'create_project',
   'update_project',
   'archive_project',
+  'create_label',
+  'set_task_label',
+  'remove_task_label',
 ]);
 type Backend = { url: string; apiKey: string };
 
