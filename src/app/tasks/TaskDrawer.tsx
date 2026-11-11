@@ -32,6 +32,10 @@ import { errorMessage } from '../shell/messages';
 import type { Execute } from '../projects/ProjectsPage';
 import { statuses, statusLabel, priorityLabel } from './TaskList';
 export type DraftGuard = { dirty: boolean; flush: () => Promise<boolean> };
+function fitTextareaHeight(input: HTMLTextAreaElement) {
+  input.style.height = 'auto';
+  input.style.height = `${input.scrollHeight}px`;
+}
 export function TaskDrawer({
   task,
   removed = false,
@@ -125,18 +129,18 @@ export function TaskDrawer({
   const saveButton = useRef<HTMLButtonElement>(null);
   const fingerprint = JSON.stringify([title, description, project, status, priority, due, assignee, start, recurrence, estimate]);
   const savedFingerprint = useRef(fingerprint);
-  useLayoutEffect(() => {
-    const input = titleInput.current;
+  // The sheet portal mounts the textarea after this component's first layout effects, so sizing starts from the ref.
+  const attachTitleInput = useCallback((input: HTMLTextAreaElement | null) => {
+    titleInput.current = input;
     if (!input) return;
-    const size = () => {
-      input.style.height = 'auto';
-      input.style.height = `${input.scrollHeight}px`;
-    };
-    size();
-    const observer = new ResizeObserver(size);
+    fitTextareaHeight(input);
+    const observer = new ResizeObserver(() => fitTextareaHeight(input));
     observer.observe(input);
     return () => observer.disconnect();
-  }, [title, full]);
+  }, []);
+  useLayoutEffect(() => {
+    if (titleInput.current) fitTextareaHeight(titleInput.current);
+  }, [title]);
   const dirty = fingerprint !== savedFingerprint.current;
   async function save() {
     if (subDirty) {
@@ -418,7 +422,7 @@ export function TaskDrawer({
                 className={centered ? 'ttl-edit input input-lg' : 'ttl-edit'}
                 placeholder={t('Nome da tarefa', 'Task name')}
                 required
-                ref={titleInput}
+                ref={attachTitleInput}
                 rows={1}
                 maxLength={500}
                 value={title}

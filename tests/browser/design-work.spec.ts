@@ -2,11 +2,11 @@ import { test, expect, type Page } from '@playwright/test';
 import { seed } from '../../src/data/seed.js';
 
 const data = seed();
-async function prepare(page: Page) {
+async function prepare(page: Page, workspace = data) {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.addInitScript(
     value => localStorage.setItem('gr8r.v2', JSON.stringify({ data: value, prefs: { lang: 'en', theme: 'dark', density: 'compact' } })),
-    data,
+    workspace,
   );
 }
 
@@ -236,6 +236,18 @@ test('list select all and bulk clear are visible controls acting on the actual r
   expect(
     await subtaskChecks.evaluateAll(nodes => nodes.map(node => ({ label: node.closest('label')?.textContent, checked: (node as HTMLInputElement).checked }))),
   ).toEqual(retainedSubtasks);
+});
+
+test('drawer opens with a wrapped title fully visible', async ({ page }) => {
+  const long = structuredClone(data);
+  long.tasks[0].title = 'Cockpit | Criar um espaço para anexar documentos, como propostas e materiais enviados, que aceite arquivos e links';
+  await prepare(page, long);
+  await page.goto(`/app-local/w/w1/tasks?task=${long.tasks[0].id}`);
+  const title = page.getByRole('dialog', { name: 'Task details', exact: true }).getByRole('textbox', { name: 'Title', exact: true });
+  await expect(title).toBeVisible();
+  const geometry = await title.evaluate(el => ({ client: el.clientHeight, scroll: el.scrollHeight, line: parseFloat(getComputedStyle(el).lineHeight) }));
+  expect(geometry.scroll).toBeGreaterThan(geometry.line * 2);
+  expect(geometry.client).toBeGreaterThanOrEqual(geometry.scroll);
 });
 
 test('drawer headings survive formatting blur save and reopen while multiline titles fit their rendered height', async ({ page }) => {
