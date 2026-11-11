@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import vm from 'node:vm';
 
-const source = stripTypeScriptTypes(readFileSync(new URL('../src/app/workspaces/organization-logo.ts', import.meta.url), 'utf8'), { mode: 'transform' })
+const source = stripTypeScriptTypes(readFileSync(new URL('../src/app/workspaces/organization-logo.ts', import.meta.url), 'utf8'))
   .replace(/^import .*;$/m, '')
   .replaceAll('export ', '');
 const path = '11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.webp';

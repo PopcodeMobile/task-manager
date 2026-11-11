@@ -8,8 +8,7 @@ import { registerHooks, stripTypeScriptTypes } from 'node:module';
 import { readFileSync } from 'node:fs';
 const hooks = registerHooks({
   load(url, context, next) {
-    if (url.endsWith('.ts'))
-      return { format: 'module', shortCircuit: true, source: stripTypeScriptTypes(readFileSync(new URL(url), 'utf8'), { mode: 'transform' }) };
+    if (url.endsWith('.ts')) return { format: 'module', shortCircuit: true, source: stripTypeScriptTypes(readFileSync(new URL(url), 'utf8')) };
     return next(url, context);
   },
 });
@@ -128,6 +127,12 @@ test('009 MCP SDK context pages exact human instructions, task cursor binding an
         'create_project',
         'update_project',
         'archive_project',
+        'list_labels',
+        'list_task_labels',
+        'list_members',
+        'create_label',
+        'set_task_label',
+        'remove_task_label',
       ].sort(),
     );
     const projectCreate = await client.callTool({
