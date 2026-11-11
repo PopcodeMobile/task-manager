@@ -1,8 +1,10 @@
 import { supabase } from '../integrations/client';
 export type PreparedLogo = { blob: Blob; dataUrl: string };
 export class LogoError extends Error {
-  constructor(public code: 'format' | 'size' | 'decode' | 'storage') {
+  code: 'format' | 'size' | 'decode' | 'storage';
+  constructor(code: LogoError['code']) {
     super(code);
+    this.code = code;
   }
 }
 const bucket = 'organization-logos';

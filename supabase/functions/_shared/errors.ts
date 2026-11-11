@@ -24,8 +24,10 @@ export const statuses: Record<ErrorCode, number> = {
   temporarily_unavailable: 503,
 };
 export class PublicError extends Error {
-  constructor(public code: ErrorCode) {
+  code: ErrorCode;
+  constructor(code: ErrorCode) {
     super(code);
+    this.code = code;
     this.name = 'PublicError';
   }
 }
