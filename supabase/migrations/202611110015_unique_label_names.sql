@@ -3,11 +3,12 @@
 -- A collision surfaces as unique_violation, which execute_operation already maps to validation_error (PT422).
 begin;
 
--- Names are stored trimmed on every write path, so the stored value matches what uniqueness compares.
+-- Names are stored trimmed (ASCII whitespace, vertical tab and no-break space) on every write path, so the stored value matches what uniqueness compares.
 create function public.labels_trim_name() returns trigger
 language plpgsql set search_path='' as $$
 begin
- new.name:=btrim(new.name,E' \t\n\r\f');
+ new.name:=btrim(new.name,E' \t\n\r\f'||chr(11)||chr(160));
+ if new.name='' then raise exception 'validation_error' using errcode='PT422'; end if;
  return new;
 end $$;
 revoke all on function public.labels_trim_name() from public,anon,authenticated;
@@ -15,7 +16,9 @@ create trigger labels_trim_name before insert or update of name on public.labels
  for each row execute function public.labels_trim_name();
 
 -- Existing duplicates merge into the label with the lowest id; their task links move to it.
-update public.labels set name=btrim(name,E' \t\n\r\f') where name<>btrim(name,E' \t\n\r\f');
+-- The trigger above trims on this update; a name that is only whitespace keeps its id with a visible placeholder.
+update public.labels set name=case when btrim(name,E' \t\n\r\f'||chr(11)||chr(160))='' then 'label-'||id else name end
+ where name<>btrim(name,E' \t\n\r\f'||chr(11)||chr(160));
 create temporary table label_merges on commit drop as
  select workspace_id,id as loser,first_value(id) over w as survivor
  from public.labels

@@ -48,6 +48,10 @@ test('label names are stored trimmed and unique per workspace regardless of case
     const created = await h.exec('create_label', { id: 'l1', name: '\tCockpit  ' });
     assert.equal(created.data.name, 'Cockpit');
     await reject(h.exec('create_label', { id: 'l2', name: 'cockpit' }), 'PT422');
+    // Vertical tab and no-break space are trimmed too, so they cannot smuggle in a duplicate or a blank name.
+    await reject(h.exec('create_label', { id: 'l4', name: 'cockpit\v' }), 'PT422');
+    await reject(h.exec('create_label', { id: 'l5', name: '\u00a0cockpit' }), 'PT422');
+    await reject(h.exec('create_label', { id: 'l6', name: '\t' }), 'PT422');
     const ops = await h.exec('create_label', { id: 'l3', name: 'Ops' });
     await reject(h.exec('update_label', { id: 'l3', name: ' COCKPIT' }, crypto.randomUUID(), ops.data.version), 'PT422');
     assert.deepEqual(await h.labels(), [
