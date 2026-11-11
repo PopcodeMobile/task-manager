@@ -527,6 +527,8 @@ test('organization write token reads labels and members, creates a label, labels
     const label = await h.exec(issued.token, 'create_label', { name: 'cockpit' }, 'label-create');
     assert.equal(label.data.name, 'cockpit');
     assert.deepEqual(await h.exec(issued.token, 'create_label', { name: 'cockpit' }, 'label-create'), label);
+    // Label names are unique per workspace, ignoring case and surrounding spaces, so racing agents cannot duplicate a tag.
+    await reject(h.exec(issued.token, 'create_label', { name: ' Cockpit ' }, 'label-duplicate'), 'PT422');
     assert.equal((await h.read(readOnly.token, 'list_labels')).items.length, 1);
     const task = (await h.exec(issued.token, 'create_task', { projectId: 'p1', title: 'Labelled' })).data;
     // Task label writes keep the existing live-claim requirement for agent actors.
@@ -546,6 +548,11 @@ test('organization write token reads labels and members, creates a label, labels
     const removed = await h.exec(issued.token, 'remove_task_label', { id: task.id, labelId: label.data.id, claimToken }, 'label-remove', 5);
     assert.equal(removed.data.version, 6);
     assert.deepEqual((await h.read(issued.token, 'list_task_labels', { taskId: task.id })).items, []);
+    // The outsider really belongs to another workspace, so the refusal proves the membership scope rather than a missing user.
+    await h.db.exec('reset role');
+    await h.db.query("insert into auth.users(id,email) values($1,'outsider@example.test')", [outsider]);
+    await h.db.query("insert into public.workspace_memberships values($1,$2,'member')", [h.other, outsider]);
+    await h.as();
     await reject(h.exec(issued.token, 'update_task', { id: task.id, assigneeUserId: outsider, claimToken }, 'label-outsider', 6), 'PT422');
     // Minimum privilege: no label renaming or deletion, membership writes or wider reads.
     for (const [operation, input] of [
